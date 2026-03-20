@@ -1,12 +1,167 @@
-import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, isNotNull } from 'drizzle-orm';
+import { Inject, Injectable, ConflictException } from '@nestjs/common';
+import { and, eq, isNotNull, ilike, or, sql, count } from 'drizzle-orm';
+import { randomBytes } from 'crypto';
 import { DB } from '../db/db.module';
 import type { DbType } from '../db/db.module';
-import { spaceMembers, users } from '../db/schema';
+import { spaceMembers, spaces, users } from '../db/schema';
 
 @Injectable()
 export class UsersService {
   constructor(@Inject(DB) private db: DbType) {}
+
+  async getAllUsers(opts: {
+    page: number;
+    perPage: number;
+    search?: string;
+    filter?: 'all' | 'internal' | 'disabled';
+    sortBy?: string;
+    sortDir?: 'asc' | 'desc';
+  }) {
+    const { page, perPage, search, filter = 'all', sortBy = 'firstname', sortDir = 'asc' } = opts;
+
+    const conditions: ReturnType<typeof eq>[] = [];
+
+    if (filter === 'disabled') {
+      conditions.push(eq(users.disabled, true));
+    } else {
+      conditions.push(eq(users.disabled, false));
+      if (filter === 'internal') {
+        conditions.push(ilike(users.email, '%@telekom.sk'));
+      }
+    }
+
+    if (search) {
+      const q = `%${search}%`;
+      conditions.push(
+        or(
+          ilike(users.firstname, q),
+          ilike(users.lastname, q),
+          ilike(users.email, q),
+        ) as ReturnType<typeof eq>,
+      );
+    }
+
+    const where = and(...conditions);
+
+    const [{ total }] = await this.db
+      .select({ total: count() })
+      .from(users)
+      .where(where);
+
+    const dir = sortDir === 'desc' ? 'DESC' : 'ASC';
+    const roleOrder = sql`(EXISTS (SELECT 1 FROM space_members sm WHERE sm.user_id = users.id AND sm.role = 'admin'))`;
+
+    const orderExpr =
+      sortBy === 'role'
+        ? sql`${roleOrder} ${sql.raw(dir === 'ASC' ? 'DESC' : 'ASC')}, ${users.firstname} ASC`
+        : sortBy === 'email'
+          ? sql`${users.email} ${sql.raw(dir)}`
+          : sortBy === 'lastname'
+            ? sql`${users.lastname} ${sql.raw(dir)}, ${users.firstname} ASC`
+            : sql`${users.firstname} ${sql.raw(dir)}, ${users.lastname} ASC`;
+
+    const rows = await this.db
+      .select()
+      .from(users)
+      .where(where)
+      .orderBy(orderExpr)
+      .limit(perPage)
+      .offset((page - 1) * perPage);
+
+    const userIds = rows.map((u) => u.id);
+
+    const memberships = userIds.length > 0
+      ? await this.db
+          .select({
+            userId: spaceMembers.userId,
+            spaceId: spaceMembers.spaceId,
+            spaceName: spaces.name,
+            role: spaceMembers.role,
+          })
+          .from(spaceMembers)
+          .leftJoin(spaces, eq(spaceMembers.spaceId, spaces.id))
+          .where(sql`${spaceMembers.userId} = ANY(${sql.raw(`ARRAY[${userIds.join(',')}]`)})`)
+      : [];
+
+    const membershipsByUser = new Map<number, typeof memberships>();
+    for (const m of memberships) {
+      if (!membershipsByUser.has(m.userId)) membershipsByUser.set(m.userId, []);
+      membershipsByUser.get(m.userId)!.push(m);
+    }
+
+    const isAdmin = (userId: number) =>
+      (membershipsByUser.get(userId) ?? []).some((m) => m.role === 'admin');
+
+    return {
+      users: rows.map((u) => ({
+        id: u.id,
+        firstname: u.firstname,
+        lastname: u.lastname,
+        name: `${u.firstname} ${u.lastname}`.trim(),
+        email: u.email,
+        avatar: u.avatar,
+        disabled: u.disabled,
+        role: isAdmin(u.id) ? 'admin' : 'member',
+        spaces: (membershipsByUser.get(u.id) ?? []).map((m) => ({
+          id: m.spaceId,
+          name: m.spaceName ?? `Space ${m.spaceId}`,
+          role: m.role,
+        })),
+        createdAt: u.createdAt,
+        updatedAt: u.updatedAt,
+      })),
+      total: Number(total),
+      page,
+      perPage,
+    };
+  }
+
+  async deleteUser(id: number) {
+    await this.db.delete(users).where(eq(users.id, id));
+    return { success: true };
+  }
+
+  async updateUser(id: number, dto: { firstname?: string; lastname?: string; disabled?: boolean }) {
+    const [updated] = await this.db
+      .update(users)
+      .set({ ...dto, updatedAt: new Date() })
+      .where(eq(users.id, id))
+      .returning();
+
+    return {
+      id: updated.id,
+      firstname: updated.firstname,
+      lastname: updated.lastname,
+      email: updated.email,
+    };
+  }
+
+  async createUser(dto: { firstname: string; lastname: string; email: string }) {
+    const existing = await this.db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.email, dto.email))
+      .limit(1);
+
+    if (existing.length > 0) {
+      throw new ConflictException('User with this email already exists');
+    }
+
+    const uuid = randomBytes(16).toString('hex');
+    const [created] = await this.db
+      .insert(users)
+      .values({ uuid, email: dto.email, firstname: dto.firstname, lastname: dto.lastname })
+      .returning();
+
+    return {
+      id: created.id,
+      firstname: created.firstname,
+      lastname: created.lastname,
+      email: created.email,
+      disabled: created.disabled,
+      createdAt: created.createdAt,
+    };
+  }
 
   async getCollaborators(spaceId: number) {
     const rows = await this.db
