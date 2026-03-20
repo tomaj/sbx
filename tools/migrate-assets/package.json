@@ -1,0 +1,23 @@
+{
+  "name": "migrate-assets",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "export": "tsx export.ts",
+    "sync": "tsx sync.ts",
+    "import": "tsx import.ts",
+    "seed-from-golden": "tsx seed-from-golden.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.800.0",
+    "@types/pg": "^8.18.0",
+    "drizzle-orm": "^0.45.1",
+    "pg": "^8.20.0"
+  }
+}

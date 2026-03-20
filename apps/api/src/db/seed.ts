@@ -177,36 +177,34 @@ async function seedDatasources() {
 }
 
 async function seedDatasourceEntries() {
-  console.log('Seeding datasource entries (golden sample)...');
+  console.log('Seeding datasource entries...');
   for (const spaceId of SPACE_IDS) {
-    const entriesPath = path.join(GOLDEN, String(spaceId), 'cdn_datasource_entries.json');
+    const entriesPath = path.join(GOLDEN, String(spaceId), 'datasource_entries.json');
     if (!fs.existsSync(entriesPath)) continue;
 
     const raw = JSON.parse(fs.readFileSync(entriesPath, 'utf-8'));
     const entries = raw.datasource_entries ?? [];
     if (!entries.length) continue;
 
-    const dsRaw = JSON.parse(
-      fs.readFileSync(path.join(GOLDEN, String(spaceId), 'datasources.json'), 'utf-8'),
-    );
-    const firstDs = dsRaw.datasources?.[0];
-    if (!firstDs) continue;
-
-    const [ds] = await db
-      .select()
-      .from(datasources)
-      .where(and(eq(datasources.spaceId, spaceId), eq(datasources.slug, firstDs.slug)))
-      .limit(1);
-
-    if (!ds) continue;
-
     for (const e of entries) {
       await db
         .insert(datasourceEntries)
-        .values({ id: BigInt(e.id), datasourceId: ds.id, name: e.name, value: e.value })
-        .onConflictDoUpdate({ target: datasourceEntries.id, set: { name: e.name, value: e.value } });
+        .values({
+          id: BigInt(e.id),
+          datasourceId: BigInt(e.datasource_id),
+          name: e.name,
+          value: e.value,
+          dimensionValue: e.dimension_value ?? {},
+          position: e.position ?? 0,
+          createdAt: e.created_at ? new Date(e.created_at) : undefined,
+          updatedAt: e.updated_at ? new Date(e.updated_at) : undefined,
+        })
+        .onConflictDoUpdate({
+          target: datasourceEntries.id,
+          set: { name: e.name, value: e.value, dimensionValue: e.dimension_value ?? {}, position: e.position ?? 0 },
+        });
     }
-    console.log(`  ✓ Space ${spaceId}: ${entries.length} entries for "${firstDs.name}"`);
+    console.log(`  ✓ Space ${spaceId}: ${entries.length} entries`);
   }
 }
 

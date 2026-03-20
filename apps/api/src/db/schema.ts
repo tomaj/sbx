@@ -272,6 +272,41 @@ export const stories = pgTable('stories', {
   lastAuthorId: bigint('last_author_id', { mode: 'number' }),
 });
 
+export const assetFolders = pgTable('asset_folders', {
+  id: bigint('id', { mode: 'number' }).primaryKey(),
+  spaceId: integer('space_id')
+    .notNull()
+    .references(() => spaces.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  parentId: bigint('parent_id', { mode: 'number' }),
+  uuid: text('uuid').notNull().unique(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+export const assets = pgTable('assets', {
+  id: bigint('id', { mode: 'number' }).primaryKey(),
+  spaceId: integer('space_id')
+    .notNull()
+    .references(() => spaces.id, { onDelete: 'cascade' }),
+  filename: text('filename').notNull(),
+  contentType: text('content_type').notNull().default(''),
+  contentLength: bigint('content_length', { mode: 'number' }).notNull().default(0),
+  alt: text('alt'),
+  title: text('title'),
+  copyright: text('copyright'),
+  focus: text('focus'),
+  folderId: bigint('folder_id', { mode: 'number' }),
+  locked: boolean('locked').notNull().default(false),
+  expireAt: timestamp('expire_at'),
+  isExternalUrl: boolean('is_external_url').notNull().default(false),
+  metaData: json('meta_data').notNull().default({}),
+  shortFilename: text('short_filename').notNull().default(''),
+  deletedAt: timestamp('deleted_at'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
 export const datasourceEntries = pgTable('datasource_entries', {
   id: bigint('id', { mode: 'bigint' }).primaryKey(),
   datasourceId: bigint('datasource_id', { mode: 'bigint' })

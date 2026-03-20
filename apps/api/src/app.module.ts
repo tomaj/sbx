@@ -12,8 +12,9 @@ import { WebhooksModule } from './webhooks/webhooks.module';
 import { PresetsModule } from './presets/presets.module';
 import { ActivitiesModule } from './activities/activities.module';
 import { PersonalTokensModule } from './personal-tokens/personal-tokens.module';
+import { AssetsModule } from './assets/assets.module';
 
 @Module({
-  imports: [DbModule, AuthModule, DatasourcesModule, SpacesModule, UsersModule, TagsModule, ComponentsModule, AccessTokensModule, SpaceRolesModule, WebhooksModule, PresetsModule, ActivitiesModule, PersonalTokensModule],
+  imports: [DbModule, AuthModule, DatasourcesModule, SpacesModule, UsersModule, TagsModule, ComponentsModule, AccessTokensModule, SpaceRolesModule, WebhooksModule, PresetsModule, ActivitiesModule, PersonalTokensModule, AssetsModule],
 })
 export class AppModule {}

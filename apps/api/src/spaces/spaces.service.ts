@@ -1,8 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
+import { eq, max } from 'drizzle-orm';
 import { DB } from '../db/db.module';
 import type { DbType } from '../db/db.module';
-import { spaces, spaceMembers, users } from '../db/schema';
+import { spaces, spaceMembers, users, stories } from '../db/schema';
 
 @Injectable()
 export class SpacesService {
@@ -21,10 +21,20 @@ export class SpacesService {
       .from(spaceMembers)
       .leftJoin(users, eq(spaceMembers.userId, users.id));
 
+    const lastUpdates = await this.db
+      .select({ spaceId: stories.spaceId, lastAt: max(stories.updatedAt) })
+      .from(stories)
+      .groupBy(stories.spaceId);
+
     const membersBySpace = new Map<number, typeof allMembers>();
     for (const m of allMembers) {
       if (!membersBySpace.has(m.spaceId)) membersBySpace.set(m.spaceId, []);
       membersBySpace.get(m.spaceId)!.push(m);
+    }
+
+    const lastActivityBySpace = new Map<number, Date | null>();
+    for (const a of lastUpdates) {
+      lastActivityBySpace.set(a.spaceId, a.lastAt);
     }
 
     return {
@@ -33,6 +43,7 @@ export class SpacesService {
         name: s.name,
         updatedAt: s.updatedAt,
         createdAt: s.createdAt,
+        lastActivityAt: lastActivityBySpace.get(s.id) ?? null,
         members: (membersBySpace.get(s.id) ?? []).map((m) => ({
           firstname: m.firstname ?? '',
           lastname: m.lastname ?? '',

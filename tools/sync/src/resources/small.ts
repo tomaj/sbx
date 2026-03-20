@@ -41,6 +41,38 @@ async function fetchAll(spaceId: number, res: SmallResource, token: string): Pro
   return items;
 }
 
+async function fetchDatasourceEntries(spaceId: number, token: string, dir: string): Promise<void> {
+  const dsFile = path.join(dir, 'datasources.json');
+  if (!fs.existsSync(dsFile)) return;
+
+  const dsList: any[] = JSON.parse(fs.readFileSync(dsFile, 'utf-8')).datasources ?? [];
+  const allEntries: any[] = [];
+
+  for (const ds of dsList) {
+    const entries: any[] = [];
+    let page = 1;
+    while (true) {
+      const url = `${MAPI_BASE}/v1/spaces/${spaceId}/datasource_entries?datasource_id=${ds.id}&per_page=500&page=${page}`;
+      const { data, headers } = await apiFetch(url, token);
+      const batch: any[] = data.datasource_entries ?? [];
+      entries.push(...batch);
+      const total = parseInt(headers['total'] ?? '0', 10);
+      if (entries.length >= total || batch.length < 500) break;
+      page++;
+      await sleep(REQUEST_DELAY_MS);
+    }
+    // MAPI doesn't include datasource_id in the response — add it ourselves
+    allEntries.push(...entries.map((e: any) => ({ ...e, datasource_id: ds.id })));
+    await sleep(REQUEST_DELAY_MS);
+  }
+
+  fs.writeFileSync(
+    path.join(dir, 'datasource_entries.json'),
+    JSON.stringify({ datasource_entries: allEntries }, null, 2),
+  );
+  console.log(`    datasource_entries: ${allEntries.length} (${dsList.length} datasources)`);
+}
+
 export async function syncSmall(spaceId: number, token: string): Promise<void> {
   const dir = path.join(GOLDEN, String(spaceId));
   fs.mkdirSync(dir, { recursive: true });
@@ -51,4 +83,6 @@ export async function syncSmall(spaceId: number, token: string): Promise<void> {
     console.log(`    ${res.name}: ${items.length}`);
     await sleep(REQUEST_DELAY_MS);
   }
+
+  await fetchDatasourceEntries(spaceId, token, dir);
 }
