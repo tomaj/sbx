@@ -1,0 +1,74 @@
+'use client'
+
+import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
+
+export interface PaginationState {
+  total: number
+  page: number
+  perPage: number
+  onPageChange: (page: number) => void
+  onPerPageChange: (perPage: number) => void
+}
+
+const PER_PAGE_OPTIONS = [10, 25, 50, 100]
+
+export function Pagination({ total, page, perPage, onPageChange, onPerPageChange }: PaginationState) {
+  const totalPages = Math.max(1, Math.ceil(total / perPage))
+  const from = total === 0 ? 0 : (page - 1) * perPage + 1
+  const to = Math.min(page * perPage, total)
+
+  return (
+    <div className="bg-white dark:bg-gray-950 border-t border-gray-200 dark:border-gray-700 px-4 py-2.5 flex items-center gap-6 text-sm text-gray-600 dark:text-gray-400">
+      <div className="flex items-center gap-2">
+        <span className="whitespace-nowrap">Items per page:</span>
+        <div className="relative">
+          <select
+            value={perPage}
+            onChange={(e) => { onPerPageChange(Number(e.target.value)); onPageChange(1) }}
+            className="appearance-none pl-2 pr-6 py-1 border border-gray-200 dark:border-gray-700 rounded text-sm bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-teal-500"
+          >
+            {PER_PAGE_OPTIONS.map((n) => (
+              <option key={n} value={n}>{n}</option>
+            ))}
+          </select>
+          <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 size-3 pointer-events-none text-gray-400" />
+        </div>
+      </div>
+
+      <span className="whitespace-nowrap">{from}–{to} of {total} items</span>
+
+      <div className="flex-1" />
+
+      <div className="flex items-center gap-2">
+        <span>Page</span>
+        <div className="relative">
+          <select
+            value={page}
+            onChange={(e) => onPageChange(Number(e.target.value))}
+            className="appearance-none pl-2 pr-6 py-1 border border-gray-200 dark:border-gray-700 rounded text-sm bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-teal-500"
+          >
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
+              <option key={n} value={n}>{n}</option>
+            ))}
+          </select>
+          <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 size-3 pointer-events-none text-gray-400" />
+        </div>
+        <span>of {totalPages}</span>
+        <button
+          onClick={() => onPageChange(page - 1)}
+          disabled={page <= 1}
+          className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        >
+          <ChevronLeft className="size-4" />
+        </button>
+        <button
+          onClick={() => onPageChange(page + 1)}
+          disabled={page >= totalPages}
+          className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        >
+          <ChevronRight className="size-4" />
+        </button>
+      </div>
+    </div>
+  )
+}

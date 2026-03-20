@@ -1,0 +1,200 @@
+{
+  "pages": {
+    "/api/auth/[...all]/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/auth/[...all]/route.js"
+    ],
+    "/layout": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/css/app/layout.css",
+      "static/chunks/app/layout.js"
+    ],
+    "/(dashboard)/layout": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/layout.js"
+    ],
+    "/(dashboard)/spaces/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/spaces/page.js"
+    ],
+    "/(dashboard)/settings/layout": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/settings/layout.js"
+    ],
+    "/(dashboard)/settings/account/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/settings/account/page.js"
+    ],
+    "/(dashboard)/settings/appearance/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/settings/appearance/page.js"
+    ],
+    "/(dashboard)/settings/security/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/settings/security/page.js"
+    ],
+    "/(dashboard)/settings/tokens/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/settings/tokens/page.js"
+    ],
+    "/api/admin/tokens/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/admin/tokens/route.js"
+    ],
+    "/(dashboard)/organization/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/organization/page.js"
+    ],
+    "/(dashboard)/organization/spaces/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/organization/spaces/page.js"
+    ],
+    "/(dashboard)/organization/activities/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/organization/activities/page.js"
+    ],
+    "/(dashboard)/organization/user-management/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/organization/user-management/page.js"
+    ],
+    "/(dashboard)/organization/field-types/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/organization/field-types/page.js"
+    ],
+    "/(dashboard)/organization/settings/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/organization/settings/page.js"
+    ],
+    "/api/admin/users/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/admin/users/route.js"
+    ],
+    "/api/admin/users/[id]/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/admin/users/[id]/route.js"
+    ],
+    "/(dashboard)/spaces/[spaceId]/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/spaces/[spaceId]/page.js"
+    ],
+    "/(dashboard)/spaces/[spaceId]/activities/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/spaces/[spaceId]/activities/page.js"
+    ],
+    "/api/admin/spaces/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/admin/spaces/route.js"
+    ],
+    "/(dashboard)/spaces/[spaceId]/block-library/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/spaces/[spaceId]/block-library/page.js"
+    ],
+    "/(dashboard)/spaces/[spaceId]/datasources/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/spaces/[spaceId]/datasources/page.js"
+    ],
+    "/api/admin/activities/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/admin/activities/route.js"
+    ],
+    "/(dashboard)/spaces/[spaceId]/tags/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/spaces/[spaceId]/tags/page.js"
+    ],
+    "/(dashboard)/spaces/[spaceId]/tasks/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/spaces/[spaceId]/tasks/page.js"
+    ],
+    "/(dashboard)/spaces/[spaceId]/assets/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/spaces/[spaceId]/assets/page.js"
+    ],
+    "/api/admin/spaces/[spaceId]/datasources/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/admin/spaces/[spaceId]/datasources/route.js"
+    ],
+    "/(dashboard)/spaces/[spaceId]/datasources/[datasourceId]/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/spaces/[spaceId]/datasources/[datasourceId]/page.js"
+    ],
+    "/api/admin/spaces/[spaceId]/datasources/[datasourceId]/entries/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/admin/spaces/[spaceId]/datasources/[datasourceId]/entries/route.js"
+    ],
+    "/api/admin/spaces/[spaceId]/datasources/[datasourceId]/entries/reorder/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/admin/spaces/[spaceId]/datasources/[datasourceId]/entries/reorder/route.js"
+    ],
+    "/api/admin/spaces/[spaceId]/datasources/[datasourceId]/entries/[entryId]/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/admin/spaces/[spaceId]/datasources/[datasourceId]/entries/[entryId]/route.js"
+    ],
+    "/api/admin/spaces/[spaceId]/datasources/[datasourceId]/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/admin/spaces/[spaceId]/datasources/[datasourceId]/route.js"
+    ],
+    "/api/admin/spaces/[spaceId]/tags/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/admin/spaces/[spaceId]/tags/route.js"
+    ],
+    "/api/admin/spaces/[spaceId]/tags/[tagId]/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/admin/spaces/[spaceId]/tags/[tagId]/route.js"
+    ],
+    "/(dashboard)/spaces/[spaceId]/content/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/spaces/[spaceId]/content/page.js"
+    ],
+    "/api/admin/spaces/[spaceId]/assets/folders/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/admin/spaces/[spaceId]/assets/folders/route.js"
+    ],
+    "/api/admin/spaces/[spaceId]/assets/counts/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/admin/spaces/[spaceId]/assets/counts/route.js"
+    ],
+    "/api/admin/spaces/[spaceId]/assets/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/admin/spaces/[spaceId]/assets/route.js"
+    ]
+  }
+}
