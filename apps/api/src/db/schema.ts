@@ -272,7 +272,7 @@ export const stories = pgTable('stories', {
   deletedAt: timestamp('deleted_at'),
   createdAt: timestamp('created_at').notNull(),
   updatedAt: timestamp('updated_at').notNull(),
-  lastAuthorId: integer('last_author_id'),
+  lastAuthorId: bigint('last_author_id', { mode: 'number' }),
 });
 
 export const datasourceEntries = pgTable('datasource_entries', {

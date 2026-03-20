@@ -3,7 +3,7 @@ import { Pool } from 'pg';
 import { createHash, randomUUID } from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import * as schema from './schema';
 import {
   spaces,
@@ -473,7 +473,18 @@ async function seedStories() {
       }));
       await db.insert(stories).values(batch).onConflictDoUpdate({
         target: stories.id,
-        set: { name: batch[0].name, updatedAt: batch[0].updatedAt, published: batch[0].published },
+        set: {
+          name: sql`excluded.name`,
+          slug: sql`excluded.slug`,
+          fullSlug: sql`excluded.full_slug`,
+          published: sql`excluded.published`,
+          unpublishedChanges: sql`excluded.unpublished_changes`,
+          updatedAt: sql`excluded.updated_at`,
+          publishedAt: sql`excluded.published_at`,
+          tagList: sql`excluded.tag_list`,
+          content: sql`excluded.content`,
+          position: sql`excluded.position`,
+        },
       });
       process.stdout.write(`\r  Space ${spaceId}: ${Math.min(i + BATCH, items.length)}/${items.length} stories...`);
     }
