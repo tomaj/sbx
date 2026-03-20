@@ -235,6 +235,46 @@ export const activities = pgTable('activities', {
   updatedAt: timestamp('updated_at').notNull(),
 });
 
+export const personalAccessTokens = pgTable('personal_access_tokens', {
+  id: serial('id').primaryKey(),
+  userId: text('user_id').notNull(), // better-auth user id
+  name: text('name').notNull(),
+  token: text('token').notNull().unique(),
+  expiresAt: timestamp('expires_at'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+export const stories = pgTable('stories', {
+  id: bigint('id', { mode: 'bigint' }).primaryKey(),
+  spaceId: integer('space_id')
+    .notNull()
+    .references(() => spaces.id, { onDelete: 'cascade' }),
+  uuid: text('uuid').notNull(),
+  name: text('name').notNull(),
+  slug: text('slug').notNull(),
+  fullSlug: text('full_slug').notNull(),
+  path: text('path'),
+  parentId: bigint('parent_id', { mode: 'bigint' }),
+  groupId: text('group_id'),
+  contentType: text('content_type'),
+  isFolder: boolean('is_folder').notNull().default(false),
+  isStartpage: boolean('is_startpage').notNull().default(false),
+  published: boolean('published').notNull().default(false),
+  unpublishedChanges: boolean('unpublished_changes').notNull().default(false),
+  position: integer('position').notNull().default(0),
+  tagList: json('tag_list').notNull().default([]),
+  content: json('content').notNull().default({}),
+  sortByDate: timestamp('sort_by_date'),
+  publishAt: timestamp('publish_at'),
+  expireAt: timestamp('expire_at'),
+  publishedAt: timestamp('published_at'),
+  firstPublishedAt: timestamp('first_published_at'),
+  deletedAt: timestamp('deleted_at'),
+  createdAt: timestamp('created_at').notNull(),
+  updatedAt: timestamp('updated_at').notNull(),
+  lastAuthorId: integer('last_author_id'),
+});
+
 export const datasourceEntries = pgTable('datasource_entries', {
   id: bigint('id', { mode: 'bigint' }).primaryKey(),
   datasourceId: bigint('datasource_id', { mode: 'bigint' })

@@ -19,6 +19,7 @@ import {
   webhookEndpoints,
   presets,
   activities,
+  stories,
 } from './schema';
 
 const pool = new Pool({
@@ -378,24 +379,35 @@ async function seedPresets() {
   }
 }
 
-async function seedActivities() {
-  console.log('Seeding activities (first 500 per space)...');
-  for (const spaceId of SPACE_IDS) {
-    const filePath = path.join(GOLDEN, String(spaceId), 'activities.json');
-    if (!fs.existsSync(filePath)) continue;
+/** Read all items from chunk files in golden/{spaceId}/{resource}/ directory. */
+function readChunks(spaceId: number, resource: string): any[] {
+  const dir = path.join(GOLDEN, String(spaceId), resource);
+  if (!fs.existsSync(dir)) return [];
+  const files = fs.readdirSync(dir)
+    .filter((f) => f.startsWith('chunk_') && f.endsWith('.json'))
+    .sort();
+  const items: any[] = [];
+  for (const f of files) {
+    const chunk = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf-8'));
+    items.push(...chunk);
+  }
+  return items;
+}
 
-    const raw = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-    const items = raw.activities ?? [];
+async function seedActivities() {
+  console.log('Seeding activities from chunks...');
+  for (const spaceId of SPACE_IDS) {
+    const items = readChunks(spaceId, 'activities');
     if (!items.length) {
       console.log(`  ✓ Space ${spaceId}: 0 activities`);
       continue;
     }
 
-    for (const item of items) {
-      const a = item.activity;
-      await db
-        .insert(activities)
-        .values({
+    const BATCH = 500;
+    for (let i = 0; i < items.length; i += BATCH) {
+      const batch = items.slice(i, i + BATCH).map((item: any) => {
+        const a = item.activity;
+        return {
           id: BigInt(a.id),
           spaceId,
           trackableId: a.trackable_id ? BigInt(a.trackable_id) : null,
@@ -410,10 +422,63 @@ async function seedActivities() {
           user: item.user ?? {},
           createdAt: new Date(a.created_at),
           updatedAt: new Date(a.updated_at),
-        })
-        .onConflictDoNothing();
+        };
+      });
+      await db.insert(activities).values(batch).onConflictDoNothing();
+      process.stdout.write(`\r  Space ${spaceId}: ${Math.min(i + BATCH, items.length)}/${items.length} activities...`);
     }
+    process.stdout.write('\n');
     console.log(`  ✓ Space ${spaceId}: ${items.length} activities`);
+  }
+}
+
+async function seedStories() {
+  console.log('Seeding stories from chunks...');
+  for (const spaceId of SPACE_IDS) {
+    const items = readChunks(spaceId, 'stories');
+    if (!items.length) {
+      console.log(`  ✓ Space ${spaceId}: 0 stories`);
+      continue;
+    }
+
+    const BATCH = 200;
+    for (let i = 0; i < items.length; i += BATCH) {
+      const batch = items.slice(i, i + BATCH).map((s: any) => ({
+        id: BigInt(s.id),
+        spaceId,
+        uuid: s.uuid,
+        name: s.name,
+        slug: s.slug,
+        fullSlug: s.full_slug,
+        path: s.path || null,
+        parentId: s.parent_id ? BigInt(s.parent_id) : null,
+        groupId: s.group_id ?? null,
+        contentType: s.content_type ?? null,
+        isFolder: s.is_folder ?? false,
+        isStartpage: s.is_startpage ?? false,
+        published: s.published ?? false,
+        unpublishedChanges: s.unpublished_changes ?? false,
+        position: s.position ?? 0,
+        tagList: s.tag_list ?? [],
+        content: s.content ?? {},
+        sortByDate: s.sort_by_date ? new Date(s.sort_by_date) : null,
+        publishAt: s.publish_at ? new Date(s.publish_at) : null,
+        expireAt: s.expire_at ? new Date(s.expire_at) : null,
+        publishedAt: s.published_at ? new Date(s.published_at) : null,
+        firstPublishedAt: s.first_published_at ? new Date(s.first_published_at) : null,
+        deletedAt: s.deleted_at ? new Date(s.deleted_at) : null,
+        createdAt: new Date(s.created_at),
+        updatedAt: new Date(s.updated_at),
+        lastAuthorId: s.last_author_id ?? null,
+      }));
+      await db.insert(stories).values(batch).onConflictDoUpdate({
+        target: stories.id,
+        set: { name: batch[0].name, updatedAt: batch[0].updatedAt, published: batch[0].published },
+      });
+      process.stdout.write(`\r  Space ${spaceId}: ${Math.min(i + BATCH, items.length)}/${items.length} stories...`);
+    }
+    process.stdout.write('\n');
+    console.log(`  ✓ Space ${spaceId}: ${items.length} stories`);
   }
 }
 
@@ -536,6 +601,7 @@ async function main() {
   await seedComponents();
   await seedPresets();
   await seedActivities();
+  await seedStories();
   await seedSpaceRoles();
   await seedWebhooks();
   await seedAdminUser();

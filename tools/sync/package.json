@@ -1,0 +1,13 @@
+{
+  "name": "sync",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "start": "ts-node src/index.ts"
+  },
+  "dependencies": {
+    "ts-node": "^10.9.2",
+    "typescript": "^5.0.0",
+    "@types/node": "^22.0.0"
+  }
+}

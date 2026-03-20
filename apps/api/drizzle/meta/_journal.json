@@ -64,6 +64,13 @@
       "when": 1774011785510,
       "tag": "0008_quick_kang",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1774013297154,
+      "tag": "0009_slippery_red_skull",
+      "breakpoints": true
     }
   ]
 }
