@@ -93,6 +93,20 @@ export const datasources = pgTable(
   (t) => [unique().on(t.spaceId, t.slug)],
 );
 
+export const tags = pgTable(
+  'tags',
+  {
+    id: serial('id').primaryKey(),
+    spaceId: integer('space_id')
+      .notNull()
+      .references(() => spaces.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    taggingsCount: integer('taggings_count').notNull().default(0),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (t) => [unique().on(t.spaceId, t.name)],
+);
+
 export const datasourceEntries = pgTable('datasource_entries', {
   id: bigint('id', { mode: 'bigint' }).primaryKey(),
   datasourceId: bigint('datasource_id', { mode: 'bigint' })

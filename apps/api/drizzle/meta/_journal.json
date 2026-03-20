@@ -15,6 +15,13 @@
       "when": 1774007993759,
       "tag": "0001_wise_starhawk",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1774008656301,
+      "tag": "0002_serious_nico_minoru",
+      "breakpoints": true
     }
   ]
 }

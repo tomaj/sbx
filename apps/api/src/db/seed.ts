@@ -12,6 +12,7 @@ import {
   apiTokens,
   datasources,
   datasourceEntries,
+  tags,
 } from './schema';
 
 const pool = new Pool({
@@ -203,6 +204,28 @@ async function seedDatasourceEntries() {
   }
 }
 
+async function seedTags() {
+  console.log('Seeding tags...');
+  for (const spaceId of SPACE_IDS) {
+    const filePath = path.join(GOLDEN, String(spaceId), 'cdn_tags.json');
+    if (!fs.existsSync(filePath)) continue;
+
+    const raw = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    const tagList = raw.tags ?? [];
+
+    for (const t of tagList) {
+      await db
+        .insert(tags)
+        .values({ spaceId, name: t.name, taggingsCount: t.taggings_count })
+        .onConflictDoUpdate({
+          target: [tags.spaceId, tags.name],
+          set: { taggingsCount: t.taggings_count },
+        });
+    }
+    console.log(`  ✓ Space ${spaceId}: ${tagList.length} tags`);
+  }
+}
+
 async function seedAdminUser() {
   console.log('Seeding admin user...');
   const [user] = await db
@@ -230,6 +253,7 @@ async function main() {
   await seedSpaces();
   await seedUsers();
   await seedCollaborators();
+  await seedTags();
   await seedDatasources();
   await seedDatasourceEntries();
   await seedAdminUser();
