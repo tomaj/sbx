@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { DbModule } from './db/db.module';
+import { StorageModule } from './storage/storage.module';
 import { DatasourcesModule } from './datasources/datasources.module';
 import { SpacesModule } from './spaces/spaces.module';
 import { UsersModule } from './users/users.module';
@@ -13,8 +14,12 @@ import { PresetsModule } from './presets/presets.module';
 import { ActivitiesModule } from './activities/activities.module';
 import { PersonalTokensModule } from './personal-tokens/personal-tokens.module';
 import { AssetsModule } from './assets/assets.module';
+import { BranchesModule } from './branches/branches.module';
+import { ReleasesModule } from './releases/releases.module';
+import { StoriesModule } from './stories/stories.module';
+import { TasksModule } from './tasks/tasks.module';
 
 @Module({
-  imports: [DbModule, AuthModule, DatasourcesModule, SpacesModule, UsersModule, TagsModule, ComponentsModule, AccessTokensModule, SpaceRolesModule, WebhooksModule, PresetsModule, ActivitiesModule, PersonalTokensModule, AssetsModule],
+  imports: [DbModule, StorageModule, AuthModule, DatasourcesModule, SpacesModule, UsersModule, TagsModule, ComponentsModule, AccessTokensModule, SpaceRolesModule, WebhooksModule, PresetsModule, ActivitiesModule, PersonalTokensModule, AssetsModule, BranchesModule, ReleasesModule, StoriesModule, TasksModule],
 })
 export class AppModule {}

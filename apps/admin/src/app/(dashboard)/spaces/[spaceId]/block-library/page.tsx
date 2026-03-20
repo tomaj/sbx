@@ -8,6 +8,7 @@ import { GroupTree, type ComponentGroup } from '@/components/block-library/group
 import { CreateGroupModal } from '@/components/block-library/create-group-modal'
 import { CreateBlockModal } from '@/components/block-library/create-block-modal'
 import { BlockList, type Block } from '@/components/block-library/block-list'
+import { EditBlockModal } from '@/components/block-library/edit-block-modal'
 import type { SortOption } from '@/components/ui/search-filter-bar'
 
 const SORT_OPTIONS: SortOption[] = [
@@ -51,6 +52,7 @@ export default function BlockLibraryPage({ params }: { params: Promise<{ spaceId
 
   // ─── Block modals ──────────────────────────────────────────────────────────
   const [createBlockOpen, setCreateBlockOpen] = useState(false)
+  const [editBlock, setEditBlock] = useState<Block | null>(null)
 
   // ─── Group modals ──────────────────────────────────────────────────────────
   const [createGroupOpen, setCreateGroupOpen] = useState(false)
@@ -330,6 +332,7 @@ export default function BlockLibraryPage({ params }: { params: Promise<{ spaceId
               isLoading={isLoading}
               selectedIds={selectedIds}
               onSelectionChange={setSelectedIds}
+              onEdit={setEditBlock}
             />
           </div>
 
@@ -393,6 +396,21 @@ export default function BlockLibraryPage({ params }: { params: Promise<{ spaceId
             Delete
           </button>
         </div>
+      )}
+
+      {/* Edit block modal */}
+      {editBlock && (
+        <EditBlockModal
+          open={!!editBlock}
+          block={editBlock}
+          spaceId={spaceId}
+          groups={groups}
+          onClose={() => setEditBlock(null)}
+          onSaved={(updatedBlock) => {
+            setBlocks((prev) => prev.map((b) => (b.id === updatedBlock.id ? updatedBlock : b)))
+            setEditBlock(updatedBlock)
+          }}
+        />
       )}
 
       {/* Create block modal */}

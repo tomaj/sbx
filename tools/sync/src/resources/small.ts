@@ -21,6 +21,9 @@ const SMALL_RESOURCES: SmallResource[] = [
   { name: 'component_groups',  endpoint: 'component_groups',  key: 'component_groups'  },
   { name: 'presets',           endpoint: 'presets',           key: 'presets'           },
   { name: 'datasources',       endpoint: 'datasources',       key: 'datasources'       },
+  { name: 'branches',          endpoint: 'branches',          key: 'branches'          },
+  { name: 'releases',          endpoint: 'releases',          key: 'releases'          },
+  { name: 'tasks',             endpoint: 'tasks',             key: 'tasks'             },
 ];
 
 /** Fetch all pages of a resource (handles pagination automatically). */

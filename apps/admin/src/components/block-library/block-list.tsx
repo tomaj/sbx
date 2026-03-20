@@ -17,6 +17,7 @@ export interface Block {
   is_nestable: boolean
   created_at: string
   updated_at: string
+  schema: Record<string, any>
 }
 
 function formatDate(iso: string): string {
@@ -51,9 +52,10 @@ interface BlockRowProps {
   group: ComponentGroup | undefined
   selected: boolean
   onToggle: (id: number) => void
+  onEdit: (block: Block) => void
 }
 
-function BlockRow({ block, group, selected, onToggle }: BlockRowProps) {
+function BlockRow({ block, group, selected, onToggle, onEdit }: BlockRowProps) {
   const [previewPos, setPreviewPos] = useState<{ x: number; y: number } | null>(null)
   const thumbRef = useRef<HTMLDivElement>(null)
 
@@ -65,19 +67,17 @@ function BlockRow({ block, group, selected, onToggle }: BlockRowProps) {
 
   return (
     <div
-      className={`relative flex items-center gap-4 py-2.5 px-3 border-b border-gray-100 dark:border-gray-800/60 cursor-pointer transition-colors ${
+      className={`relative flex items-center gap-4 py-2.5 px-3 border-b border-gray-100 dark:border-gray-800/60 transition-colors ${
         selected
           ? 'bg-teal-50 dark:bg-teal-950/40'
           : 'hover:bg-gray-50 dark:hover:bg-gray-800/50'
       }`}
-      onClick={() => onToggle(block.id)}
     >
       {/* Checkbox */}
       <input
         type="checkbox"
         checked={selected}
         onChange={() => onToggle(block.id)}
-        onClick={(e) => e.stopPropagation()}
         className="w-4 h-4 shrink-0 rounded border-gray-300 text-teal-600 focus:ring-teal-500 cursor-pointer"
       />
 
@@ -106,9 +106,9 @@ function BlockRow({ block, group, selected, onToggle }: BlockRowProps) {
         </div>
       )}
 
-      {/* Name */}
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+      {/* Name — clickable to edit */}
+      <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onEdit(block)}>
+        <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate hover:text-teal-600 dark:hover:text-teal-400 transition-colors">
           {block.display_name || block.name}
         </p>
         <p className="text-xs text-gray-400 truncate font-mono">{block.name}</p>
@@ -140,9 +140,10 @@ interface BlockListProps {
   isLoading?: boolean
   selectedIds: Set<number>
   onSelectionChange: (ids: Set<number>) => void
+  onEdit: (block: Block) => void
 }
 
-export function BlockList({ blocks, groups, isLoading, selectedIds, onSelectionChange }: BlockListProps) {
+export function BlockList({ blocks, groups, isLoading, selectedIds, onSelectionChange, onEdit }: BlockListProps) {
   const groupMap = new Map(groups.map((g) => [g.uuid, g]))
   const allSelected = blocks.length > 0 && blocks.every((b) => selectedIds.has(b.id))
 
@@ -218,6 +219,7 @@ export function BlockList({ blocks, groups, isLoading, selectedIds, onSelectionC
           group={block.component_group_uuid ? groupMap.get(block.component_group_uuid) : undefined}
           selected={selectedIds.has(block.id)}
           onToggle={toggleOne}
+          onEdit={onEdit}
         />
       ))}
     </div>

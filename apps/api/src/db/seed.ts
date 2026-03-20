@@ -20,6 +20,9 @@ import {
   presets,
   activities,
   stories,
+  branches,
+  releases,
+  tasks,
 } from './schema';
 
 const pool = new Pool({
@@ -581,6 +584,117 @@ async function seedWebhooks() {
   }
 }
 
+async function seedBranches() {
+  console.log('Seeding branches...');
+  for (const spaceId of SPACE_IDS) {
+    const filePath = path.join(GOLDEN, String(spaceId), 'branches.json');
+    if (!fs.existsSync(filePath)) continue;
+
+    const raw = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    const items = raw.branches ?? [];
+
+    for (const b of items) {
+      await db
+        .insert(branches)
+        .values({
+          id: b.id,
+          spaceId,
+          name: b.name,
+          sourceId: b.source_id ?? null,
+          url: b.url ?? null,
+          position: b.position ?? 1,
+          deployedAt: b.deployed_at ? new Date(b.deployed_at) : null,
+          deletedAt: b.deleted_at ? new Date(b.deleted_at) : null,
+          createdAt: b.created_at ? new Date(b.created_at) : undefined,
+          updatedAt: b.updated_at ? new Date(b.updated_at) : undefined,
+        })
+        .onConflictDoUpdate({
+          target: branches.id,
+          set: { name: b.name, url: b.url ?? null, deployedAt: b.deployed_at ? new Date(b.deployed_at) : null },
+        });
+    }
+    console.log(`  ✓ Space ${spaceId}: ${items.length} branches`);
+  }
+}
+
+async function seedReleases() {
+  console.log('Seeding releases...');
+  for (const spaceId of SPACE_IDS) {
+    const filePath = path.join(GOLDEN, String(spaceId), 'releases.json');
+    if (!fs.existsSync(filePath)) continue;
+
+    const raw = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    const items = raw.releases ?? [];
+
+    for (const r of items) {
+      await db
+        .insert(releases)
+        .values({
+          id: r.id,
+          spaceId,
+          name: r.name,
+          uuid: r.uuid,
+          releaseAt: r.release_at ? new Date(r.release_at) : null,
+          released: r.released ?? false,
+          timezone: r.timezone ?? null,
+          branchesToDeploy: r.branches_to_deploy ?? [],
+          ownerId: r.owner_id ?? null,
+          usersToNotifyIds: r.users_to_notify_ids ?? [],
+          public: r.public ?? true,
+          allowedUserIds: r.allowed_user_ids ?? [],
+          allowedSpaceRoleIds: r.allowed_space_role_ids ?? [],
+          allowedApiKeyIds: r.allowed_api_key_ids ?? [],
+          createdAt: r.created_at ? new Date(r.created_at) : undefined,
+          updatedAt: r.updated_at ? new Date(r.updated_at) : undefined,
+        })
+        .onConflictDoUpdate({
+          target: releases.id,
+          set: { name: r.name, released: r.released ?? false, releaseAt: r.release_at ? new Date(r.release_at) : null },
+        });
+    }
+    console.log(`  ✓ Space ${spaceId}: ${items.length} releases`);
+  }
+}
+
+async function seedTasks() {
+  console.log('Seeding tasks...');
+  for (const spaceId of SPACE_IDS) {
+    const filePath = path.join(GOLDEN, String(spaceId), 'tasks.json');
+    if (!fs.existsSync(filePath)) continue;
+
+    const raw = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    const items = raw.tasks ?? [];
+
+    for (const t of items) {
+      await db
+        .insert(tasks)
+        .values({
+          id: t.id,
+          spaceId,
+          name: t.name,
+          description: t.description ?? null,
+          taskType: t.task_type ?? 'webhook',
+          lastExecution: t.last_execution ? new Date(t.last_execution) : null,
+          running: t.running ?? false,
+          lastResponse: t.last_response ?? null,
+          webhookUrl: t.webhook_url ?? null,
+          userDialog: t.user_dialog ?? {},
+        })
+        .onConflictDoUpdate({
+          target: tasks.id,
+          set: {
+            name: t.name,
+            description: t.description ?? null,
+            webhookUrl: t.webhook_url ?? null,
+            userDialog: t.user_dialog ?? {},
+            lastExecution: t.last_execution ? new Date(t.last_execution) : null,
+          },
+        });
+    }
+    console.log(`  ✓ Space ${spaceId}: ${items.length} tasks`);
+  }
+}
+
 async function seedAdminUser() {
   console.log('Seeding admin user...');
   const [user] = await db
@@ -619,6 +733,9 @@ async function main() {
   await seedStories();
   await seedSpaceRoles();
   await seedWebhooks();
+  await seedBranches();
+  await seedReleases();
+  await seedTasks();
   await seedAdminUser();
   console.log('\nDone ✓');
   await pool.end();

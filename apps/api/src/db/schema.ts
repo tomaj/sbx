@@ -319,3 +319,56 @@ export const datasourceEntries = pgTable('datasource_entries', {
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
+
+export const branches = pgTable('branches', {
+  id: integer('id').primaryKey(),
+  spaceId: integer('space_id')
+    .notNull()
+    .references(() => spaces.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  sourceId: integer('source_id'),
+  url: text('url'),
+  position: integer('position').notNull().default(1),
+  deployedAt: timestamp('deployed_at'),
+  deletedAt: timestamp('deleted_at'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+export const releases = pgTable('releases', {
+  id: bigint('id', { mode: 'number' }).primaryKey(),
+  spaceId: integer('space_id')
+    .notNull()
+    .references(() => spaces.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  uuid: text('uuid').notNull().unique(),
+  releaseAt: timestamp('release_at'),
+  released: boolean('released').notNull().default(false),
+  timezone: text('timezone'),
+  branchesToDeploy: json('branches_to_deploy').notNull().default([]),
+  ownerId: bigint('owner_id', { mode: 'number' }),
+  usersToNotifyIds: json('users_to_notify_ids').notNull().default([]),
+  public: boolean('public').notNull().default(true),
+  allowedUserIds: json('allowed_user_ids').notNull().default([]),
+  allowedSpaceRoleIds: json('allowed_space_role_ids').notNull().default([]),
+  allowedApiKeyIds: json('allowed_api_key_ids').notNull().default([]),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+export const tasks = pgTable('tasks', {
+  id: bigserial('id', { mode: 'number' }).primaryKey(),
+  spaceId: integer('space_id')
+    .notNull()
+    .references(() => spaces.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  description: text('description'),
+  taskType: text('task_type').notNull().default('webhook'),
+  lastExecution: timestamp('last_execution'),
+  running: boolean('running').notNull().default(false),
+  lastResponse: json('last_response'),
+  webhookUrl: text('webhook_url'),
+  userDialog: json('user_dialog').notNull().default({}),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
