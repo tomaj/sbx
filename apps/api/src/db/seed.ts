@@ -73,7 +73,7 @@ async function seedUsers() {
   console.log('Seeding users from collaborators...');
 
   // Collect unique users across all spaces
-  const userMap = new Map<string, { sbId: bigint; email: string; firstname: string; lastname: string; avatar: string | null; disabled: boolean }>();
+  const userMap = new Map<string, { id: number; email: string; firstname: string; lastname: string; avatar: string | null; disabled: boolean }>();
 
   for (const spaceId of SPACE_IDS) {
     const filePath = path.join(GOLDEN, String(spaceId), 'collaborators.json');
@@ -85,7 +85,7 @@ async function seedUsers() {
       if (!u?.real_email) continue;
       if (!userMap.has(u.real_email)) {
         userMap.set(u.real_email, {
-          sbId: BigInt(u.id),
+          id: Number(u.id),
           email: u.real_email,
           firstname: u.firstname ?? '',
           lastname: u.lastname ?? '',
@@ -101,10 +101,13 @@ async function seedUsers() {
       .insert(users)
       .values({ uuid: randomUUID(), ...userData })
       .onConflictDoUpdate({
-        target: users.email,
-        set: { firstname: userData.firstname, lastname: userData.lastname, disabled: userData.disabled },
+        target: users.id,
+        set: { firstname: userData.firstname, lastname: userData.lastname, avatar: userData.avatar, disabled: userData.disabled },
       });
   }
+
+  // Reset sequence so locally-created users get IDs above all imported IDs
+  await db.execute(sql`SELECT setval(pg_get_serial_sequence('users', 'id'), COALESCE((SELECT MAX(id) FROM users), 0))`);
 
   console.log(`  ✓ ${userMap.size} unique users imported`);
 }
@@ -133,7 +136,7 @@ async function seedCollaborators() {
       await db
         .insert(spaceMembers)
         .values({
-          sbId: BigInt(c.id),
+          id: Number(c.id),
           spaceId,
           userId: user.id,
           role: String(c.role),
@@ -142,14 +145,17 @@ async function seedCollaborators() {
           allowedPath: c.allowed_path ?? '',
         })
         .onConflictDoUpdate({
-          target: spaceMembers.sbId,
-          set: { role: String(c.role) },
+          target: spaceMembers.id,
+          set: { role: String(c.role), userId: user.id },
         });
 
       count++;
     }
     console.log(`  ✓ Space ${spaceId}: ${count} collaborators`);
   }
+
+  // Reset sequence so locally-created members get IDs above all imported IDs
+  await db.execute(sql`SELECT setval(pg_get_serial_sequence('space_members', 'id'), COALESCE((SELECT MAX(id) FROM space_members), 0))`);
 }
 
 async function seedDatasources() {

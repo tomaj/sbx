@@ -1,5 +1,5 @@
 import { Inject, Injectable, ConflictException } from '@nestjs/common';
-import { and, eq, isNotNull, ilike, or, sql, count } from 'drizzle-orm';
+import { and, eq, ilike, or, sql, count } from 'drizzle-orm';
 import { randomBytes } from 'crypto';
 import { DB } from '../db/db.module';
 import type { DbType } from '../db/db.module';
@@ -168,13 +168,13 @@ export class UsersService {
       .select()
       .from(spaceMembers)
       .innerJoin(users, eq(spaceMembers.userId, users.id))
-      .where(and(eq(spaceMembers.spaceId, spaceId), isNotNull(spaceMembers.sbId)));
+      .where(eq(spaceMembers.spaceId, spaceId));
 
     // Storyblok MAPI /collaborators response shape
     return {
       collaborators: rows.map((r) => ({
-        id: Number(r.space_members.sbId ?? r.space_members.id),
-        user_id: Number(r.users.sbId ?? r.users.id),
+        id: r.space_members.id,
+        user_id: r.users.id,
         space_id: r.space_members.spaceId,
         role: r.space_members.role,
         space_role_id: r.space_members.spaceRoleId
@@ -186,7 +186,7 @@ export class UsersService {
         field_permissions: '',
         invitation: null,
         user: {
-          id: Number(r.users.sbId ?? r.users.id),
+          id: r.users.id,
           friendly_name: `${r.users.firstname} ${r.users.lastname}`.trim(),
           firstname: r.users.firstname,
           lastname: r.users.lastname,

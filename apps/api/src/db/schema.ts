@@ -2,6 +2,7 @@ import {
   pgTable,
   pgEnum,
   serial,
+  bigserial,
   integer,
   bigint,
   text,
@@ -32,9 +33,7 @@ export const spaces = pgTable('spaces', {
 });
 
 export const users = pgTable('users', {
-  id: serial('id').primaryKey(),
-  // sbId = original Storyblok user ID (BigInt), null for locally created users
-  sbId: bigint('sb_id', { mode: 'bigint' }).unique(),
+  id: bigserial('id', { mode: 'number' }).primaryKey(),
   uuid: text('uuid').notNull().unique(),
   email: text('email').notNull().unique(),
   firstname: text('firstname').notNull().default(''),
@@ -49,13 +48,11 @@ export const users = pgTable('users', {
 export const spaceMembers = pgTable(
   'space_members',
   {
-    id: serial('id').primaryKey(),
-    // sbId = original Storyblok collaborator ID
-    sbId: bigint('sb_id', { mode: 'bigint' }).unique(),
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
     spaceId: integer('space_id')
       .notNull()
       .references(() => spaces.id, { onDelete: 'cascade' }),
-    userId: integer('user_id')
+    userId: bigint('user_id', { mode: 'number' })
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     role: text('role').notNull().default('editor'),
@@ -283,6 +280,7 @@ export const datasourceEntries = pgTable('datasource_entries', {
   name: text('name').notNull(),
   value: text('value').notNull(),
   dimensionValue: json('dimension_value').notNull().default({}),
+  position: integer('position').notNull().default(0),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });

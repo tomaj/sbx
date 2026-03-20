@@ -71,6 +71,20 @@
       "when": 1774013297154,
       "tag": "0009_slippery_red_skull",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1774018464504,
+      "tag": "0010_lowly_micromax",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1774019327810,
+      "tag": "0011_melted_mulholland_black",
+      "breakpoints": true
     }
   ]
 }
