@@ -22,11 +22,15 @@ export class SessionGuard implements CanActivate {
 
     if (!token) throw new UnauthorizedException('No session provided');
 
+    // better-auth stores token as "<rawToken>.<hmacSignature>" in cookie
+    // but the DB only has the raw token part
+    const rawToken = token.split('.')[0];
+
     const result = await this.db.execute(
       sql`SELECT s."userId", u.email, u.name
           FROM session s
           JOIN "user" u ON s."userId" = u.id
-          WHERE s.token = ${token} AND s."expiresAt" > NOW()
+          WHERE s.token = ${rawToken} AND s."expiresAt" > NOW()
           LIMIT 1`
     );
 

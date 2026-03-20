@@ -17,6 +17,7 @@ import {
   components,
   spaceRoles,
   webhookEndpoints,
+  presets,
 } from './schema';
 
 const pool = new Pool({
@@ -342,6 +343,40 @@ async function seedAccessTokens() {
   }
 }
 
+async function seedPresets() {
+  console.log('Seeding presets...');
+  for (const spaceId of SPACE_IDS) {
+    const filePath = path.join(GOLDEN, String(spaceId), 'presets.json');
+    if (!fs.existsSync(filePath)) continue;
+
+    const raw = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    const items = raw.presets ?? [];
+
+    for (const p of items) {
+      await db
+        .insert(presets)
+        .values({
+          id: BigInt(p.id),
+          spaceId,
+          componentId: BigInt(p.component_id),
+          name: p.name,
+          preset: p.preset ?? {},
+          image: p.image || null,
+          color: p.color || null,
+          icon: p.icon || null,
+          description: p.description || null,
+          createdAt: p.created_at ? new Date(p.created_at) : undefined,
+          updatedAt: p.updated_at ? new Date(p.updated_at) : undefined,
+        })
+        .onConflictDoUpdate({
+          target: presets.id,
+          set: { name: p.name, preset: p.preset ?? {}, image: p.image || null, icon: p.icon || null },
+        });
+    }
+    console.log(`  ✓ Space ${spaceId}: ${items.length} presets`);
+  }
+}
+
 async function seedSpaceRoles() {
   console.log('Seeding space roles...');
   for (const spaceId of SPACE_IDS) {
@@ -459,6 +494,7 @@ async function main() {
   await seedDatasourceEntries();
   await seedComponentGroups();
   await seedComponents();
+  await seedPresets();
   await seedSpaceRoles();
   await seedWebhooks();
   await seedAdminUser();

@@ -50,6 +50,13 @@
       "when": 1774010804738,
       "tag": "0006_fast_juggernaut",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1774011301276,
+      "tag": "0007_perpetual_shinko_yamashiro",
+      "breakpoints": true
     }
   ]
 }

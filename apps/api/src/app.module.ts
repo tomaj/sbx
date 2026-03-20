@@ -9,8 +9,9 @@ import { ComponentsModule } from './components/components.module';
 import { AccessTokensModule } from './access-tokens/access-tokens.module';
 import { SpaceRolesModule } from './space-roles/space-roles.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
+import { PresetsModule } from './presets/presets.module';
 
 @Module({
-  imports: [DbModule, AuthModule, DatasourcesModule, SpacesModule, UsersModule, TagsModule, ComponentsModule, AccessTokensModule, SpaceRolesModule, WebhooksModule],
+  imports: [DbModule, AuthModule, DatasourcesModule, SpacesModule, UsersModule, TagsModule, ComponentsModule, AccessTokensModule, SpaceRolesModule, WebhooksModule, PresetsModule],
 })
 export class AppModule {}

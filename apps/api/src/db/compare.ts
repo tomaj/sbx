@@ -274,6 +274,32 @@ async function compareWebhooks() {
   }
 }
 
+async function comparePresets() {
+  console.log('\n=== MAPI /v1/spaces/:id/presets ===');
+
+  for (const sp of SPACES) {
+    console.log(`\n  [${sp.id}] ${sp.name}`);
+
+    const [ours, live] = await Promise.all([
+      fetch(`${OUR_BASE}/v1/spaces/${sp.id}/presets?token=${sp.cdnToken}`),
+      fetch(`${SB_MAPI_BASE}/v1/spaces/${sp.id}/presets`, { Authorization: MAPI_TOKEN }),
+    ]);
+
+    const ourItems: any[] = ours.presets ?? [];
+    const liveItems: any[] = live.presets ?? [];
+
+    console.log(`    count: ours=${ourItems.length}  live=${liveItems.length} ${ourItems.length === liveItems.length ? '✅' : '❌'}`);
+
+    if (ourItems.length > 0 && liveItems.length > 0) {
+      const liveFirst = liveItems[0];
+      const ourFirst = ourItems.find((p: any) => p.id === liveFirst.id);
+      if (ourFirst) {
+        diff('first preset', ourFirst, liveFirst, ['id', 'name', 'component_id', 'space_id', 'icon', 'color', 'description']);
+      }
+    }
+  }
+}
+
 async function main() {
   await compareSpacesMe();
   await compareCollaborators();
@@ -282,6 +308,7 @@ async function main() {
   await compareAccessTokens();
   await compareSpaceRoles();
   await compareWebhooks();
+  await comparePresets();
   console.log('\n=== Done ===');
 }
 

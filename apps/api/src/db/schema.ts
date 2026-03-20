@@ -199,6 +199,22 @@ export const webhookEndpoints = pgTable('webhook_endpoints', {
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
 
+export const presets = pgTable('presets', {
+  id: bigint('id', { mode: 'bigint' }).primaryKey(),
+  spaceId: integer('space_id')
+    .notNull()
+    .references(() => spaces.id, { onDelete: 'cascade' }),
+  componentId: bigint('component_id', { mode: 'bigint' }).notNull(),
+  name: text('name').notNull(),
+  preset: json('preset').notNull().default({}),
+  image: text('image'),
+  color: text('color'),
+  icon: text('icon'),
+  description: text('description'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
 export const datasourceEntries = pgTable('datasource_entries', {
   id: bigint('id', { mode: 'bigint' }).primaryKey(),
   datasourceId: bigint('datasource_id', { mode: 'bigint' })
