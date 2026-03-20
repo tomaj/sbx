@@ -113,9 +113,80 @@ async function compareCollaborators() {
   }
 }
 
+async function compareComponents() {
+  console.log('\n=== MAPI /v1/spaces/:id/components ===');
+
+  for (const sp of SPACES) {
+    console.log(`\n  [${sp.id}] ${sp.name}`);
+
+    const [ours, live] = await Promise.all([
+      fetch(`${OUR_BASE}/v1/spaces/${sp.id}/components?token=${sp.cdnToken}`),
+      fetch(`${SB_MAPI_BASE}/v1/spaces/${sp.id}/components`, { Authorization: MAPI_TOKEN }),
+    ]);
+
+    const ourComps = ours.components ?? [];
+    const liveComps = live.components ?? [];
+
+    console.log(`    count: ours=${ourComps.length}  live=${liveComps.length} ${ourComps.length === liveComps.length ? '✅' : '❌'}`);
+
+    const liveById = new Map(liveComps.map((c: any) => [c.id, c]));
+    const ourById = new Map(ourComps.map((c: any) => [c.id, c]));
+
+    let mismatches = 0;
+    for (const [id, liveC] of liveById) {
+      if (!ourById.has(id)) {
+        console.log(`    ❌ missing component id=${id} name=${liveC.name}`);
+        mismatches++;
+      }
+    }
+
+    // Compare key fields for first component
+    if (ourComps.length > 0 && liveComps.length > 0) {
+      const firstId = liveComps[0].id;
+      const ourC = ourById.get(firstId) as any;
+      const liveC = liveById.get(firstId) as any;
+      if (ourC && liveC) {
+        diff('first component', ourC, liveC, ['id', 'name', 'is_root', 'is_nestable', 'color', 'icon', 'component_group_uuid']);
+      }
+    }
+
+    if (mismatches === 0 && ourComps.length === liveComps.length) {
+      console.log(`    ✅ all components present`);
+    }
+  }
+}
+
+async function compareComponentGroups() {
+  console.log('\n=== MAPI /v1/spaces/:id/component_groups ===');
+
+  for (const sp of SPACES) {
+    console.log(`\n  [${sp.id}] ${sp.name}`);
+
+    const [ours, live] = await Promise.all([
+      fetch(`${OUR_BASE}/v1/spaces/${sp.id}/component_groups?token=${sp.cdnToken}`),
+      fetch(`${SB_MAPI_BASE}/v1/spaces/${sp.id}/component_groups`, { Authorization: MAPI_TOKEN }),
+    ]);
+
+    const ourGroups = ours.component_groups ?? [];
+    const liveGroups = live.component_groups ?? [];
+
+    console.log(`    count: ours=${ourGroups.length}  live=${liveGroups.length} ${ourGroups.length === liveGroups.length ? '✅' : '❌'}`);
+
+    if (ourGroups.length > 0 && liveGroups.length > 0) {
+      const liveFirst = liveGroups[0];
+      const ourFirst = ourGroups.find((g: any) => g.id === liveFirst.id);
+      if (ourFirst) {
+        diff('first group', ourFirst, liveFirst, ['id', 'uuid', 'name', 'parent_id', 'parent_uuid']);
+      }
+    }
+  }
+}
+
 async function main() {
   await compareSpacesMe();
   await compareCollaborators();
+  await compareComponents();
+  await compareComponentGroups();
   console.log('\n=== Done ===');
 }
 

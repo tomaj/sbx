@@ -107,6 +107,46 @@ export const tags = pgTable(
   (t) => [unique().on(t.spaceId, t.name)],
 );
 
+export const componentGroups = pgTable('component_groups', {
+  id: bigint('id', { mode: 'bigint' }).primaryKey(),
+  uuid: text('uuid').notNull().unique(),
+  spaceId: integer('space_id')
+    .notNull()
+    .references(() => spaces.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  parentId: bigint('parent_id', { mode: 'bigint' }),
+  parentUuid: text('parent_uuid'),
+});
+
+export const components = pgTable('components', {
+  id: bigint('id', { mode: 'bigint' }).primaryKey(),
+  spaceId: integer('space_id')
+    .notNull()
+    .references(() => spaces.id, { onDelete: 'cascade' }),
+  componentGroupUuid: text('component_group_uuid'),
+  name: text('name').notNull(),
+  displayName: text('display_name'),
+  schema: json('schema').notNull().default({}),
+  image: text('image'),
+  previewField: text('preview_field'),
+  previewTmpl: text('preview_tmpl'),
+  isRoot: boolean('is_root').notNull().default(false),
+  isNestable: boolean('is_nestable').notNull().default(true),
+  color: text('color'),
+  icon: text('icon'),
+  description: text('description'),
+  // all_presets: array of preset objects [{id, name, component_id, image, icon, color, description}]
+  allPresets: json('all_presets').notNull().default([]),
+  // internal_tags_list: [{id, name}]
+  internalTagsList: json('internal_tags_list').notNull().default([]),
+  // internal_tag_ids: ["id1", "id2"]
+  internalTagIds: json('internal_tag_ids').notNull().default([]),
+  // content_type_asset_preview: field key used as asset preview for content type blocks
+  contentTypeAssetPreview: text('content_type_asset_preview'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
 export const datasourceEntries = pgTable('datasource_entries', {
   id: bigint('id', { mode: 'bigint' }).primaryKey(),
   datasourceId: bigint('datasource_id', { mode: 'bigint' })

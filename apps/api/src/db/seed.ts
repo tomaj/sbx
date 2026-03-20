@@ -13,6 +13,8 @@ import {
   datasources,
   datasourceEntries,
   tags,
+  componentGroups,
+  components,
 } from './schema';
 
 const pool = new Pool({
@@ -226,6 +228,87 @@ async function seedTags() {
   }
 }
 
+async function seedComponentGroups() {
+  console.log('Seeding component groups...');
+  for (const spaceId of SPACE_IDS) {
+    const filePath = path.join(GOLDEN, String(spaceId), 'component_groups.json');
+    if (!fs.existsSync(filePath)) continue;
+
+    const raw = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    const groups = raw.component_groups ?? [];
+
+    for (const g of groups) {
+      await db
+        .insert(componentGroups)
+        .values({
+          id: BigInt(g.id),
+          uuid: g.uuid,
+          spaceId,
+          name: g.name,
+          parentId: g.parent_id ? BigInt(g.parent_id) : null,
+          parentUuid: g.parent_uuid ?? null,
+        })
+        .onConflictDoUpdate({
+          target: componentGroups.id,
+          set: { name: g.name, parentId: g.parent_id ? BigInt(g.parent_id) : null, parentUuid: g.parent_uuid ?? null },
+        });
+    }
+    console.log(`  ✓ Space ${spaceId}: ${groups.length} component groups`);
+  }
+}
+
+async function seedComponents() {
+  console.log('Seeding components...');
+  for (const spaceId of SPACE_IDS) {
+    const filePath = path.join(GOLDEN, String(spaceId), 'components.json');
+    if (!fs.existsSync(filePath)) continue;
+
+    const raw = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    const comps = raw.components ?? [];
+
+    for (const c of comps) {
+      await db
+        .insert(components)
+        .values({
+          id: BigInt(c.id),
+          spaceId,
+          componentGroupUuid: c.component_group_uuid ?? null,
+          name: c.name,
+          displayName: c.display_name ?? null,
+          schema: c.schema ?? {},
+          image: c.image ?? null,
+          previewField: c.preview_field ?? null,
+          previewTmpl: c.preview_tmpl ?? null,
+          isRoot: c.is_root ?? false,
+          isNestable: c.is_nestable ?? true,
+          color: c.color ?? null,
+          icon: c.icon ?? null,
+          description: c.description ?? null,
+          allPresets: c.all_presets ?? [],
+          internalTagsList: c.internal_tags_list ?? [],
+          internalTagIds: c.internal_tag_ids ?? [],
+          contentTypeAssetPreview: c.content_type_asset_preview ?? null,
+          createdAt: c.created_at ? new Date(c.created_at) : undefined,
+          updatedAt: c.updated_at ? new Date(c.updated_at) : undefined,
+        })
+        .onConflictDoUpdate({
+          target: components.id,
+          set: {
+            name: c.name,
+            displayName: c.display_name ?? null,
+            schema: c.schema ?? {},
+            isRoot: c.is_root ?? false,
+            isNestable: c.is_nestable ?? true,
+            allPresets: c.all_presets ?? [],
+            internalTagsList: c.internal_tags_list ?? [],
+            internalTagIds: c.internal_tag_ids ?? [],
+          },
+        });
+    }
+    console.log(`  ✓ Space ${spaceId}: ${comps.length} components`);
+  }
+}
+
 async function seedAdminUser() {
   console.log('Seeding admin user...');
   const [user] = await db
@@ -256,6 +339,8 @@ async function main() {
   await seedTags();
   await seedDatasources();
   await seedDatasourceEntries();
+  await seedComponentGroups();
+  await seedComponents();
   await seedAdminUser();
   console.log('\nDone ✓');
   await pool.end();
