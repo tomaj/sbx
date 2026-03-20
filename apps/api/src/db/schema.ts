@@ -13,7 +13,7 @@ import {
 
 export const tokenTypeEnum = pgEnum('token_type', [
   'public',
-  'preview',
+  'private',
   'management',
 ]);
 
@@ -67,13 +67,17 @@ export const spaceMembers = pgTable(
 );
 
 export const apiTokens = pgTable('api_tokens', {
-  id: serial('id').primaryKey(),
+  id: bigint('id', { mode: 'number' }).primaryKey(),
   spaceId: integer('space_id')
     .notNull()
     .references(() => spaces.id, { onDelete: 'cascade' }),
-  name: text('name').notNull(),
+  name: text('name'),
   token: text('token').notNull().unique(),
   tokenType: tokenTypeEnum('token_type').notNull(),
+  branchId: bigint('branch_id', { mode: 'number' }),
+  storyIds: json('story_ids').notNull().default([]),
+  minCache: integer('min_cache').notNull().default(0),
+  releaseIds: json('release_ids').notNull().default([]),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });
 
@@ -143,6 +147,54 @@ export const components = pgTable('components', {
   internalTagIds: json('internal_tag_ids').notNull().default([]),
   // content_type_asset_preview: field key used as asset preview for content type blocks
   contentTypeAssetPreview: text('content_type_asset_preview'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+export const spaceRoles = pgTable('space_roles', {
+  id: bigint('id', { mode: 'bigint' }).primaryKey(),
+  spaceId: integer('space_id')
+    .notNull()
+    .references(() => spaces.id, { onDelete: 'cascade' }),
+  role: text('role').notNull(),
+  subtitle: text('subtitle'),
+  extId: text('ext_id'),
+  permissions: json('permissions').notNull().default([]),
+  allowedPaths: json('allowed_paths').notNull().default([]),
+  blockedPaths: json('blocked_paths').notNull().default([]),
+  fieldPermissions: json('field_permissions').notNull().default([]),
+  allowedFieldPermissions: json('allowed_field_permissions').notNull().default([]),
+  readonlyFieldPermissions: json('readonly_field_permissions').notNull().default([]),
+  datasourceIds: json('datasource_ids').notNull().default([]),
+  blockedDatasourceIds: json('blocked_datasource_ids').notNull().default([]),
+  componentIds: json('component_ids').notNull().default([]),
+  allowedComponentIds: json('allowed_component_ids').notNull().default([]),
+  branchIds: json('branch_ids').notNull().default([]),
+  blockedBranchIds: json('blocked_branch_ids').notNull().default([]),
+  allowedLanguages: json('allowed_languages').notNull().default([]),
+  blockedLanguages: json('blocked_languages').notNull().default([]),
+  assetFolderIds: json('asset_folder_ids').notNull().default([]),
+  blockedAssetFolderIds: json('blocked_asset_folder_ids').notNull().default([]),
+  managedComponentIds: json('managed_component_ids').notNull().default([]),
+  blockedManageComponentIds: json('blocked_manage_component_ids').notNull().default([]),
+  managedComponentGroupUuids: json('managed_component_group_uuids').notNull().default([]),
+  blockedManageComponentGroupUuids: json('blocked_manage_component_group_uuids').notNull().default([]),
+  componentGroupUuids: json('component_group_uuids').notNull().default([]),
+  blockedComponentGroupUuids: json('blocked_component_group_uuids').notNull().default([]),
+});
+
+export const webhookEndpoints = pgTable('webhook_endpoints', {
+  id: integer('id').primaryKey(),
+  spaceId: integer('space_id')
+    .notNull()
+    .references(() => spaces.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  description: text('description'),
+  endpoint: text('endpoint').notNull(),
+  secret: text('secret'),
+  actions: json('actions').notNull().default([]),
+  activated: boolean('activated').notNull().default(true),
+  deletedAt: timestamp('deleted_at'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });

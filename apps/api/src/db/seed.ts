@@ -15,6 +15,8 @@ import {
   tags,
   componentGroups,
   components,
+  spaceRoles,
+  webhookEndpoints,
 } from './schema';
 
 const pool = new Pool({
@@ -59,13 +61,6 @@ async function seedSpaces() {
         target: spaces.id,
         set: { name: s.name, domain: s.domain ?? null, version, languageCodes, firstToken: s.first_token },
       });
-
-    if (s.first_token) {
-      await db
-        .insert(apiTokens)
-        .values({ spaceId: s.id, name: 'Public token', token: s.first_token, tokenType: 'public' })
-        .onConflictDoNothing();
-    }
 
     console.log(`  ✓ ${s.id}: ${s.name}`);
   }
@@ -309,6 +304,128 @@ async function seedComponents() {
   }
 }
 
+async function seedAccessTokens() {
+  console.log('Seeding access tokens...');
+  for (const spaceId of SPACE_IDS) {
+    const filePath = path.join(GOLDEN, String(spaceId), 'access_tokens.json');
+    if (!fs.existsSync(filePath)) continue;
+
+    const raw = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    const keys = raw.api_keys ?? [];
+
+    for (const k of keys) {
+      await db
+        .insert(apiTokens)
+        .values({
+          id: k.id,
+          spaceId,
+          name: k.name,
+          token: k.token,
+          tokenType: k.access === 'public' ? 'public' : 'private',
+          branchId: k.branch_id ?? null,
+          storyIds: k.story_ids ?? [],
+          minCache: k.min_cache ?? 0,
+          releaseIds: k.release_ids ?? [],
+        })
+        .onConflictDoUpdate({
+          target: apiTokens.id,
+          set: {
+            name: k.name,
+            branchId: k.branch_id ?? null,
+            storyIds: k.story_ids ?? [],
+            minCache: k.min_cache ?? 0,
+            releaseIds: k.release_ids ?? [],
+          },
+        });
+    }
+    console.log(`  ✓ Space ${spaceId}: ${keys.length} tokens`);
+  }
+}
+
+async function seedSpaceRoles() {
+  console.log('Seeding space roles...');
+  for (const spaceId of SPACE_IDS) {
+    const filePath = path.join(GOLDEN, String(spaceId), 'space_roles.json');
+    if (!fs.existsSync(filePath)) continue;
+
+    const raw = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    const roles = raw.space_roles ?? [];
+
+    for (const r of roles) {
+      await db
+        .insert(spaceRoles)
+        .values({
+          id: BigInt(r.id),
+          spaceId,
+          role: r.role,
+          subtitle: r.subtitle ?? null,
+          extId: r.ext_id ?? null,
+          permissions: r.permissions ?? [],
+          allowedPaths: r.allowed_paths ?? [],
+          blockedPaths: r.blocked_paths ?? [],
+          fieldPermissions: r.field_permissions ?? [],
+          allowedFieldPermissions: r.allowed_field_permissions ?? [],
+          readonlyFieldPermissions: r.readonly_field_permissions ?? [],
+          datasourceIds: r.datasource_ids ?? [],
+          blockedDatasourceIds: r.blocked_datasource_ids ?? [],
+          componentIds: r.component_ids ?? [],
+          allowedComponentIds: r.allowed_component_ids ?? [],
+          branchIds: r.branch_ids ?? [],
+          blockedBranchIds: r.blocked_branch_ids ?? [],
+          allowedLanguages: r.allowed_languages ?? [],
+          blockedLanguages: r.blocked_languages ?? [],
+          assetFolderIds: r.asset_folder_ids ?? [],
+          blockedAssetFolderIds: r.blocked_asset_folder_ids ?? [],
+          managedComponentIds: r.managed_component_ids ?? [],
+          blockedManageComponentIds: r.blocked_manage_component_ids ?? [],
+          managedComponentGroupUuids: r.managed_component_group_uuids ?? [],
+          blockedManageComponentGroupUuids: r.blocked_manage_component_group_uuids ?? [],
+          componentGroupUuids: r.component_group_uuids ?? [],
+          blockedComponentGroupUuids: r.blocked_component_group_uuids ?? [],
+        })
+        .onConflictDoUpdate({
+          target: spaceRoles.id,
+          set: { role: r.role, subtitle: r.subtitle ?? null, permissions: r.permissions ?? [] },
+        });
+    }
+    console.log(`  ✓ Space ${spaceId}: ${roles.length} space roles`);
+  }
+}
+
+async function seedWebhooks() {
+  console.log('Seeding webhooks...');
+  for (const spaceId of SPACE_IDS) {
+    const filePath = path.join(GOLDEN, String(spaceId), 'webhooks.json');
+    if (!fs.existsSync(filePath)) continue;
+
+    const raw = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    const hooks = raw.webhook_endpoints ?? [];
+
+    for (const h of hooks) {
+      await db
+        .insert(webhookEndpoints)
+        .values({
+          id: h.id,
+          spaceId,
+          name: h.name,
+          description: h.description ?? null,
+          endpoint: h.endpoint,
+          secret: h.secret ?? null,
+          actions: h.actions ?? [],
+          activated: h.activated ?? true,
+          deletedAt: h.deleted_at ? new Date(h.deleted_at) : null,
+          createdAt: h.created_at ? new Date(h.created_at) : undefined,
+          updatedAt: h.updated_at ? new Date(h.updated_at) : undefined,
+        })
+        .onConflictDoUpdate({
+          target: webhookEndpoints.id,
+          set: { name: h.name, endpoint: h.endpoint, actions: h.actions ?? [], activated: h.activated ?? true },
+        });
+    }
+    console.log(`  ✓ Space ${spaceId}: ${hooks.length} webhooks`);
+  }
+}
+
 async function seedAdminUser() {
   console.log('Seeding admin user...');
   const [user] = await db
@@ -334,6 +451,7 @@ async function seedAdminUser() {
 
 async function main() {
   await seedSpaces();
+  await seedAccessTokens();
   await seedUsers();
   await seedCollaborators();
   await seedTags();
@@ -341,6 +459,8 @@ async function main() {
   await seedDatasourceEntries();
   await seedComponentGroups();
   await seedComponents();
+  await seedSpaceRoles();
+  await seedWebhooks();
   await seedAdminUser();
   console.log('\nDone ✓');
   await pool.end();

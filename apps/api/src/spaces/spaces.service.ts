@@ -8,6 +8,19 @@ import { spaces } from '../db/schema';
 export class SpacesService {
   constructor(@Inject(DB) private db: DbType) {}
 
+  async getAllSpaces() {
+    const allSpaces = await this.db.select().from(spaces);
+    return {
+      spaces: allSpaces.map((s) => ({
+        id: s.id,
+        name: s.name,
+        domain: s.domain ?? '',
+        updatedAt: s.updatedAt,
+        createdAt: s.createdAt,
+      })),
+    };
+  }
+
   async getSpaceMe(spaceId: number) {
     const [space] = await this.db
       .select()

@@ -1,0 +1,10 @@
+import { Module } from '@nestjs/common';
+import { WebhooksController } from './webhooks.controller';
+import { WebhooksService } from './webhooks.service';
+import { TokenGuard } from '../auth/token.guard';
+
+@Module({
+  controllers: [WebhooksController],
+  providers: [WebhooksService, TokenGuard],
+})
+export class WebhooksModule {}

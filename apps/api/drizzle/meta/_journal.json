@@ -36,6 +36,20 @@
       "when": 1774009995561,
       "tag": "0004_tidy_george_stacy",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1742428800000,
+      "tag": "0005_access_tokens",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1774010804738,
+      "tag": "0006_fast_juggernaut",
+      "breakpoints": true
     }
   ]
 }

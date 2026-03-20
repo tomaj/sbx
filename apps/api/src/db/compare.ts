@@ -133,7 +133,7 @@ async function compareComponents() {
     const ourById = new Map(ourComps.map((c: any) => [c.id, c]));
 
     let mismatches = 0;
-    for (const [id, liveC] of liveById) {
+    for (const [id, liveC] of liveById as Map<any, any>) {
       if (!ourById.has(id)) {
         console.log(`    ❌ missing component id=${id} name=${liveC.name}`);
         mismatches++;
@@ -182,11 +182,106 @@ async function compareComponentGroups() {
   }
 }
 
+async function compareAccessTokens() {
+  console.log('\n=== MAPI /v1/spaces/:id/api_keys ===');
+
+  for (const sp of SPACES) {
+    console.log(`\n  [${sp.id}] ${sp.name}`);
+
+    const [ours, live] = await Promise.all([
+      fetch(`${OUR_BASE}/v1/spaces/${sp.id}/api_keys?token=${sp.cdnToken}`),
+      fetch(`${SB_MAPI_BASE}/v1/spaces/${sp.id}/api_keys/`, { Authorization: MAPI_TOKEN }),
+    ]);
+
+    const ourKeys: any[] = ours.api_keys ?? [];
+    const liveKeys: any[] = live.api_keys ?? [];
+
+    console.log(`    count: ours=${ourKeys.length}  live=${liveKeys.length} ${ourKeys.length === liveKeys.length ? '✅' : '❌'}`);
+
+    const liveById = new Map(liveKeys.map((k) => [k.id, k]));
+    const ourById = new Map(ourKeys.map((k) => [k.id, k]));
+
+    for (const [id, liveK] of liveById) {
+      const ourK = ourById.get(id) as any;
+      if (!ourK) {
+        console.log(`    ❌ missing token id=${id} name="${liveK.name}"`);
+        continue;
+      }
+      diff(`token ${id} (${liveK.name})`, ourK, liveK, [
+        'id', 'access', 'branch_id', 'name', 'space_id', 'token', 'min_cache',
+      ]);
+    }
+  }
+}
+
+async function compareSpaceRoles() {
+  console.log('\n=== MAPI /v1/spaces/:id/space_roles ===');
+
+  for (const sp of SPACES) {
+    console.log(`\n  [${sp.id}] ${sp.name}`);
+
+    const [ours, live] = await Promise.all([
+      fetch(`${OUR_BASE}/v1/spaces/${sp.id}/space_roles?token=${sp.cdnToken}`),
+      fetch(`${SB_MAPI_BASE}/v1/spaces/${sp.id}/space_roles`, { Authorization: MAPI_TOKEN }),
+    ]);
+
+    const ourRoles: any[] = ours.space_roles ?? [];
+    const liveRoles: any[] = live.space_roles ?? [];
+
+    console.log(`    count: ours=${ourRoles.length}  live=${liveRoles.length} ${ourRoles.length === liveRoles.length ? '✅' : '❌'}`);
+
+    const liveById = new Map(liveRoles.map((r: any) => [r.id, r]));
+    const ourById = new Map(ourRoles.map((r: any) => [r.id, r]));
+
+    for (const [id, liveR] of liveById as Map<any, any>) {
+      const ourR = ourById.get(id) as any;
+      if (!ourR) {
+        console.log(`    ❌ missing role id=${id} name="${liveR.role}"`);
+        continue;
+      }
+      diff(`role "${liveR.role}"`, ourR, liveR, ['id', 'role', 'subtitle', 'permissions', 'allowed_paths', 'blocked_paths']);
+    }
+  }
+}
+
+async function compareWebhooks() {
+  console.log('\n=== MAPI /v1/spaces/:id/webhook_endpoints ===');
+
+  for (const sp of SPACES) {
+    console.log(`\n  [${sp.id}] ${sp.name}`);
+
+    const [ours, live] = await Promise.all([
+      fetch(`${OUR_BASE}/v1/spaces/${sp.id}/webhook_endpoints?token=${sp.cdnToken}`),
+      fetch(`${SB_MAPI_BASE}/v1/spaces/${sp.id}/webhook_endpoints`, { Authorization: MAPI_TOKEN }),
+    ]);
+
+    const ourHooks: any[] = ours.webhook_endpoints ?? [];
+    const liveHooks: any[] = live.webhook_endpoints ?? [];
+
+    console.log(`    count: ours=${ourHooks.length}  live=${liveHooks.length} ${ourHooks.length === liveHooks.length ? '✅' : '❌'}`);
+
+    const liveById = new Map(liveHooks.map((h: any) => [h.id, h]));
+    const ourById = new Map(ourHooks.map((h: any) => [h.id, h]));
+
+    for (const [id, liveH] of liveById as Map<any, any>) {
+      const ourH = ourById.get(id) as any;
+      if (!ourH) {
+        console.log(`    ❌ missing webhook id=${id} name="${liveH.name}"`);
+        continue;
+      }
+      diff(`webhook "${liveH.name}"`, ourH, liveH, ['id', 'name', 'endpoint', 'actions', 'activated', 'space_id']);
+    }
+  }
+}
+
 async function main() {
   await compareSpacesMe();
   await compareCollaborators();
   await compareComponents();
   await compareComponentGroups();
+  await compareAccessTokens();
+  await compareSpaceRoles();
+  await compareWebhooks();
   console.log('\n=== Done ===');
 }
 
