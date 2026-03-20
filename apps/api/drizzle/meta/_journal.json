@@ -57,6 +57,13 @@
       "when": 1774011301276,
       "tag": "0007_perpetual_shinko_yamashiro",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1774011785510,
+      "tag": "0008_quick_kang",
+      "breakpoints": true
     }
   ]
 }

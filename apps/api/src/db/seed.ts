@@ -18,6 +18,7 @@ import {
   spaceRoles,
   webhookEndpoints,
   presets,
+  activities,
 } from './schema';
 
 const pool = new Pool({
@@ -377,6 +378,45 @@ async function seedPresets() {
   }
 }
 
+async function seedActivities() {
+  console.log('Seeding activities (first 500 per space)...');
+  for (const spaceId of SPACE_IDS) {
+    const filePath = path.join(GOLDEN, String(spaceId), 'activities.json');
+    if (!fs.existsSync(filePath)) continue;
+
+    const raw = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    const items = raw.activities ?? [];
+    if (!items.length) {
+      console.log(`  ✓ Space ${spaceId}: 0 activities`);
+      continue;
+    }
+
+    for (const item of items) {
+      const a = item.activity;
+      await db
+        .insert(activities)
+        .values({
+          id: BigInt(a.id),
+          spaceId,
+          trackableId: a.trackable_id ? BigInt(a.trackable_id) : null,
+          trackableType: a.trackable_type ?? null,
+          ownerId: a.owner_id ? BigInt(a.owner_id) : null,
+          ownerType: a.owner_type ?? null,
+          key: a.key,
+          parameters: a.parameters ?? {},
+          recipientId: a.recipient_id ? BigInt(a.recipient_id) : null,
+          recipientType: a.recipient_type ?? null,
+          trackable: item.trackable ?? {},
+          user: item.user ?? {},
+          createdAt: new Date(a.created_at),
+          updatedAt: new Date(a.updated_at),
+        })
+        .onConflictDoNothing();
+    }
+    console.log(`  ✓ Space ${spaceId}: ${items.length} activities`);
+  }
+}
+
 async function seedSpaceRoles() {
   console.log('Seeding space roles...');
   for (const spaceId of SPACE_IDS) {
@@ -495,6 +535,7 @@ async function main() {
   await seedComponentGroups();
   await seedComponents();
   await seedPresets();
+  await seedActivities();
   await seedSpaceRoles();
   await seedWebhooks();
   await seedAdminUser();

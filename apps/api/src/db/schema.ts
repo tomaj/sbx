@@ -215,6 +215,26 @@ export const presets = pgTable('presets', {
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
 
+export const activities = pgTable('activities', {
+  id: bigint('id', { mode: 'bigint' }).primaryKey(),
+  spaceId: integer('space_id')
+    .notNull()
+    .references(() => spaces.id, { onDelete: 'cascade' }),
+  trackableId: bigint('trackable_id', { mode: 'bigint' }),
+  trackableType: text('trackable_type'),
+  ownerId: bigint('owner_id', { mode: 'bigint' }),
+  ownerType: text('owner_type'),
+  key: text('key').notNull(),
+  parameters: json('parameters').notNull().default({}),
+  recipientId: bigint('recipient_id', { mode: 'bigint' }),
+  recipientType: text('recipient_type'),
+  // denormalized trackable/user info for display (mirrors Storyblok response)
+  trackable: json('trackable').notNull().default({}),
+  user: json('user').notNull().default({}),
+  createdAt: timestamp('created_at').notNull(),
+  updatedAt: timestamp('updated_at').notNull(),
+});
+
 export const datasourceEntries = pgTable('datasource_entries', {
   id: bigint('id', { mode: 'bigint' }).primaryKey(),
   datasourceId: bigint('datasource_id', { mode: 'bigint' })
