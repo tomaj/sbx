@@ -25,7 +25,7 @@ export async function syncStories(spaceId: number, token: string, full = false):
   let totalOnServer = 0;
 
   while (!done) {
-    const url = `${MAPI_BASE}/v1/spaces/${spaceId}/stories?per_page=${PER_PAGE}&page=${page}&sort_by=updated_at:desc`;
+    const url = `${MAPI_BASE}/v1/spaces/${spaceId}/stories?per_page=${PER_PAGE}&page=${page}&sort_by=updated_at:desc&with_content=1`;
     const { data, headers } = await apiFetch(url, token);
     totalOnServer = parseInt(headers['total'] ?? '0', 10);
     const batch: any[] = data.stories ?? [];

@@ -16,6 +16,16 @@ export class SpacesAdminController {
     return this.spacesService.getAllSpaces();
   }
 
+  @Get('spaces/:id')
+  getSpace(@Param('id') id: string) {
+    return this.spacesService.getSpaceById(parseInt(id));
+  }
+
+  @Patch('spaces/:id')
+  updateSpace(@Param('id') id: string, @Body() body: { name?: string; defaultRoot?: string | null }) {
+    return this.spacesService.updateSpace(parseInt(id), body);
+  }
+
   @Post('users')
   createUser(@Body() body: { firstname: string; lastname: string; email: string }) {
     return this.usersService.createUser(body);

@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, ChevronDown } from 'lucide-react'
+import { X } from 'lucide-react'
 import type { ComponentGroup } from './group-tree'
+import { SelectDropdown } from '@/components/ui/select-dropdown'
 
 type BlockType = 'nestable' | 'content_type' | 'universal'
 
@@ -150,19 +151,12 @@ export function CreateBlockModal({ open, groups, onConfirm, onCancel }: CreateBl
           <label className="block text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">
             Block Folder
           </label>
-          <div className="relative">
-            <select
-              value={groupUuid ?? ''}
-              onChange={(e) => setGroupUuid(e.target.value || null)}
-              className="w-full appearance-none px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-            >
-              <option value="">Select a block folder</option>
-              {groups.map((g) => (
-                <option key={g.id} value={g.uuid}>{g.name}</option>
-              ))}
-            </select>
-            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-          </div>
+          <SelectDropdown
+            value={groupUuid}
+            onChange={setGroupUuid}
+            options={groups.map((g) => ({ value: g.uuid, label: g.name }))}
+            placeholder="No folder"
+          />
         </div>
 
         {error && <p className="text-sm text-red-600 dark:text-red-400 mb-4">{error}</p>}

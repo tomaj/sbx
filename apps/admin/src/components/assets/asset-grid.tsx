@@ -20,6 +20,7 @@ interface AssetGridProps {
   assets: Asset[]
   spaceId: string
   isLoading?: boolean
+  onAssetClick?: (asset: Asset) => void
 }
 
 function formatExt(contentType: string): string {
@@ -27,7 +28,7 @@ function formatExt(contentType: string): string {
   return parts[1] ?? parts[0] ?? ''
 }
 
-export function AssetGrid({ assets, spaceId, isLoading }: AssetGridProps) {
+export function AssetGrid({ assets, spaceId, isLoading, onAssetClick }: AssetGridProps) {
   if (isLoading) {
     return (
       <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
@@ -53,7 +54,7 @@ export function AssetGrid({ assets, spaceId, isLoading }: AssetGridProps) {
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 gap-5 p-1">
       {assets.map(asset => (
-        <div key={asset.id} className="flex flex-col gap-2 group cursor-pointer">
+        <div key={asset.id} className="flex flex-col gap-2 group cursor-pointer" onClick={() => onAssetClick?.(asset)}>
           {/* Image card — gray bg, image contained with padding */}
           <div className="aspect-[4/3] rounded-xl bg-gray-100 dark:bg-gray-800 overflow-hidden hover:ring-2 hover:ring-teal-500 transition-all flex items-center justify-center p-3">
             <AssetThumb

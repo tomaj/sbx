@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useRef, useEffect, useMemo } from 'react'
-import { ChevronDown, Search } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
+import { ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export interface SelectOption {
@@ -11,27 +11,34 @@ export interface SelectOption {
 
 interface SelectDropdownProps {
   options: SelectOption[]
-  value: string | null
+  value: string | null | undefined
   onChange: (value: string | null) => void
+  /** Shown when value is null/empty; also acts as the "clear" option in the dropdown */
   placeholder?: string
+  loading?: boolean
   className?: string
+  /** Smaller padding/height for inline uses (pagination, condition rows) */
+  compact?: boolean
+  /** No border/bg — for use inside chips or tight inline contexts */
+  ghost?: boolean
 }
 
 export function SelectDropdown({
   options,
   value,
   onChange,
-  placeholder = 'Select...',
+  placeholder = 'Choose...',
+  loading = false,
   className,
+  compact = false,
+  ghost = false,
 }: SelectDropdownProps) {
   const [open, setOpen] = useState(false)
-  const [search, setSearch] = useState('')
+  const [filter, setFilter] = useState('')
   const containerRef = useRef<HTMLDivElement>(null)
-  const searchRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!open) return
-    setTimeout(() => searchRef.current?.focus(), 0)
     function handleClickOutside(e: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setOpen(false)
@@ -41,76 +48,110 @@ export function SelectDropdown({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [open])
 
-  const selected = options.find((o) => o.value === value)
+  const selected = options.find((o) => o.value === (value ?? ''))
+  const showFilter = options.length > 6 && !compact
+  const filtered = showFilter
+    ? options.filter((o) => o.label.toLowerCase().includes(filter.toLowerCase()))
+    : options
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    return q ? options.filter((o) => o.label.toLowerCase().includes(q)) : options
-  }, [options, search])
+  function toggle() {
+    setOpen((v) => !v)
+    setFilter('')
+  }
+
+  const buttonClass = ghost
+    ? cn('inline-flex items-center gap-1 text-xs text-gray-700 dark:text-gray-300 cursor-pointer select-none')
+    : compact
+    ? cn(
+        'flex items-center justify-between gap-1.5 px-2 py-1 border rounded text-sm bg-white dark:bg-gray-900 transition-colors',
+        open
+          ? 'border-teal-500 ring-1 ring-teal-200 dark:ring-teal-900'
+          : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600',
+      )
+    : cn(
+        'w-full flex items-center justify-between px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-900 transition-colors min-h-[40px]',
+        open
+          ? 'border-teal-500 ring-2 ring-teal-200 dark:ring-teal-900'
+          : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600',
+      )
 
   return (
-    <div ref={containerRef} className={cn('relative', className)}>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className={cn(
-          'flex items-center w-full border rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-900 transition-colors',
-          open
-            ? 'border-teal-600 ring-1 ring-teal-600'
-            : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600',
-        )}
-      >
+    <div
+      ref={containerRef}
+      className={cn('relative', ghost ? 'inline-flex' : '', className)}
+    >
+      <button type="button" onClick={toggle} className={buttonClass}>
         <span
           className={cn(
-            'flex-1 text-left truncate',
-            selected ? 'text-gray-900 dark:text-gray-100' : 'text-gray-400',
+            ghost ? 'text-gray-700 dark:text-gray-300' : selected ? 'text-gray-900 dark:text-gray-100 truncate' : 'text-teal-500 dark:text-teal-400 truncate',
           )}
         >
-          {selected ? selected.label : placeholder}
+          {loading ? 'Loading...' : (selected?.label ?? placeholder)}
         </span>
-        <div className="ml-2 p-1 rounded-md border border-gray-200 dark:border-gray-600 shrink-0">
-          <ChevronDown className="size-3.5 text-gray-500 dark:text-gray-400" />
-        </div>
+        <ChevronDown
+          className={cn(
+            'flex-shrink-0 text-gray-400',
+            ghost || compact ? 'w-3 h-3' : 'w-4 h-4 ml-2',
+          )}
+        />
       </button>
 
       {open && (
-        <div className="absolute z-50 top-full mt-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg min-w-full flex flex-col">
-          <div className="px-3 py-2 border-b border-gray-100 dark:border-gray-700 flex items-center gap-2">
-            <Search className="size-3.5 text-gray-400 shrink-0" />
-            <input
-              ref={searchRef}
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search..."
-              className="flex-1 text-sm bg-transparent outline-none text-gray-800 dark:text-gray-200 placeholder:text-gray-400"
-            />
-          </div>
-          <div className="max-h-64 overflow-y-auto py-1">
-            {filtered.length === 0 ? (
-              <p className="text-center text-sm text-gray-400 py-4">No results</p>
-            ) : (
-              filtered.map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => {
-                    onChange(opt.value)
-                    setOpen(false)
-                    setSearch('')
-                  }}
-                  className={cn(
-                    'w-full text-left px-4 py-3 text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors',
-                    opt.value === value
-                      ? 'text-teal-600 dark:text-teal-400 font-medium'
-                      : 'text-gray-800 dark:text-gray-200',
-                  )}
-                >
-                  {opt.label}
-                </button>
-              ))
-            )}
-          </div>
+        <div
+          className={cn(
+            'absolute top-full mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl max-h-64 overflow-y-auto',
+            ghost ? 'left-0' : 'left-0 right-0',
+          )}
+          style={ghost ? { minWidth: '130px' } : undefined}
+        >
+          {showFilter && (
+            <div className="sticky top-0 bg-white dark:bg-gray-900 px-3 pt-2 pb-1 border-b border-gray-100 dark:border-gray-800">
+              <input
+                autoFocus
+                type="text"
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+                placeholder="Filter..."
+                className="w-full px-2 py-1 text-sm border border-gray-200 dark:border-gray-700 rounded bg-white dark:bg-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
+          )}
+
+          {placeholder !== undefined && (
+            <button
+              type="button"
+              onClick={() => { onChange(null); setOpen(false) }}
+              className={cn(
+                'w-full text-left px-3 py-2.5 text-sm transition-colors',
+                !value
+                  ? 'text-teal-600 dark:text-teal-400 font-medium bg-gray-50 dark:bg-gray-800'
+                  : 'text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800',
+              )}
+            >
+              {placeholder}
+            </button>
+          )}
+
+          {filtered.length === 0 ? (
+            <div className="px-3 py-3 text-sm text-gray-400">No results</div>
+          ) : (
+            filtered.map((o) => (
+              <button
+                key={o.value}
+                type="button"
+                onClick={() => { onChange(o.value); setOpen(false) }}
+                className={cn(
+                  'w-full text-left px-3 py-2.5 text-sm transition-colors',
+                  value === o.value
+                    ? 'bg-gray-50 dark:bg-gray-800 font-medium text-teal-600 dark:text-teal-400'
+                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800',
+                )}
+              >
+                {o.label}
+              </button>
+            ))
+          )}
         </div>
       )}
     </div>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { Pencil, Trash2, TriangleAlert } from 'lucide-react'
+import { SelectDropdown } from '@/components/ui/select-dropdown'
 
 interface Token {
   id: number
@@ -155,15 +156,12 @@ export default function TokensPage() {
           <div>
             <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-1.5">Expiration</label>
             <div className="flex items-center gap-4">
-              <select
-                value={expiryDays}
-                onChange={(e) => setExpiryDays(Number(e.target.value))}
-                className="px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-500 min-w-[140px]"
-              >
-                {EXPIRY_OPTIONS.map((o) => (
-                  <option key={o.days} value={o.days}>{o.label}</option>
-                ))}
-              </select>
+              <SelectDropdown
+                value={String(expiryDays)}
+                onChange={(v) => v && setExpiryDays(Number(v))}
+                options={EXPIRY_OPTIONS.map((o) => ({ value: String(o.days), label: o.label }))}
+                className="w-40"
+              />
               {expiryDate && (
                 <span className="text-sm text-gray-400">
                   The token will expire on {expiryDate}

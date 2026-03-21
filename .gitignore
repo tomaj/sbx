@@ -4,3 +4,7 @@ node_modules/
 dist/
 *.tsbuildinfo
 golden/
+.next/
+e2e/
+test-results/
+playwright-report/

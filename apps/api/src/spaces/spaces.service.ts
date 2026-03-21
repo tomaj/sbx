@@ -53,6 +53,54 @@ export class SpacesService {
     };
   }
 
+  async getSpaceById(spaceId: number) {
+    const [space] = await this.db
+      .select()
+      .from(spaces)
+      .where(eq(spaces.id, spaceId))
+      .limit(1);
+
+    if (!space) return null;
+
+    return {
+      space: {
+        id: space.id,
+        uuid: space.uuid,
+        name: space.name,
+        domain: space.domain ?? '',
+        defaultRoot: space.defaultRoot ?? null,
+        createdAt: space.createdAt,
+        updatedAt: space.updatedAt,
+      },
+    };
+  }
+
+  async updateSpace(spaceId: number, data: { name?: string; defaultRoot?: string | null }) {
+    const [updated] = await this.db
+      .update(spaces)
+      .set({
+        ...(data.name !== undefined && { name: data.name }),
+        ...(data.defaultRoot !== undefined && { defaultRoot: data.defaultRoot }),
+        updatedAt: new Date(),
+      })
+      .where(eq(spaces.id, spaceId))
+      .returning();
+
+    if (!updated) return null;
+
+    return {
+      space: {
+        id: updated.id,
+        uuid: updated.uuid,
+        name: updated.name,
+        domain: updated.domain ?? '',
+        defaultRoot: updated.defaultRoot ?? null,
+        createdAt: updated.createdAt,
+        updatedAt: updated.updatedAt,
+      },
+    };
+  }
+
   async getSpaceMe(spaceId: number) {
     const [space] = await this.db
       .select()

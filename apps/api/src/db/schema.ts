@@ -28,6 +28,7 @@ export const spaces = pgTable('spaces', {
   // version = unix timestamp, updated on every publish (used for CDN cache invalidation)
   version: bigint('version', { mode: 'number' }).notNull().default(0),
   firstToken: text('first_token'),
+  defaultRoot: text('default_root'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });

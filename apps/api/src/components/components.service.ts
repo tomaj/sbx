@@ -1,5 +1,5 @@
-import { Inject, Injectable } from '@nestjs/common';
-import { asc, eq } from 'drizzle-orm';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { SQL, and, asc, count, desc, eq, ilike, isNull } from 'drizzle-orm';
 import { DB } from '../db/db.module';
 import type { DbType } from '../db/db.module';
 import { componentGroups, components } from '../db/schema';
@@ -7,6 +7,8 @@ import { componentGroups, components } from '../db/schema';
 @Injectable()
 export class ComponentsService {
   constructor(@Inject(DB) private db: DbType) {}
+
+  // ─── CDN / read-only ────────────────────────────────────────────────────────
 
   async findAllComponents(spaceId: number) {
     const rows = await this.db
@@ -39,13 +41,257 @@ export class ComponentsService {
       .orderBy(asc(componentGroups.name));
 
     return {
-      component_groups: rows.map((g) => ({
-        id: Number(g.id),
-        uuid: g.uuid,
-        name: g.name,
-        parent_id: g.parentId ? Number(g.parentId) : null,
-        parent_uuid: g.parentUuid ?? null,
-      })),
+      component_groups: rows.map((g) => this.formatGroup(g)),
+    };
+  }
+
+  // ─── Admin: counts ──────────────────────────────────────────────────────────
+
+  async getComponentCounts(spaceId: number) {
+    const rows = await this.db
+      .select({ groupUuid: components.componentGroupUuid, total: count() })
+      .from(components)
+      .where(eq(components.spaceId, spaceId))
+      .groupBy(components.componentGroupUuid);
+
+    const byGroup: Record<string, number> = {};
+    let total = 0;
+    for (const row of rows) {
+      const n = Number(row.total);
+      total += n;
+      if (row.groupUuid) byGroup[row.groupUuid] = n;
+    }
+    return { total, by_group: byGroup };
+  }
+
+  // ─── Admin: list with pagination ────────────────────────────────────────────
+
+  async listComponents(
+    spaceId: number,
+    opts: {
+      page?: number;
+      perPage?: number;
+      search?: string;
+      sortField?: string;
+      sortDir?: 'asc' | 'desc';
+      groupUuid?: string | null;
+    } = {},
+  ) {
+    const { page = 1, perPage = 25, search, sortField = 'name', sortDir = 'asc', groupUuid } = opts;
+
+    const conditions: (SQL | undefined)[] = [
+      eq(components.spaceId, spaceId),
+      search?.trim() ? ilike(components.name, `%${search.trim()}%`) : undefined,
+      groupUuid !== undefined
+        ? groupUuid === null
+          ? isNull(components.componentGroupUuid)
+          : eq(components.componentGroupUuid, groupUuid)
+        : undefined,
+    ];
+
+    const where = and(...conditions);
+
+    const [{ total }] = await this.db
+      .select({ total: count() })
+      .from(components)
+      .where(where);
+
+    const orderCol =
+      sortField === 'created_at'
+        ? components.createdAt
+        : sortField === 'updated_at'
+          ? components.updatedAt
+          : components.name;
+    const order = sortDir === 'desc' ? desc(orderCol) : asc(orderCol);
+
+    const rows = await this.db
+      .select()
+      .from(components)
+      .where(where)
+      .orderBy(order)
+      .limit(perPage)
+      .offset((page - 1) * perPage);
+
+    return {
+      components: rows.map((c) => this.formatComponent(c)),
+      total,
+    };
+  }
+
+  // ─── Admin: component CRUD ───────────────────────────────────────────────────
+
+  async createComponent(
+    spaceId: number,
+    data: {
+      name: string;
+      display_name?: string | null;
+      description?: string | null;
+      schema?: any;
+      is_root?: boolean;
+      is_nestable?: boolean;
+      component_group_uuid?: string | null;
+      image?: string | null;
+      color?: string | null;
+      icon?: string | null;
+    },
+  ) {
+    const id = BigInt(Date.now() * 1000 + Math.floor(Math.random() * 1000));
+    const [row] = await this.db
+      .insert(components)
+      .values({
+        id,
+        spaceId,
+        name: data.name,
+        displayName: data.display_name ?? null,
+        description: data.description ?? null,
+        schema: data.schema ?? {},
+        isRoot: data.is_root ?? false,
+        isNestable: data.is_nestable ?? true,
+        componentGroupUuid: data.component_group_uuid ?? null,
+        image: data.image ?? null,
+        color: data.color ?? null,
+        icon: data.icon ?? null,
+      })
+      .returning();
+    return { component: this.formatComponent(row) };
+  }
+
+  async updateComponent(
+    spaceId: number,
+    id: number,
+    data: {
+      name?: string;
+      display_name?: string | null;
+      description?: string | null;
+      schema?: any;
+      is_root?: boolean;
+      is_nestable?: boolean;
+      component_group_uuid?: string | null;
+      image?: string | null;
+      color?: string | null;
+      icon?: string | null;
+    },
+  ) {
+    const set: Record<string, any> = { updatedAt: new Date() };
+    if (data.name !== undefined) set.name = data.name;
+    if (data.display_name !== undefined) set.displayName = data.display_name;
+    if (data.description !== undefined) set.description = data.description;
+    if (data.schema !== undefined) set.schema = data.schema;
+    if (data.is_root !== undefined) set.isRoot = data.is_root;
+    if (data.is_nestable !== undefined) set.isNestable = data.is_nestable;
+    if ('component_group_uuid' in data) set.componentGroupUuid = data.component_group_uuid;
+    if ('image' in data) set.image = data.image;
+    if ('color' in data) set.color = data.color;
+    if ('icon' in data) set.icon = data.icon;
+
+    const [row] = await this.db
+      .update(components)
+      .set(set)
+      .where(and(eq(components.id, BigInt(id)), eq(components.spaceId, spaceId)))
+      .returning();
+    if (!row) throw new NotFoundException('Component not found');
+    return { component: this.formatComponent(row) };
+  }
+
+  async deleteComponent(spaceId: number, id: number) {
+    const [row] = await this.db
+      .delete(components)
+      .where(and(eq(components.id, BigInt(id)), eq(components.spaceId, spaceId)))
+      .returning();
+    if (!row) throw new NotFoundException('Component not found');
+    return { component: this.formatComponent(row) };
+  }
+
+  async duplicateComponent(spaceId: number, id: number) {
+    const [orig] = await this.db
+      .select()
+      .from(components)
+      .where(and(eq(components.id, BigInt(id)), eq(components.spaceId, spaceId)))
+      .limit(1);
+    if (!orig) throw new NotFoundException('Component not found');
+
+    const newId = BigInt(Date.now() * 1000 + Math.floor(Math.random() * 1000));
+    const [row] = await this.db
+      .insert(components)
+      .values({
+        id: newId,
+        spaceId,
+        name: `${orig.name}_copy`,
+        displayName: orig.displayName ? `Copy of ${orig.displayName}` : null,
+        description: orig.description,
+        schema: orig.schema,
+        isRoot: orig.isRoot,
+        isNestable: orig.isNestable,
+        componentGroupUuid: orig.componentGroupUuid,
+        image: orig.image,
+        color: orig.color,
+        icon: orig.icon,
+      })
+      .returning();
+    return { component: this.formatComponent(row) };
+  }
+
+  // ─── Admin: component group CRUD ────────────────────────────────────────────
+
+  async createComponentGroup(spaceId: number, data: { name: string; parent_uuid?: string | null }) {
+    const id = BigInt(Date.now() * 1000 + Math.floor(Math.random() * 1000));
+    const uuid = crypto.randomUUID();
+
+    let parentId: bigint | null = null;
+    if (data.parent_uuid) {
+      const [parent] = await this.db
+        .select()
+        .from(componentGroups)
+        .where(and(eq(componentGroups.uuid, data.parent_uuid), eq(componentGroups.spaceId, spaceId)))
+        .limit(1);
+      if (parent) parentId = parent.id;
+    }
+
+    const [row] = await this.db
+      .insert(componentGroups)
+      .values({
+        id,
+        uuid,
+        spaceId,
+        name: data.name,
+        parentId,
+        parentUuid: data.parent_uuid ?? null,
+      })
+      .returning();
+    return this.formatGroup(row);
+  }
+
+  async updateComponentGroup(spaceId: number, id: number, data: { name?: string }) {
+    const set: Record<string, any> = {};
+    if (data.name !== undefined) set.name = data.name;
+
+    const [row] = await this.db
+      .update(componentGroups)
+      .set(set)
+      .where(and(eq(componentGroups.id, BigInt(id)), eq(componentGroups.spaceId, spaceId)))
+      .returning();
+    if (!row) throw new NotFoundException('Group not found');
+    return this.formatGroup(row);
+  }
+
+  async deleteComponentGroup(spaceId: number, id: number) {
+    const [row] = await this.db
+      .delete(componentGroups)
+      .where(and(eq(componentGroups.id, BigInt(id)), eq(componentGroups.spaceId, spaceId)))
+      .returning();
+    if (!row) throw new NotFoundException('Group not found');
+    return this.formatGroup(row);
+  }
+
+  // ─── Formatters ─────────────────────────────────────────────────────────────
+
+  private formatGroup(g: typeof componentGroups.$inferSelect) {
+    return {
+      id: Number(g.id),
+      uuid: g.uuid,
+      name: g.name,
+      parent_id: g.parentId ? Number(g.parentId) : null,
+      parent_uuid: g.parentUuid ?? null,
     };
   }
 

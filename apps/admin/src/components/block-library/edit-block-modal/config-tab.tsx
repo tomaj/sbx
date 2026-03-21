@@ -1,7 +1,7 @@
 'use client'
 
-import { ChevronDown } from 'lucide-react'
 import type { ComponentGroup } from '../group-tree'
+import { SelectDropdown } from '@/components/ui/select-dropdown'
 
 type BlockType = 'nestable' | 'content_type' | 'universal'
 
@@ -116,21 +116,12 @@ export function ConfigTab({
         <label className="block text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">
           Block Folder
         </label>
-        <div className="relative">
-          <select
-            value={groupUuid ?? ''}
-            onChange={(e) => onGroupUuidChange(e.target.value || null)}
-            className="w-full appearance-none px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-teal-500"
-          >
-            <option value="">No folder</option>
-            {groups.map((g) => (
-              <option key={g.id} value={g.uuid}>
-                {g.name}
-              </option>
-            ))}
-          </select>
-          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-        </div>
+        <SelectDropdown
+          value={groupUuid}
+          onChange={onGroupUuidChange}
+          options={groups.map((g) => ({ value: g.uuid, label: g.name }))}
+          placeholder="No folder"
+        />
       </div>
     </div>
   )

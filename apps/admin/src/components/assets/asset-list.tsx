@@ -28,9 +28,10 @@ interface AssetListProps {
   isLoading?: boolean
   showRestore?: boolean
   onRestore?: (asset: Asset) => void
+  onAssetClick?: (asset: Asset) => void
 }
 
-export function AssetList({ assets, spaceId, isLoading, showRestore, onRestore }: AssetListProps) {
+export function AssetList({ assets, spaceId, isLoading, showRestore, onRestore, onAssetClick }: AssetListProps) {
   if (isLoading) {
     return (
       <div className="flex flex-col gap-1">
@@ -66,6 +67,7 @@ export function AssetList({ assets, spaceId, isLoading, showRestore, onRestore }
         <div
           key={asset.id}
           className="flex items-center gap-4 py-3 px-1 hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded-lg group cursor-pointer"
+          onClick={() => onAssetClick?.(asset)}
         >
           {/* Thumbnail */}
           <div className="w-16 h-16 rounded-lg bg-gray-100 dark:bg-gray-800 shrink-0 flex items-center justify-center p-1.5">

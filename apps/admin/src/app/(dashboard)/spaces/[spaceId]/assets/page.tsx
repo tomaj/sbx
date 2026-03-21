@@ -17,6 +17,8 @@ import { FolderTree, type AssetFolder } from '@/components/assets/folder-tree'
 import { CreateFolderModal } from '@/components/assets/create-folder-modal'
 import { AssetGrid, type Asset } from '@/components/assets/asset-grid'
 import { AssetList } from '@/components/assets/asset-list'
+import { AssetDetailModal } from '@/components/assets/asset-detail-modal'
+import { UploadAssetsModal } from '@/components/assets/upload-assets-modal'
 
 const SORT_OPTIONS: SortOption[] = [
   { value: 'created_at_desc', label: 'Default' },
@@ -88,6 +90,8 @@ export default function AssetsPage({ params }: { params: Promise<{ spaceId: stri
   const [renameFolder, setRenameFolder] = useState<AssetFolder | null>(null)
   const [renameName, setRenameName] = useState('')
   const [deleteFolderTarget, setDeleteFolderTarget] = useState<AssetFolder | null>(null)
+  const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null)
+  const [uploadOpen, setUploadOpen] = useState(false)
 
   // ─── Load folders ──────────────────────────────────────────────────────────
   const loadFolders = useCallback(async () => {
@@ -226,9 +230,8 @@ export default function AssetsPage({ params }: { params: Promise<{ spaceId: stri
             Create Folder
           </button>
           <button
-            disabled
-            className="flex items-center gap-1.5 px-3 py-2 text-sm bg-teal-600 text-white rounded-lg opacity-60 cursor-not-allowed"
-            title="Upload coming soon"
+            onClick={() => setUploadOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-2 text-sm bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
           >
             <Upload className="w-4 h-4" />
             Upload files
@@ -353,7 +356,12 @@ export default function AssetsPage({ params }: { params: Promise<{ spaceId: stri
           {/* Asset listing */}
           <div className="flex-1 overflow-y-auto px-6 pb-4">
             {viewMode === 'grid' ? (
-              <AssetGrid assets={assets} spaceId={spaceId} isLoading={isLoading} />
+              <AssetGrid
+                assets={assets}
+                spaceId={spaceId}
+                isLoading={isLoading}
+                onAssetClick={setSelectedAsset}
+              />
             ) : (
               <AssetList
                 assets={assets}
@@ -361,6 +369,7 @@ export default function AssetsPage({ params }: { params: Promise<{ spaceId: stri
                 isLoading={isLoading}
                 showRestore={showDeleted}
                 onRestore={handleRestoreAsset}
+                onAssetClick={setSelectedAsset}
               />
             )}
           </div>
@@ -417,6 +426,37 @@ export default function AssetsPage({ params }: { params: Promise<{ spaceId: stri
         onConfirm={handleDeleteFolder}
         onCancel={() => setDeleteFolderTarget(null)}
       />
+
+      {/* Asset detail modal */}
+      {selectedAsset && (
+        <AssetDetailModal
+          asset={selectedAsset}
+          spaceId={spaceId}
+          onClose={() => setSelectedAsset(null)}
+          onDeleted={() => {
+            setSelectedAsset(null)
+            loadAssets()
+            loadCounts()
+          }}
+          onSaved={updated => {
+            setAssets(prev => prev.map(a => a.id === updated.id ? updated : a))
+            setSelectedAsset(null)
+          }}
+        />
+      )}
+
+      {/* Upload modal */}
+      {uploadOpen && (
+        <UploadAssetsModal
+          spaceId={spaceId}
+          folderId={typeof selectedFolder === 'number' ? selectedFolder : null}
+          onClose={() => setUploadOpen(false)}
+          onUploaded={() => {
+            loadAssets()
+            loadCounts()
+          }}
+        />
+      )}
     </div>
   )
 }

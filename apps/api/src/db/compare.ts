@@ -300,6 +300,88 @@ async function comparePresets() {
   }
 }
 
+const CDN_STORY_FIELDS = [
+  'id', 'uuid', 'name', 'slug', 'full_slug', 'path', 'position', 'parent_id',
+  'group_id', 'is_startpage', 'sort_by_date', 'tag_list',
+  'published_at', 'first_published_at', 'lang',
+  'alternates', 'translated_slugs', 'release_id', 'default_full_slug',
+];
+
+async function compareCdnStoriesList() {
+  console.log('\n=== CDN /v2/cdn/stories (list) ===');
+
+  for (const sp of SPACES) {
+    console.log(`\n  [${sp.id}] ${sp.name}`);
+
+    const qs = `token=${sp.cdnToken}&per_page=5&sort_by=position:asc&version=published`;
+    const [ours, live] = await Promise.all([
+      fetch(`${OUR_BASE}/v2/cdn/stories?${qs}`),
+      fetch(`${SB_CDN_BASE}/v2/cdn/stories?${qs}`),
+    ]);
+
+    const ourStories: any[] = ours.stories ?? [];
+    const liveStories: any[] = live.stories ?? [];
+
+    console.log(`    count (page 1): ours=${ourStories.length}  live=${liveStories.length} ${ourStories.length === liveStories.length ? '✅' : '❌'}`);
+
+    // Check cv is a number
+    const cvOk = typeof ours.cv === 'number' && typeof live.cv === 'number';
+    console.log(`    cv: ours=${ours.cv}  live=${live.cv} ${cvOk ? '✅' : '❌'} (values differ by design — just checking type)`);
+
+    // Spot-check first story
+    if (ourStories.length > 0 && liveStories.length > 0) {
+      const liveFirst = liveStories[0];
+      const ourFirst = ourStories.find((s: any) => s.uuid === liveFirst.uuid);
+      if (ourFirst) {
+        diff(`story[0] uuid=${liveFirst.uuid}`, ourFirst, liveFirst, CDN_STORY_FIELDS);
+        // content: just check it's an object with same component
+        const contentOk = ourFirst.content?.component === liveFirst.content?.component;
+        console.log(`    content.component: ours=${ourFirst.content?.component}  live=${liveFirst.content?.component} ${contentOk ? '✅' : '❌'}`);
+      } else {
+        console.log(`    ❌ first live story uuid=${liveFirst.uuid} not found in our response`);
+      }
+    }
+
+    // Check rels/links arrays exist
+    const structOk = Array.isArray(ours.rels) && Array.isArray(ours.links);
+    console.log(`    rels/links arrays: ${structOk ? '✅' : '❌'}`);
+  }
+}
+
+async function compareCdnStory() {
+  console.log('\n=== CDN /v2/cdn/stories/:slug (single) ===');
+
+  for (const sp of SPACES) {
+    console.log(`\n  [${sp.id}] ${sp.name}`);
+
+    // Fetch first story from list to get a known slug
+    const listQs = `token=${sp.cdnToken}&per_page=1&sort_by=position:asc&version=published`;
+    const listRes = await fetch(`${OUR_BASE}/v2/cdn/stories?${listQs}`);
+    const firstStory = listRes.stories?.[0];
+
+    if (!firstStory) {
+      console.log(`    ⚠️  no published stories to test`);
+      continue;
+    }
+
+    const slug = firstStory.full_slug;
+    const qs = `token=${sp.cdnToken}&version=published`;
+    const [ours, live] = await Promise.all([
+      fetch(`${OUR_BASE}/v2/cdn/stories/${slug}?${qs}`),
+      fetch(`${SB_CDN_BASE}/v2/cdn/stories/${slug}?${qs}`),
+    ]);
+
+    if (!ours.story || !live.story) {
+      console.log(`    ❌ slug="${slug}" ours=${JSON.stringify(ours).slice(0, 80)}  live=${JSON.stringify(live).slice(0, 80)}`);
+      continue;
+    }
+
+    diff(`story "${slug}"`, ours.story, live.story, CDN_STORY_FIELDS);
+    const contentOk = ours.story.content?.component === live.story.content?.component;
+    console.log(`    content.component: ours=${ours.story.content?.component}  live=${live.story.content?.component} ${contentOk ? '✅' : '❌'}`);
+  }
+}
+
 async function main() {
   await compareSpacesMe();
   await compareCollaborators();
@@ -309,6 +391,8 @@ async function main() {
   await compareSpaceRoles();
   await compareWebhooks();
   await comparePresets();
+  await compareCdnStoriesList();
+  await compareCdnStory();
   console.log('\n=== Done ===');
 }
 

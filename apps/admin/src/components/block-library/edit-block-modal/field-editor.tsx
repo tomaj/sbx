@@ -16,6 +16,7 @@ import {
   FIELD_TYPE_LABELS,
 } from './types'
 import type { ComponentGroup } from '../group-tree'
+import { SelectDropdown } from '@/components/ui/select-dropdown'
 
 // ─── Shared form helpers ──────────────────────────────────────────────────────
 
@@ -39,104 +40,6 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   )
 }
 
-// ─── Reusable SelectDropdown ──────────────────────────────────────────────────
-
-interface SelectOption {
-  value: string
-  label: string
-}
-
-export function SelectDropdown({
-  value,
-  onChange,
-  options,
-  placeholder = 'Choose...',
-  loading = false,
-  className,
-}: {
-  value: string | null | undefined
-  onChange: (v: string | null) => void
-  options: SelectOption[]
-  placeholder?: string
-  loading?: boolean
-  className?: string
-}) {
-  const [open, setOpen] = useState(false)
-  const [filter, setFilter] = useState('')
-  const selected = options.find((o) => o.value === (value ?? ''))
-  const filtered = options.filter((o) =>
-    o.label.toLowerCase().includes(filter.toLowerCase())
-  )
-
-  return (
-    <div className={`relative ${className ?? ''}`}>
-      <button
-        type="button"
-        onClick={() => { setOpen((v) => !v); setFilter('') }}
-        className={`w-full flex items-center justify-between px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-900 transition-colors min-h-[40px] ${
-          open
-            ? 'border-teal-500 ring-2 ring-teal-200 dark:ring-teal-900'
-            : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-        }`}
-      >
-        <span className={selected ? 'text-gray-900 dark:text-gray-100' : 'text-teal-500 dark:text-teal-400'}>
-          {loading ? 'Loading...' : (selected?.label ?? placeholder)}
-        </span>
-        <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0 ml-2" />
-      </button>
-
-      {open && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute top-full left-0 right-0 mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl max-h-64 overflow-y-auto">
-            {options.length > 6 && (
-              <div className="sticky top-0 bg-white dark:bg-gray-900 px-3 pt-2 pb-1 border-b border-gray-100 dark:border-gray-800">
-                <input
-                  autoFocus
-                  type="text"
-                  value={filter}
-                  onChange={(e) => setFilter(e.target.value)}
-                  placeholder="Filter..."
-                  className="w-full px-2 py-1 text-sm border border-gray-200 dark:border-gray-700 rounded bg-white dark:bg-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-teal-500"
-                  onClick={(e) => e.stopPropagation()}
-                />
-              </div>
-            )}
-            {placeholder && (
-              <button
-                type="button"
-                onClick={() => { onChange(null); setOpen(false) }}
-                className={`w-full text-left px-3 py-2.5 text-sm transition-colors ${
-                  !value ? 'text-teal-600 dark:text-teal-400 font-medium bg-gray-50 dark:bg-gray-800' : 'text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
-                }`}
-              >
-                {placeholder}
-              </button>
-            )}
-            {filtered.length === 0 ? (
-              <div className="px-3 py-3 text-sm text-gray-400">No results</div>
-            ) : (
-              filtered.map((o) => (
-                <button
-                  key={o.value}
-                  type="button"
-                  onClick={() => { onChange(o.value); setOpen(false) }}
-                  className={`w-full text-left px-3 py-2.5 text-sm transition-colors ${
-                    value === o.value
-                      ? 'bg-gray-50 dark:bg-gray-800 font-medium text-teal-600 dark:text-teal-400'
-                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
-                  }`}
-                >
-                  {o.label}
-                </button>
-              ))
-            )}
-          </div>
-        </>
-      )}
-    </div>
-  )
-}
 
 function TooltipHint({ text }: { text: string }) {
   const [show, setShow] = useState(false)
@@ -1127,17 +1030,12 @@ function FieldConditionsSection({
         <FormRow>
           <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
             <span>If</span>
-            <div className="relative">
-              <select
-                value={conditions!.validation}
-                onChange={(e) => setMode(e.target.value as 'any' | 'all')}
-                className="appearance-none pl-2 pr-6 py-1 border border-gray-200 dark:border-gray-700 rounded text-sm bg-white dark:bg-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500"
-              >
-                <option value="any">any</option>
-                <option value="all">all</option>
-              </select>
-              <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none" />
-            </div>
+            <SelectDropdown
+              compact
+              value={conditions!.validation}
+              onChange={(v) => setMode((v ?? 'any') as 'any' | 'all')}
+              options={[{ value: 'any', label: 'any' }, { value: 'all', label: 'all' }]}
+            />
             <span>of the following conditions are true</span>
           </div>
         </FormRow>
@@ -1152,36 +1050,20 @@ function FieldConditionsSection({
                 {idx === 0 ? 'if' : 'and'}
               </span>
               <div className="flex-1 flex flex-col gap-1.5">
-                <div className="relative">
-                  <select
-                    value={rule.field}
-                    onChange={(e) => updateRule(idx, { field: e.target.value })}
-                    className="w-full appearance-none px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500"
-                  >
-                    {availableFields.length === 0 ? (
-                      <option value="">No fields available</option>
-                    ) : (
-                      availableFields.map((f) => (
-                        <option key={f.key} value={f.key}>
-                          {(f.def as any).display_name || f.key}
-                        </option>
-                      ))
-                    )}
-                  </select>
-                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                </div>
-                <div className="relative">
-                  <select
-                    value={rule.validation}
-                    onChange={(e) => updateRule(idx, { validation: e.target.value as FieldConditionRule['validation'], value: undefined })}
-                    className="w-full appearance-none px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500"
-                  >
-                    {VALIDATION_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value}>{o.label}</option>
-                    ))}
-                  </select>
-                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                </div>
+                <SelectDropdown
+                  value={rule.field}
+                  onChange={(v) => updateRule(idx, { field: v ?? '' })}
+                  options={
+                    availableFields.length === 0
+                      ? [{ value: '', label: 'No fields available' }]
+                      : availableFields.map((f) => ({ value: f.key, label: (f.def as any).display_name || f.key }))
+                  }
+                />
+                <SelectDropdown
+                  value={rule.validation}
+                  onChange={(v) => updateRule(idx, { validation: (v ?? 'empty') as FieldConditionRule['validation'], value: undefined })}
+                  options={VALIDATION_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+                />
                 {valOpt?.hasValue && (
                   <input
                     type="text"

@@ -10,6 +10,7 @@ import { CreateBlockModal } from '@/components/block-library/create-block-modal'
 import { BlockList, type Block } from '@/components/block-library/block-list'
 import { EditBlockModal } from '@/components/block-library/edit-block-modal'
 import type { SortOption } from '@/components/ui/search-filter-bar'
+import { SelectDropdown } from '@/components/ui/select-dropdown'
 
 const SORT_OPTIONS: SortOption[] = [
   { value: 'name_asc', label: 'Name (A–Z)' },
@@ -313,15 +314,12 @@ export default function BlockLibraryPage({ params }: { params: Promise<{ spaceId
             </div>
 
             {/* Sort */}
-            <select
+            <SelectDropdown
               value={sort}
-              onChange={(e) => setSort(e.target.value)}
-              className="px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-teal-500"
-            >
-              {SORT_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>{o.label}</option>
-              ))}
-            </select>
+              onChange={(v) => v && setSort(v)}
+              options={SORT_OPTIONS}
+              className="w-44"
+            />
           </div>
 
           {/* Block listing */}

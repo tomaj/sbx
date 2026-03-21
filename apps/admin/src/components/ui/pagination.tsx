@@ -1,6 +1,7 @@
 'use client'
 
-import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { SelectDropdown } from './select-dropdown'
 
 export interface PaginationState {
   total: number
@@ -21,18 +22,12 @@ export function Pagination({ total, page, perPage, onPageChange, onPerPageChange
     <div className="bg-white dark:bg-gray-950 border-t border-gray-200 dark:border-gray-700 px-4 py-2.5 flex items-center gap-6 text-sm text-gray-600 dark:text-gray-400">
       <div className="flex items-center gap-2">
         <span className="whitespace-nowrap">Items per page:</span>
-        <div className="relative">
-          <select
-            value={perPage}
-            onChange={(e) => { onPerPageChange(Number(e.target.value)); onPageChange(1) }}
-            className="appearance-none pl-2 pr-6 py-1 border border-gray-200 dark:border-gray-700 rounded text-sm bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-teal-500"
-          >
-            {PER_PAGE_OPTIONS.map((n) => (
-              <option key={n} value={n}>{n}</option>
-            ))}
-          </select>
-          <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 size-3 pointer-events-none text-gray-400" />
-        </div>
+        <SelectDropdown
+          compact
+          value={String(perPage)}
+          onChange={(v) => { if (v) { onPerPageChange(Number(v)); onPageChange(1) } }}
+          options={PER_PAGE_OPTIONS.map((n) => ({ value: String(n), label: String(n) }))}
+        />
       </div>
 
       <span className="whitespace-nowrap">{from}–{to} of {total} items</span>
@@ -41,18 +36,12 @@ export function Pagination({ total, page, perPage, onPageChange, onPerPageChange
 
       <div className="flex items-center gap-2">
         <span>Page</span>
-        <div className="relative">
-          <select
-            value={page}
-            onChange={(e) => onPageChange(Number(e.target.value))}
-            className="appearance-none pl-2 pr-6 py-1 border border-gray-200 dark:border-gray-700 rounded text-sm bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-teal-500"
-          >
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
-              <option key={n} value={n}>{n}</option>
-            ))}
-          </select>
-          <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 size-3 pointer-events-none text-gray-400" />
-        </div>
+        <SelectDropdown
+          compact
+          value={String(page)}
+          onChange={(v) => { if (v) onPageChange(Number(v)) }}
+          options={Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => ({ value: String(n), label: String(n) }))}
+        />
         <span>of {totalPages}</span>
         <button
           onClick={() => onPageChange(page - 1)}

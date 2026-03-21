@@ -92,6 +92,13 @@
       "when": 1774021811298,
       "tag": "0012_deep_paper_doll",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1774080149579,
+      "tag": "0013_nostalgic_talon",
+      "breakpoints": true
     }
   ]
 }

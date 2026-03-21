@@ -6,6 +6,7 @@ import { DataTable, type Column, type SortState } from '@/components/ui/data-tab
 import { SearchBar } from '@/components/ui/search-bar'
 import { RightSidebar } from '@/components/ui/right-sidebar'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
+import { SelectDropdown } from '@/components/ui/select-dropdown'
 
 interface Task {
   id: number
@@ -103,16 +104,12 @@ function ExecuteDialog({ open, task, spaceId, onClose, onExecuted }: ExecuteDial
                 {def.required && <span className="text-red-500 ml-1">*</span>}
               </label>
               {def.type === 'option' ? (
-                <select
-                  value={values[key] ?? ''}
-                  onChange={(e) => setValues((v) => ({ ...v, [key]: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500"
-                >
-                  <option value="">Select...</option>
-                  {(def.options ?? []).map((opt: any) => (
-                    <option key={opt.value} value={opt.value}>{opt.name}</option>
-                  ))}
-                </select>
+                <SelectDropdown
+                  value={values[key] ?? null}
+                  onChange={(v) => setValues((prev) => ({ ...prev, [key]: v ?? '' }))}
+                  options={(def.options ?? []).map((opt: any) => ({ value: opt.value, label: opt.name }))}
+                  placeholder="Select..."
+                />
               ) : (
                 <input
                   type="text"

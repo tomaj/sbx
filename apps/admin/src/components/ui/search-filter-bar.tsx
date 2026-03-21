@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Search, SlidersHorizontal, ChevronDown, X, Plus } from 'lucide-react'
+import { SelectDropdown } from './select-dropdown'
 
 export interface SortOption {
   value: string
@@ -195,16 +196,13 @@ export function SearchFilterBar({
             >
               <span className="text-xs text-gray-500 dark:text-gray-400">{filter.label}:</span>
               {filter.type === 'select' && filter.options ? (
-                <select
-                  value={filter.value}
-                  onChange={e => updateFilterValue(filter.key, e.target.value)}
-                  className="text-xs text-gray-700 dark:text-gray-300 bg-transparent border-none outline-none cursor-pointer"
-                >
-                  <option value="">Any</option>
-                  {filter.options.map(o => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
-                  ))}
-                </select>
+                <SelectDropdown
+                  ghost
+                  value={filter.value || null}
+                  onChange={(v) => updateFilterValue(filter.key, v ?? '')}
+                  options={filter.options}
+                  placeholder="Any"
+                />
               ) : filter.type === 'date' ? (
                 <input
                   type="date"

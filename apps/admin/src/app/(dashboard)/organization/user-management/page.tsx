@@ -7,6 +7,7 @@ import { SearchBar } from '@/components/ui/search-bar'
 import { DataTable, type Column, type SortState } from '@/components/ui/data-table'
 import { RightSidebar } from '@/components/ui/right-sidebar'
 import { UserAvatar } from '@/components/ui/user-avatar'
+import { SelectDropdown } from '@/components/ui/select-dropdown'
 import { cn } from '@/lib/utils'
 
 interface Space {
@@ -500,19 +501,14 @@ export default function UserManagementPage() {
 
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Role</label>
-          <div className="relative">
-            <select
-              value={editRole}
-              onChange={(e) => setEditRole(e.target.value as 'admin' | 'member')}
-              className="w-full appearance-none px-3 py-2.5 pr-8 border border-gray-200 dark:border-gray-700 rounded-md text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
-            >
-              <option value="member">Member</option>
-              <option value="admin">Admin</option>
-            </select>
-            <svg className="absolute right-2.5 top-1/2 -translate-y-1/2 size-4 text-gray-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </div>
+          <SelectDropdown
+            value={editRole}
+            onChange={(v) => v && setEditRole(v as 'admin' | 'member')}
+            options={[
+              { value: 'member', label: 'Member' },
+              { value: 'admin', label: 'Admin' },
+            ]}
+          />
           <div className="text-xs text-gray-500 dark:text-gray-400 mt-1.5 space-y-0.5">
             <p><strong>Member</strong> - Can be added to organization spaces</p>
             <p><strong>Admin</strong> - Can manage organization users and spaces</p>
