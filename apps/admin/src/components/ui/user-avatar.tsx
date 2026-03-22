@@ -25,7 +25,8 @@ function getInitials(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
 }
 
-function getColor(name: string): string {
+function getColor(name: string | undefined | null): string {
+  if (!name) return COLORS[0]
   let hash = 0
   for (let i = 0; i < name.length; i++) {
     hash = (hash * 31 + name.charCodeAt(i)) % COLORS.length
@@ -41,13 +42,14 @@ const sizes = {
 }
 
 interface UserAvatarProps {
-  name: string
+  name: string | undefined | null
   src?: string | null
   size?: keyof typeof sizes
   className?: string
 }
 
-export function UserAvatar({ name, src, size = 'md', className }: UserAvatarProps) {
+export function UserAvatar({ name: nameProp, src, size = 'md', className }: UserAvatarProps) {
+  const name = nameProp || '?'
   const [imgError, setImgError] = useState(false)
 
   if (src && !imgError) {

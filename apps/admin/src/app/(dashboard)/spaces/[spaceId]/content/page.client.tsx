@@ -97,7 +97,7 @@ export default function ContentPage({ params }: { params: Promise<{ spaceId: str
         for (const c of data.collaborators ?? []) {
           if (c.user) {
             map[c.user.id] = {
-              name: c.user.friendly_name || c.user.userid,
+              name: c.user.friendly_name || c.user.userid || c.user.email || '?',
               avatar: c.user.avatar ?? null,
             }
           }
