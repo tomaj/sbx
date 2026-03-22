@@ -12,14 +12,41 @@ interface Props {
   allComponents: ComponentMeta[]
   allGroups: ComponentGroup[]
   onChange: (key: string, value: any) => void
+  loading?: boolean
 }
 
-export function EditTab({ spaceId, schema, content, allComponents, allGroups, onChange }: Props) {
+export function EditTab({ spaceId, schema, content, allComponents, allGroups, onChange, loading }: Props) {
   const [activeTab, setActiveTab] = useState(0)
 
   const componentName = content?.component as string | undefined
   const componentMeta = allComponents.find((c) => c.name === componentName)
   const componentDisplayName = componentMeta?.display_name || componentName
+
+  if (loading) {
+    return (
+      <div className="flex flex-col h-full">
+        {/* Skeleton component name */}
+        <div className="px-5 pt-5 pb-1 flex-shrink-0">
+          <div className="h-5 w-28 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+        </div>
+        {/* Skeleton tab bar */}
+        <div className="flex gap-2 border-b border-gray-200 dark:border-gray-700 px-5 py-2 flex-shrink-0">
+          {[48, 72, 80].map((w, i) => (
+            <div key={i} className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" style={{ width: w }} />
+          ))}
+        </div>
+        {/* Skeleton fields */}
+        <div className="flex-1 overflow-y-auto px-5 py-5 space-y-6">
+          {[75, 55, 100, 60, 80, 45].map((w, i) => (
+            <div key={i} className="space-y-2">
+              <div className="h-3.5 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" style={{ width: `${w}%` }} />
+              <div className="h-10 w-full bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse" />
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
 
   if (!schema || Object.keys(schema).length === 0) {
     return (
@@ -65,7 +92,7 @@ export function EditTab({ spaceId, schema, content, allComponents, allGroups, on
       )}
 
       {/* Fields */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-5">
+      <div className="flex-1 overflow-y-auto px-5 py-5 space-y-6">
         {tabFields.length === 0 && (
           <p className="text-sm text-gray-400">No fields in this tab</p>
         )}

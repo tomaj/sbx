@@ -14,6 +14,7 @@ certbot --nginx \
   -d "$DOMAIN" \
   -d "www.$DOMAIN" \
   -d "api.$DOMAIN" \
+  -d "demo.$DOMAIN" \
   --non-interactive \
   --agree-tos \
   --email "$EMAIL" \

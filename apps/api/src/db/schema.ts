@@ -9,6 +9,7 @@ import {
   boolean,
   timestamp,
   unique,
+  index,
   json,
 } from 'drizzle-orm/pg-core';
 
@@ -69,23 +70,31 @@ export const spaceMembers = pgTable(
     permissions: json('permissions').notNull().default([]),
     allowedPath: text('allowed_path').notNull().default(''),
   },
-  (t) => [unique().on(t.spaceId, t.userId)],
+  (t) => [
+    unique().on(t.spaceId, t.userId),
+    index('idx_space_members_space_id').on(t.spaceId),
+    index('idx_space_members_user_id').on(t.userId),
+  ],
 );
 
-export const apiTokens = pgTable('api_tokens', {
-  id: bigint('id', { mode: 'number' }).primaryKey(),
-  spaceId: integer('space_id')
-    .notNull()
-    .references(() => spaces.id, { onDelete: 'cascade' }),
-  name: text('name'),
-  token: text('token').notNull().unique(),
-  tokenType: tokenTypeEnum('token_type').notNull(),
-  branchId: bigint('branch_id', { mode: 'number' }),
-  storyIds: json('story_ids').notNull().default([]),
-  minCache: integer('min_cache').notNull().default(0),
-  releaseIds: json('release_ids').notNull().default([]),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-});
+export const apiTokens = pgTable(
+  'api_tokens',
+  {
+    id: bigint('id', { mode: 'number' }).primaryKey(),
+    spaceId: integer('space_id')
+      .notNull()
+      .references(() => spaces.id, { onDelete: 'cascade' }),
+    name: text('name'),
+    token: text('token').notNull().unique(),
+    tokenType: tokenTypeEnum('token_type').notNull(),
+    branchId: bigint('branch_id', { mode: 'number' }),
+    storyIds: json('story_ids').notNull().default([]),
+    minCache: integer('min_cache').notNull().default(0),
+    releaseIds: json('release_ids').notNull().default([]),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (t) => [index('idx_api_tokens_space_id').on(t.spaceId)],
+);
 
 export const datasources = pgTable(
   'datasources',
@@ -117,321 +126,442 @@ export const tags = pgTable(
   (t) => [unique().on(t.spaceId, t.name)],
 );
 
-export const componentGroups = pgTable('component_groups', {
-  id: bigint('id', { mode: 'bigint' }).primaryKey(),
-  uuid: text('uuid').notNull().unique(),
-  spaceId: integer('space_id')
-    .notNull()
-    .references(() => spaces.id, { onDelete: 'cascade' }),
-  name: text('name').notNull(),
-  parentId: bigint('parent_id', { mode: 'bigint' }),
-  parentUuid: text('parent_uuid'),
-});
+export const componentGroups = pgTable(
+  'component_groups',
+  {
+    id: bigint('id', { mode: 'bigint' }).primaryKey(),
+    uuid: text('uuid').notNull().unique(),
+    spaceId: integer('space_id')
+      .notNull()
+      .references(() => spaces.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    parentId: bigint('parent_id', { mode: 'bigint' }),
+    parentUuid: text('parent_uuid'),
+  },
+  (t) => [index('idx_component_groups_space_id').on(t.spaceId)],
+);
 
-export const components = pgTable('components', {
-  id: bigint('id', { mode: 'bigint' }).primaryKey(),
-  spaceId: integer('space_id')
-    .notNull()
-    .references(() => spaces.id, { onDelete: 'cascade' }),
-  componentGroupUuid: text('component_group_uuid'),
-  name: text('name').notNull(),
-  displayName: text('display_name'),
-  schema: json('schema').notNull().default({}),
-  image: text('image'),
-  previewField: text('preview_field'),
-  previewTmpl: text('preview_tmpl'),
-  isRoot: boolean('is_root').notNull().default(false),
-  isNestable: boolean('is_nestable').notNull().default(true),
-  color: text('color'),
-  icon: text('icon'),
-  description: text('description'),
-  // all_presets: array of preset objects [{id, name, component_id, image, icon, color, description}]
-  allPresets: json('all_presets').notNull().default([]),
-  // internal_tags_list: [{id, name}]
-  internalTagsList: json('internal_tags_list').notNull().default([]),
-  // internal_tag_ids: ["id1", "id2"]
-  internalTagIds: json('internal_tag_ids').notNull().default([]),
-  // content_type_asset_preview: field key used as asset preview for content type blocks
-  contentTypeAssetPreview: text('content_type_asset_preview'),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-  updatedAt: timestamp('updated_at').notNull().defaultNow(),
-});
+export const components = pgTable(
+  'components',
+  {
+    id: bigint('id', { mode: 'bigint' }).primaryKey(),
+    spaceId: integer('space_id')
+      .notNull()
+      .references(() => spaces.id, { onDelete: 'cascade' }),
+    componentGroupUuid: text('component_group_uuid'),
+    name: text('name').notNull(),
+    displayName: text('display_name'),
+    schema: json('schema').notNull().default({}),
+    image: text('image'),
+    previewField: text('preview_field'),
+    previewTmpl: text('preview_tmpl'),
+    isRoot: boolean('is_root').notNull().default(false),
+    isNestable: boolean('is_nestable').notNull().default(true),
+    color: text('color'),
+    icon: text('icon'),
+    description: text('description'),
+    // all_presets: array of preset objects [{id, name, component_id, image, icon, color, description}]
+    allPresets: json('all_presets').notNull().default([]),
+    // internal_tags_list: [{id, name}]
+    internalTagsList: json('internal_tags_list').notNull().default([]),
+    // internal_tag_ids: ["id1", "id2"]
+    internalTagIds: json('internal_tag_ids').notNull().default([]),
+    // content_type_asset_preview: field key used as asset preview for content type blocks
+    contentTypeAssetPreview: text('content_type_asset_preview'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    index('idx_components_space_id').on(t.spaceId),
+    index('idx_components_space_group_uuid').on(t.spaceId, t.componentGroupUuid),
+  ],
+);
 
-export const spaceRoles = pgTable('space_roles', {
-  id: bigint('id', { mode: 'bigint' }).primaryKey(),
-  spaceId: integer('space_id')
-    .notNull()
-    .references(() => spaces.id, { onDelete: 'cascade' }),
-  role: text('role').notNull(),
-  subtitle: text('subtitle'),
-  extId: text('ext_id'),
-  permissions: json('permissions').notNull().default([]),
-  allowedPaths: json('allowed_paths').notNull().default([]),
-  blockedPaths: json('blocked_paths').notNull().default([]),
-  fieldPermissions: json('field_permissions').notNull().default([]),
-  allowedFieldPermissions: json('allowed_field_permissions').notNull().default([]),
-  readonlyFieldPermissions: json('readonly_field_permissions').notNull().default([]),
-  datasourceIds: json('datasource_ids').notNull().default([]),
-  blockedDatasourceIds: json('blocked_datasource_ids').notNull().default([]),
-  componentIds: json('component_ids').notNull().default([]),
-  allowedComponentIds: json('allowed_component_ids').notNull().default([]),
-  branchIds: json('branch_ids').notNull().default([]),
-  blockedBranchIds: json('blocked_branch_ids').notNull().default([]),
-  allowedLanguages: json('allowed_languages').notNull().default([]),
-  blockedLanguages: json('blocked_languages').notNull().default([]),
-  assetFolderIds: json('asset_folder_ids').notNull().default([]),
-  blockedAssetFolderIds: json('blocked_asset_folder_ids').notNull().default([]),
-  managedComponentIds: json('managed_component_ids').notNull().default([]),
-  blockedManageComponentIds: json('blocked_manage_component_ids').notNull().default([]),
-  managedComponentGroupUuids: json('managed_component_group_uuids').notNull().default([]),
-  blockedManageComponentGroupUuids: json('blocked_manage_component_group_uuids').notNull().default([]),
-  componentGroupUuids: json('component_group_uuids').notNull().default([]),
-  blockedComponentGroupUuids: json('blocked_component_group_uuids').notNull().default([]),
-});
+export const spaceRoles = pgTable(
+  'space_roles',
+  {
+    id: bigint('id', { mode: 'bigint' }).primaryKey(),
+    spaceId: integer('space_id')
+      .notNull()
+      .references(() => spaces.id, { onDelete: 'cascade' }),
+    role: text('role').notNull(),
+    subtitle: text('subtitle'),
+    extId: text('ext_id'),
+    permissions: json('permissions').notNull().default([]),
+    allowedPaths: json('allowed_paths').notNull().default([]),
+    blockedPaths: json('blocked_paths').notNull().default([]),
+    fieldPermissions: json('field_permissions').notNull().default([]),
+    allowedFieldPermissions: json('allowed_field_permissions').notNull().default([]),
+    readonlyFieldPermissions: json('readonly_field_permissions').notNull().default([]),
+    datasourceIds: json('datasource_ids').notNull().default([]),
+    blockedDatasourceIds: json('blocked_datasource_ids').notNull().default([]),
+    componentIds: json('component_ids').notNull().default([]),
+    allowedComponentIds: json('allowed_component_ids').notNull().default([]),
+    branchIds: json('branch_ids').notNull().default([]),
+    blockedBranchIds: json('blocked_branch_ids').notNull().default([]),
+    allowedLanguages: json('allowed_languages').notNull().default([]),
+    blockedLanguages: json('blocked_languages').notNull().default([]),
+    assetFolderIds: json('asset_folder_ids').notNull().default([]),
+    blockedAssetFolderIds: json('blocked_asset_folder_ids').notNull().default([]),
+    managedComponentIds: json('managed_component_ids').notNull().default([]),
+    blockedManageComponentIds: json('blocked_manage_component_ids').notNull().default([]),
+    managedComponentGroupUuids: json('managed_component_group_uuids').notNull().default([]),
+    blockedManageComponentGroupUuids: json('blocked_manage_component_group_uuids').notNull().default([]),
+    componentGroupUuids: json('component_group_uuids').notNull().default([]),
+    blockedComponentGroupUuids: json('blocked_component_group_uuids').notNull().default([]),
+  },
+  (t) => [index('idx_space_roles_space_id').on(t.spaceId)],
+);
 
-export const webhookEndpoints = pgTable('webhook_endpoints', {
-  id: integer('id').primaryKey(),
-  spaceId: integer('space_id')
-    .notNull()
-    .references(() => spaces.id, { onDelete: 'cascade' }),
-  name: text('name').notNull(),
-  description: text('description'),
-  endpoint: text('endpoint').notNull(),
-  secret: text('secret'),
-  actions: json('actions').notNull().default([]),
-  activated: boolean('activated').notNull().default(true),
-  deletedAt: timestamp('deleted_at'),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-  updatedAt: timestamp('updated_at').notNull().defaultNow(),
-});
+export const webhookEndpoints = pgTable(
+  'webhook_endpoints',
+  {
+    id: integer('id').primaryKey(),
+    spaceId: integer('space_id')
+      .notNull()
+      .references(() => spaces.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    description: text('description'),
+    endpoint: text('endpoint').notNull(),
+    secret: text('secret'),
+    actions: json('actions').notNull().default([]),
+    activated: boolean('activated').notNull().default(true),
+    deletedAt: timestamp('deleted_at'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (t) => [index('idx_webhook_endpoints_space_id').on(t.spaceId)],
+);
 
-export const webhookLogs = pgTable('webhook_logs', {
-  id: bigserial('id', { mode: 'number' }).primaryKey(),
-  webhookEndpointId: integer('webhook_endpoint_id')
-    .notNull()
-    .references(() => webhookEndpoints.id, { onDelete: 'cascade' }),
-  spaceId: integer('space_id')
-    .notNull()
-    .references(() => spaces.id, { onDelete: 'cascade' }),
-  action: text('action').notNull(),
-  status: text('status').notNull().default('pending'), // 'success' | 'failed'
-  requestBody: json('request_body'),
-  responseBody: text('response_body'),
-  responseStatus: integer('response_status'),
-  executedAt: timestamp('executed_at').notNull().defaultNow(),
-});
+export const webhookLogs = pgTable(
+  'webhook_logs',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    webhookEndpointId: integer('webhook_endpoint_id')
+      .notNull()
+      .references(() => webhookEndpoints.id, { onDelete: 'cascade' }),
+    spaceId: integer('space_id')
+      .notNull()
+      .references(() => spaces.id, { onDelete: 'cascade' }),
+    action: text('action').notNull(),
+    status: text('status').notNull().default('pending'), // 'success' | 'failed'
+    requestBody: json('request_body'),
+    responseBody: text('response_body'),
+    responseStatus: integer('response_status'),
+    executedAt: timestamp('executed_at').notNull().defaultNow(),
+  },
+  (t) => [
+    index('idx_webhook_logs_endpoint_id').on(t.webhookEndpointId),
+    index('idx_webhook_logs_space_id').on(t.spaceId),
+  ],
+);
 
-export const workflows = pgTable('workflows', {
-  id: integer('id').primaryKey(),
-  spaceId: integer('space_id').notNull().references(() => spaces.id, { onDelete: 'cascade' }),
-  name: text('name').notNull(),
-  contentTypes: json('content_types').notNull().default([]),
-  isDefault: boolean('is_default').notNull().default(false),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-  updatedAt: timestamp('updated_at').notNull().defaultNow(),
-});
+export const workflows = pgTable(
+  'workflows',
+  {
+    id: integer('id').primaryKey(),
+    spaceId: integer('space_id').notNull().references(() => spaces.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    contentTypes: json('content_types').notNull().default([]),
+    isDefault: boolean('is_default').notNull().default(false),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (t) => [index('idx_workflows_space_id').on(t.spaceId)],
+);
 
-export const workflowStages = pgTable('workflow_stages', {
-  id: integer('id').primaryKey(),
-  workflowId: integer('workflow_id').notNull().references(() => workflows.id, { onDelete: 'cascade' }),
-  spaceId: integer('space_id').notNull().references(() => spaces.id, { onDelete: 'cascade' }),
-  name: text('name').notNull(),
-  color: text('color').notNull().default('#babcb6'),
-  position: integer('position').notNull().default(0),
-  isDefault: boolean('is_default').notNull().default(false),
-  allowPublish: boolean('allow_publish').notNull().default(false),
-  allowAllStages: boolean('allow_all_stages').notNull().default(true),
-  allowAdminPublish: boolean('allow_admin_publish').notNull().default(false),
-  allowAllUsers: boolean('allow_all_users').notNull().default(true),
-  allowAdminChange: boolean('allow_admin_change').notNull().default(false),
-  allowEditorChange: boolean('allow_editor_change').notNull().default(false),
-  storyEditingLocked: boolean('story_editing_locked').notNull().default(false),
-  allowNoneForNextStages: boolean('allow_none_for_next_stages').notNull().default(false),
-  autoRemoveAssignee: boolean('auto_remove_assignee').notNull().default(false),
-  afterPublishId: integer('after_publish_id'),
-  userIds: json('user_ids').notNull().default([]),
-  spaceRoleIds: json('space_role_ids').notNull().default([]),
-  workflowStageIds: json('workflow_stage_ids').notNull().default([]),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-  updatedAt: timestamp('updated_at').notNull().defaultNow(),
-});
+export const workflowStages = pgTable(
+  'workflow_stages',
+  {
+    id: integer('id').primaryKey(),
+    workflowId: integer('workflow_id').notNull().references(() => workflows.id, { onDelete: 'cascade' }),
+    spaceId: integer('space_id').notNull().references(() => spaces.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    color: text('color').notNull().default('#babcb6'),
+    position: integer('position').notNull().default(0),
+    isDefault: boolean('is_default').notNull().default(false),
+    allowPublish: boolean('allow_publish').notNull().default(false),
+    allowAllStages: boolean('allow_all_stages').notNull().default(true),
+    allowAdminPublish: boolean('allow_admin_publish').notNull().default(false),
+    allowAllUsers: boolean('allow_all_users').notNull().default(true),
+    allowAdminChange: boolean('allow_admin_change').notNull().default(false),
+    allowEditorChange: boolean('allow_editor_change').notNull().default(false),
+    storyEditingLocked: boolean('story_editing_locked').notNull().default(false),
+    allowNoneForNextStages: boolean('allow_none_for_next_stages').notNull().default(false),
+    autoRemoveAssignee: boolean('auto_remove_assignee').notNull().default(false),
+    afterPublishId: integer('after_publish_id'),
+    userIds: json('user_ids').notNull().default([]),
+    spaceRoleIds: json('space_role_ids').notNull().default([]),
+    workflowStageIds: json('workflow_stage_ids').notNull().default([]),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    index('idx_workflow_stages_space_id').on(t.spaceId),
+    index('idx_workflow_stages_workflow_id').on(t.workflowId),
+  ],
+);
 
-export const presets = pgTable('presets', {
-  id: bigint('id', { mode: 'bigint' }).primaryKey(),
-  spaceId: integer('space_id')
-    .notNull()
-    .references(() => spaces.id, { onDelete: 'cascade' }),
-  componentId: bigint('component_id', { mode: 'bigint' }).notNull(),
-  name: text('name').notNull(),
-  preset: json('preset').notNull().default({}),
-  image: text('image'),
-  color: text('color'),
-  icon: text('icon'),
-  description: text('description'),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-  updatedAt: timestamp('updated_at').notNull().defaultNow(),
-});
+export const presets = pgTable(
+  'presets',
+  {
+    id: bigint('id', { mode: 'bigint' }).primaryKey(),
+    spaceId: integer('space_id')
+      .notNull()
+      .references(() => spaces.id, { onDelete: 'cascade' }),
+    componentId: bigint('component_id', { mode: 'bigint' }).notNull(),
+    name: text('name').notNull(),
+    preset: json('preset').notNull().default({}),
+    image: text('image'),
+    color: text('color'),
+    icon: text('icon'),
+    description: text('description'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    index('idx_presets_space_id').on(t.spaceId),
+    index('idx_presets_component_id').on(t.componentId),
+  ],
+);
 
-export const activities = pgTable('activities', {
-  id: bigint('id', { mode: 'bigint' }).primaryKey(),
-  spaceId: integer('space_id')
-    .notNull()
-    .references(() => spaces.id, { onDelete: 'cascade' }),
-  trackableId: bigint('trackable_id', { mode: 'bigint' }),
-  trackableType: text('trackable_type'),
-  ownerId: bigint('owner_id', { mode: 'bigint' }),
-  ownerType: text('owner_type'),
-  key: text('key').notNull(),
-  parameters: json('parameters').notNull().default({}),
-  recipientId: bigint('recipient_id', { mode: 'bigint' }),
-  recipientType: text('recipient_type'),
-  // denormalized trackable/user info for display (mirrors Storyblok response)
-  trackable: json('trackable').notNull().default({}),
-  user: json('user').notNull().default({}),
-  createdAt: timestamp('created_at').notNull(),
-  updatedAt: timestamp('updated_at').notNull(),
-});
+export const activities = pgTable(
+  'activities',
+  {
+    id: bigint('id', { mode: 'bigint' }).primaryKey(),
+    spaceId: integer('space_id')
+      .notNull()
+      .references(() => spaces.id, { onDelete: 'cascade' }),
+    trackableId: bigint('trackable_id', { mode: 'bigint' }),
+    trackableType: text('trackable_type'),
+    ownerId: bigint('owner_id', { mode: 'bigint' }),
+    ownerType: text('owner_type'),
+    key: text('key').notNull(),
+    parameters: json('parameters').notNull().default({}),
+    recipientId: bigint('recipient_id', { mode: 'bigint' }),
+    recipientType: text('recipient_type'),
+    // denormalized trackable/user info for display (mirrors Storyblok response)
+    trackable: json('trackable').notNull().default({}),
+    user: json('user').notNull().default({}),
+    createdAt: timestamp('created_at').notNull(),
+    updatedAt: timestamp('updated_at').notNull(),
+  },
+  (t) => [index('idx_activities_space_id').on(t.spaceId)],
+);
 
-export const personalAccessTokens = pgTable('personal_access_tokens', {
-  id: serial('id').primaryKey(),
-  userId: text('user_id').notNull(), // better-auth user id
-  name: text('name').notNull(),
-  token: text('token').notNull().unique(),
-  expiresAt: timestamp('expires_at'),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-});
+export const personalAccessTokens = pgTable(
+  'personal_access_tokens',
+  {
+    id: serial('id').primaryKey(),
+    userId: text('user_id').notNull(), // better-auth user id
+    name: text('name').notNull(),
+    token: text('token').notNull().unique(),
+    expiresAt: timestamp('expires_at'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (t) => [index('idx_personal_access_tokens_user_id').on(t.userId)],
+);
 
-export const stories = pgTable('stories', {
-  id: bigint('id', { mode: 'bigint' }).primaryKey(),
-  spaceId: integer('space_id')
-    .notNull()
-    .references(() => spaces.id, { onDelete: 'cascade' }),
-  uuid: text('uuid').notNull(),
-  name: text('name').notNull(),
-  slug: text('slug').notNull(),
-  fullSlug: text('full_slug').notNull(),
-  path: text('path'),
-  parentId: bigint('parent_id', { mode: 'bigint' }),
-  groupId: text('group_id'),
-  contentType: text('content_type'),
-  isFolder: boolean('is_folder').notNull().default(false),
-  isStartpage: boolean('is_startpage').notNull().default(false),
-  published: boolean('published').notNull().default(false),
-  unpublishedChanges: boolean('unpublished_changes').notNull().default(false),
-  position: integer('position').notNull().default(0),
-  tagList: json('tag_list').notNull().default([]),
-  content: json('content').notNull().default({}),
-  sortByDate: timestamp('sort_by_date'),
-  publishAt: timestamp('publish_at'),
-  expireAt: timestamp('expire_at'),
-  publishedAt: timestamp('published_at'),
-  firstPublishedAt: timestamp('first_published_at'),
-  deletedAt: timestamp('deleted_at'),
-  createdAt: timestamp('created_at').notNull(),
-  updatedAt: timestamp('updated_at').notNull(),
-  lastAuthorId: bigint('last_author_id', { mode: 'number' }),
-});
+export const stories = pgTable(
+  'stories',
+  {
+    id: bigint('id', { mode: 'bigint' }).primaryKey(),
+    spaceId: integer('space_id')
+      .notNull()
+      .references(() => spaces.id, { onDelete: 'cascade' }),
+    uuid: text('uuid').notNull(),
+    name: text('name').notNull(),
+    slug: text('slug').notNull(),
+    fullSlug: text('full_slug').notNull(),
+    path: text('path'),
+    parentId: bigint('parent_id', { mode: 'bigint' }),
+    groupId: text('group_id'),
+    contentType: text('content_type'),
+    isFolder: boolean('is_folder').notNull().default(false),
+    isStartpage: boolean('is_startpage').notNull().default(false),
+    published: boolean('published').notNull().default(false),
+    unpublishedChanges: boolean('unpublished_changes').notNull().default(false),
+    position: integer('position').notNull().default(0),
+    tagList: json('tag_list').notNull().default([]),
+    content: json('content').notNull().default({}),
+    sortByDate: timestamp('sort_by_date'),
+    publishAt: timestamp('publish_at'),
+    expireAt: timestamp('expire_at'),
+    publishedAt: timestamp('published_at'),
+    firstPublishedAt: timestamp('first_published_at'),
+    deletedAt: timestamp('deleted_at'),
+    createdAt: timestamp('created_at').notNull(),
+    updatedAt: timestamp('updated_at').notNull(),
+    lastAuthorId: bigint('last_author_id', { mode: 'number' }),
+  },
+  (t) => [
+    // Primary lookup: CDN slug lookup (most critical)
+    index('idx_stories_space_full_slug').on(t.spaceId, t.fullSlug),
+    // UUID lookup
+    index('idx_stories_space_uuid').on(t.spaceId, t.uuid),
+    // Parent browsing (folder navigation)
+    index('idx_stories_space_parent').on(t.spaceId, t.parentId),
+    // Filter by published status
+    index('idx_stories_space_published').on(t.spaceId, t.published),
+    // Filter by content type
+    index('idx_stories_space_content_type').on(t.spaceId, t.contentType),
+    // Sorting by position
+    index('idx_stories_space_position').on(t.spaceId, t.position),
+    // Sorting by published_at
+    index('idx_stories_space_published_at').on(t.spaceId, t.publishedAt),
+    // Soft delete filter
+    index('idx_stories_deleted_at').on(t.deletedAt),
+  ],
+);
 
-export const assetFolders = pgTable('asset_folders', {
-  id: bigint('id', { mode: 'number' }).primaryKey(),
-  spaceId: integer('space_id')
-    .notNull()
-    .references(() => spaces.id, { onDelete: 'cascade' }),
-  name: text('name').notNull(),
-  parentId: bigint('parent_id', { mode: 'number' }),
-  uuid: text('uuid').notNull().unique(),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-  updatedAt: timestamp('updated_at').notNull().defaultNow(),
-});
+export const assetFolders = pgTable(
+  'asset_folders',
+  {
+    id: bigint('id', { mode: 'number' }).primaryKey(),
+    spaceId: integer('space_id')
+      .notNull()
+      .references(() => spaces.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    parentId: bigint('parent_id', { mode: 'number' }),
+    uuid: text('uuid').notNull().unique(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    index('idx_asset_folders_space_id').on(t.spaceId),
+    index('idx_asset_folders_space_parent').on(t.spaceId, t.parentId),
+  ],
+);
 
-export const assets = pgTable('assets', {
-  id: bigint('id', { mode: 'number' }).primaryKey(),
-  spaceId: integer('space_id')
-    .notNull()
-    .references(() => spaces.id, { onDelete: 'cascade' }),
-  filename: text('filename').notNull(),
-  contentType: text('content_type').notNull().default(''),
-  contentLength: bigint('content_length', { mode: 'number' }).notNull().default(0),
-  alt: text('alt'),
-  title: text('title'),
-  copyright: text('copyright'),
-  focus: text('focus'),
-  folderId: bigint('folder_id', { mode: 'number' }),
-  locked: boolean('locked').notNull().default(false),
-  expireAt: timestamp('expire_at'),
-  isExternalUrl: boolean('is_external_url').notNull().default(false),
-  metaData: json('meta_data').notNull().default({}),
-  shortFilename: text('short_filename').notNull().default(''),
-  deletedAt: timestamp('deleted_at'),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-  updatedAt: timestamp('updated_at').notNull().defaultNow(),
-});
+export const assets = pgTable(
+  'assets',
+  {
+    id: bigint('id', { mode: 'number' }).primaryKey(),
+    spaceId: integer('space_id')
+      .notNull()
+      .references(() => spaces.id, { onDelete: 'cascade' }),
+    filename: text('filename').notNull(),
+    contentType: text('content_type').notNull().default(''),
+    contentLength: bigint('content_length', { mode: 'number' }).notNull().default(0),
+    alt: text('alt'),
+    title: text('title'),
+    copyright: text('copyright'),
+    focus: text('focus'),
+    folderId: bigint('folder_id', { mode: 'number' }),
+    locked: boolean('locked').notNull().default(false),
+    expireAt: timestamp('expire_at'),
+    isExternalUrl: boolean('is_external_url').notNull().default(false),
+    metaData: json('meta_data').notNull().default({}),
+    shortFilename: text('short_filename').notNull().default(''),
+    deletedAt: timestamp('deleted_at'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    index('idx_assets_space_id').on(t.spaceId),
+    index('idx_assets_folder_id').on(t.folderId),
+    index('idx_assets_deleted_at').on(t.deletedAt),
+  ],
+);
 
-export const datasourceEntries = pgTable('datasource_entries', {
-  id: bigint('id', { mode: 'bigint' }).primaryKey(),
-  datasourceId: bigint('datasource_id', { mode: 'bigint' })
-    .notNull()
-    .references(() => datasources.id, { onDelete: 'cascade' }),
-  name: text('name').notNull(),
-  value: text('value').notNull(),
-  dimensionValue: json('dimension_value').notNull().default({}),
-  position: integer('position').notNull().default(0),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-  updatedAt: timestamp('updated_at').notNull().defaultNow(),
-});
+export const datasourceEntries = pgTable(
+  'datasource_entries',
+  {
+    id: bigint('id', { mode: 'bigint' }).primaryKey(),
+    datasourceId: bigint('datasource_id', { mode: 'bigint' })
+      .notNull()
+      .references(() => datasources.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    value: text('value').notNull(),
+    dimensionValue: json('dimension_value').notNull().default({}),
+    position: integer('position').notNull().default(0),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (t) => [index('idx_datasource_entries_datasource_id').on(t.datasourceId)],
+);
 
-export const branches = pgTable('branches', {
-  id: integer('id').primaryKey(),
-  spaceId: integer('space_id')
-    .notNull()
-    .references(() => spaces.id, { onDelete: 'cascade' }),
-  name: text('name').notNull(),
-  sourceId: integer('source_id'),
-  url: text('url'),
-  position: integer('position').notNull().default(1),
-  deployedAt: timestamp('deployed_at'),
-  deletedAt: timestamp('deleted_at'),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-  updatedAt: timestamp('updated_at').notNull().defaultNow(),
-});
+export const branches = pgTable(
+  'branches',
+  {
+    id: integer('id').primaryKey(),
+    spaceId: integer('space_id')
+      .notNull()
+      .references(() => spaces.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    sourceId: integer('source_id'),
+    url: text('url'),
+    position: integer('position').notNull().default(1),
+    deployedAt: timestamp('deployed_at'),
+    deletedAt: timestamp('deleted_at'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (t) => [index('idx_branches_space_id').on(t.spaceId)],
+);
 
-export const releases = pgTable('releases', {
-  id: bigint('id', { mode: 'number' }).primaryKey(),
-  spaceId: integer('space_id')
-    .notNull()
-    .references(() => spaces.id, { onDelete: 'cascade' }),
-  name: text('name').notNull(),
-  uuid: text('uuid').notNull().unique(),
-  releaseAt: timestamp('release_at'),
-  released: boolean('released').notNull().default(false),
-  timezone: text('timezone'),
-  branchesToDeploy: json('branches_to_deploy').notNull().default([]),
-  ownerId: bigint('owner_id', { mode: 'number' }),
-  usersToNotifyIds: json('users_to_notify_ids').notNull().default([]),
-  public: boolean('public').notNull().default(true),
-  allowedUserIds: json('allowed_user_ids').notNull().default([]),
-  allowedSpaceRoleIds: json('allowed_space_role_ids').notNull().default([]),
-  allowedApiKeyIds: json('allowed_api_key_ids').notNull().default([]),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-  updatedAt: timestamp('updated_at').notNull().defaultNow(),
-});
+export const releases = pgTable(
+  'releases',
+  {
+    id: bigint('id', { mode: 'number' }).primaryKey(),
+    spaceId: integer('space_id')
+      .notNull()
+      .references(() => spaces.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    uuid: text('uuid').notNull().unique(),
+    releaseAt: timestamp('release_at'),
+    released: boolean('released').notNull().default(false),
+    timezone: text('timezone'),
+    branchesToDeploy: json('branches_to_deploy').notNull().default([]),
+    ownerId: bigint('owner_id', { mode: 'number' }),
+    usersToNotifyIds: json('users_to_notify_ids').notNull().default([]),
+    public: boolean('public').notNull().default(true),
+    allowedUserIds: json('allowed_user_ids').notNull().default([]),
+    allowedSpaceRoleIds: json('allowed_space_role_ids').notNull().default([]),
+    allowedApiKeyIds: json('allowed_api_key_ids').notNull().default([]),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (t) => [index('idx_releases_space_id').on(t.spaceId)],
+);
 
-export const tasks = pgTable('tasks', {
-  id: bigserial('id', { mode: 'number' }).primaryKey(),
-  spaceId: integer('space_id')
-    .notNull()
-    .references(() => spaces.id, { onDelete: 'cascade' }),
-  name: text('name').notNull(),
-  description: text('description'),
-  taskType: text('task_type').notNull().default('webhook'),
-  lastExecution: timestamp('last_execution'),
-  running: boolean('running').notNull().default(false),
-  lastResponse: json('last_response'),
-  webhookUrl: text('webhook_url'),
-  userDialog: json('user_dialog').notNull().default({}),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-  updatedAt: timestamp('updated_at').notNull().defaultNow(),
-});
+export const tasks = pgTable(
+  'tasks',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    spaceId: integer('space_id')
+      .notNull()
+      .references(() => spaces.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    description: text('description'),
+    taskType: text('task_type').notNull().default('webhook'),
+    lastExecution: timestamp('last_execution'),
+    running: boolean('running').notNull().default(false),
+    lastResponse: json('last_response'),
+    webhookUrl: text('webhook_url'),
+    userDialog: json('user_dialog').notNull().default({}),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (t) => [index('idx_tasks_space_id').on(t.spaceId)],
+);
+
+export const pipelines = pgTable(
+  'pipelines',
+  {
+    id: serial('id').primaryKey(),
+    spaceId: integer('space_id')
+      .notNull()
+      .references(() => spaces.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    previewUrl: text('preview_url').notNull().default(''),
+    sourceOfSync: text('source_of_sync').notNull().default('preview'),
+    position: integer('position').notNull().default(0),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (t) => [index('idx_pipelines_space_id').on(t.spaceId)],
+);
 
 export const fieldTypes = pgTable('field_types', {
   id: bigserial('id', { mode: 'number' }).primaryKey(),

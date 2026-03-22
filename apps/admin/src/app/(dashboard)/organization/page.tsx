@@ -1,3 +1,7 @@
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = { title: 'Organization' }
+
 export default function OrgDashboardPage() {
   return (
     <div className="p-8">

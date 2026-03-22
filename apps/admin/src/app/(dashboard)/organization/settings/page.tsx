@@ -1,3 +1,7 @@
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = { title: 'Organization Settings' }
+
 export default function OrgSettingsPage() {
   const fields = [
     { label: 'Organization name', value: 'Slovak Telekom' },

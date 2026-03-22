@@ -1,3 +1,7 @@
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = { title: 'Internationalization' }
+
 export default function Page() {
   return (
     <div className="max-w-2xl px-10 py-8">

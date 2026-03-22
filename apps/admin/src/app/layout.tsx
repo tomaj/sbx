@@ -7,7 +7,10 @@ import { ThemeProvider } from "@/components/providers/theme-provider";
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 export const metadata: Metadata = {
-  title: 'SBX Admin',
+  title: {
+    template: '%s | SBX',
+    default: 'SBX',
+  },
   description: 'SBX Content Management System',
 }
 

@@ -39,6 +39,8 @@ interface AssetThumbProps {
 
 /**
  * Renders either an <img> (for image content types) or a file-type icon.
+ * Tries our CDN thumbnail URL first; if that fails, falls back to the
+ * original filename URL (covers assets not yet migrated to our MinIO).
  * Does NOT wrap in a container — callers are responsible for the container.
  */
 export function AssetThumb({
@@ -50,20 +52,33 @@ export function AssetThumb({
   imgClassName,
   iconClassName,
 }: AssetThumbProps) {
-  const [error, setError] = useState(false)
   const isImage = contentType.startsWith('image/')
-  const url = isImage ? assetThumbnailUrl(filename, spaceId, size) : ''
+  const cdnUrl = isImage ? assetThumbnailUrl(filename, spaceId, size) : ''
+  // Original URL as fallback (e.g. imported Storyblok/S3 assets not yet in MinIO)
+  const fallbackUrl = isImage && filename.startsWith('http') ? filename : ''
 
-  if (!isImage || error || !url) {
+  const [src, setSrc] = useState<string>(cdnUrl || fallbackUrl)
+  const [failed, setFailed] = useState(false)
+
+  if (!isImage || failed || !src) {
     return <FileIcon contentType={contentType} iconClassName={iconClassName} />
+  }
+
+  function handleError() {
+    // If CDN URL failed and we have a fallback, try original URL
+    if (src === cdnUrl && fallbackUrl && fallbackUrl !== cdnUrl) {
+      setSrc(fallbackUrl)
+    } else {
+      setFailed(true)
+    }
   }
 
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={url}
+      src={src}
       alt={alt ?? ''}
-      onError={() => setError(true)}
+      onError={handleError}
       className={imgClassName}
     />
   )

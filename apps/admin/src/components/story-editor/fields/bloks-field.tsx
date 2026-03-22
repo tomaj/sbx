@@ -45,7 +45,6 @@ function getBlockPreview(block: BlockItem, schema: Record<string, any> | undefin
 
 function renderPreviewTmpl(tmpl: string, data: Record<string, any>): string {
   return tmpl
-    // {{@image(it.field.prop)/}} or {{@image(it.field)/}}
     .replace(/\{\{@image\(it\.(\w+)(?:\.(\w+))?\)\s*\/?\}\}/g, (_, key, prop) => {
       const obj = data[key]
       if (!obj) return ''
@@ -55,18 +54,15 @@ function renderPreviewTmpl(tmpl: string, data: Record<string, any>): string {
       if (!url || typeof url !== 'string') return ''
       return `<img src="${url}" style="max-width:120px;max-height:80px;object-fit:cover;border-radius:4px;margin-top:4px;" />`
     })
-    // {{it.field.length}}
     .replace(/\{\{\s*it\.(\w+)\.length\s*\}\}/g, (_, key) => {
       const val = data[key]
       return Array.isArray(val) ? String(val.length) : '0'
     })
-    // {{it.field.prop}}
     .replace(/\{\{\s*it\.(\w+)\.(\w+)\s*\}\}/g, (_, key, prop) => {
       const obj = data[key]
       if (obj && typeof obj === 'object' && obj[prop] != null) return String(obj[prop])
       return ''
     })
-    // {{it.field}}
     .replace(/\{\{\s*it\.(\w+)\s*\}\}/g, (_, key) => {
       const val = data[key]
       if (val === undefined || val === null) return ''
@@ -144,6 +140,61 @@ function BlockFields({
   )
 }
 
+// ── AddBlockDivider ───────────────────────────────────────────────────────────
+
+function AddBlockDivider({ onAdd, empty = false }: { onAdd: () => void; empty?: boolean }) {
+  const [hovered, setHovered] = useState(false)
+
+  if (empty) {
+    return (
+      <div
+        className={`relative flex items-center justify-center h-10 rounded-lg border border-dashed cursor-pointer transition-colors ${
+          hovered
+            ? 'border-teal-400 bg-teal-50/50 dark:bg-teal-900/10'
+            : 'border-gray-200 dark:border-gray-700'
+        }`}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        onClick={onAdd}
+      >
+        <div className={`flex items-center gap-1.5 text-sm transition-colors ${hovered ? 'text-teal-600 dark:text-teal-400' : 'text-gray-300 dark:text-gray-600'}`}>
+          <Plus className="w-4 h-4" />
+          <span>Add block</span>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div
+      className="relative h-5 flex items-center"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      {hovered ? (
+        <>
+          {/* Line */}
+          <div className="absolute inset-x-0 top-1/2 h-0.5 bg-gray-800 dark:bg-gray-200 pointer-events-none" />
+          {/* Tooltip */}
+          <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-4 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-xs font-medium px-2 py-1 rounded-md shadow-sm whitespace-nowrap z-20 pointer-events-none">
+            Add Block
+          </div>
+          {/* Circle button */}
+          <button
+            type="button"
+            onClick={onAdd}
+            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 flex items-center justify-center z-10 shadow hover:bg-gray-700 dark:hover:bg-gray-300 transition-colors"
+          >
+            <Plus className="w-3.5 h-3.5" />
+          </button>
+        </>
+      ) : (
+        <div className="absolute inset-x-0 top-1/2 h-px bg-gray-100 dark:bg-gray-800 pointer-events-none" />
+      )}
+    </div>
+  )
+}
+
 // ── BlockRow ──────────────────────────────────────────────────────────────────
 
 interface BlockRowProps {
@@ -151,7 +202,6 @@ interface BlockRowProps {
   allComponents: ComponentMeta[]
   allGroups: ComponentGroup[]
   spaceId: string
-  isLast: boolean
   onUpdate: (block: BlockItem) => void
   onRemove: () => void
   onDuplicate: () => void
@@ -168,7 +218,6 @@ function BlockRow({
   allComponents,
   allGroups,
   spaceId,
-  isLast,
   onUpdate,
   onRemove,
   onDuplicate,
@@ -271,11 +320,6 @@ function BlockRow({
           Component schema not found for &quot;{block.component}&quot;
         </div>
       )}
-
-      {/* Divider — except after last item */}
-      {!isLast && (
-        <div className="border-b border-gray-100 dark:border-gray-800 mx-0" />
-      )}
     </div>
   )
 }
@@ -287,6 +331,7 @@ export function BloksField({ fieldKey, def, value, onChange, allComponents, allG
   const [draggingIdx, setDraggingIdx] = useState<number | null>(null)
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null)
   const [panelOpen, setPanelOpen] = useState(false)
+  const [insertAt, setInsertAt] = useState(0)
 
   let allowedComponents = allComponents
   if (def.restrict_components && def.component_whitelist && def.component_whitelist.length > 0) {
@@ -304,7 +349,14 @@ export function BloksField({ fieldKey, def, value, onChange, allComponents, allG
         if (fieldDef.default_value !== undefined) newBlock[key] = fieldDef.default_value
       })
     }
-    onChange([...blocks, newBlock])
+    const next = [...blocks]
+    next.splice(insertAt, 0, newBlock)
+    onChange(next)
+  }
+
+  function openPanelAt(index: number) {
+    setInsertAt(index)
+    setPanelOpen(true)
   }
 
   function updateBlock(index: number, updated: BlockItem) {
@@ -348,49 +400,42 @@ export function BloksField({ fieldKey, def, value, onChange, allComponents, allG
         <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">{def.description}</p>
       )}
 
-      {blocks.length > 0 && (
-        <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+      {blocks.length > 0 ? (
+        <div className="border border-gray-200 dark:border-gray-700 rounded-lg">
           {blocks.map((block, i) => (
-            <BlockRow
-              key={block._uid}
-              block={block}
-              allComponents={allComponents}
-              allGroups={allGroups}
-              spaceId={spaceId}
-              isLast={i === blocks.length - 1}
-              onUpdate={(updated) => updateBlock(i, updated)}
-              onRemove={() => removeBlock(i)}
-              onDuplicate={() => duplicateBlock(i)}
-              isDragging={draggingIdx === i}
-              isDragOver={dragOverIdx === i && draggingIdx !== i}
-              onDragStart={() => setDraggingIdx(i)}
-              onDragEnd={() => { setDraggingIdx(null); setDragOverIdx(null) }}
-              onDragOver={(e) => { e.preventDefault(); setDragOverIdx(i) }}
-              onDrop={() => handleDrop(i)}
-            />
+            <div key={block._uid}>
+              <BlockRow
+                block={block}
+                allComponents={allComponents}
+                allGroups={allGroups}
+                spaceId={spaceId}
+                onUpdate={(updated) => updateBlock(i, updated)}
+                onRemove={() => removeBlock(i)}
+                onDuplicate={() => duplicateBlock(i)}
+                isDragging={draggingIdx === i}
+                isDragOver={dragOverIdx === i && draggingIdx !== i}
+                onDragStart={() => setDraggingIdx(i)}
+                onDragEnd={() => { setDraggingIdx(null); setDragOverIdx(null) }}
+                onDragOver={(e) => { e.preventDefault(); setDragOverIdx(i) }}
+                onDrop={() => handleDrop(i)}
+              />
+              {!atMax && (
+                <AddBlockDivider onAdd={() => openPanelAt(i + 1)} />
+              )}
+            </div>
           ))}
         </div>
+      ) : (
+        !atMax && <AddBlockDivider onAdd={() => openPanelAt(0)} empty />
       )}
 
-      {!atMax && (
-        <>
-          <button
-            type="button"
-            onClick={() => setPanelOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm text-teal-600 dark:text-teal-400 border border-dashed border-teal-400 dark:border-teal-600 rounded-lg hover:bg-teal-50 dark:hover:bg-teal-900/20 transition-colors w-full justify-center mt-2"
-          >
-            <Plus className="w-4 h-4" />
-            Add block
-          </button>
-          <InsertBlockPanel
-            open={panelOpen}
-            allowedComponents={allowedComponents}
-            allGroups={allGroups}
-            onAdd={addBlock}
-            onClose={() => setPanelOpen(false)}
-          />
-        </>
-      )}
+      <InsertBlockPanel
+        open={panelOpen}
+        allowedComponents={allowedComponents}
+        allGroups={allGroups}
+        onAdd={addBlock}
+        onClose={() => setPanelOpen(false)}
+      />
     </div>
   )
 }

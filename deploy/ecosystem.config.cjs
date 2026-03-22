@@ -46,5 +46,15 @@ module.exports = {
       restart_delay: 3000,
       max_restarts: 10,
     },
+    {
+      name: 'sbx-demo',
+      cwd: '/opt/sbx/apps/demo-nextjs',
+      script: 'node_modules/next/dist/bin/next',
+      args: 'start --port 3003',
+      interpreter: 'node',
+      env,
+      restart_delay: 3000,
+      max_restarts: 10,
+    },
   ],
 };

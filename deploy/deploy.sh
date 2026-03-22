@@ -85,8 +85,20 @@ for entry in journal['entries']:
 # Build Admin
 echo "--- Building Admin..."
 cd /opt/sbx/apps/admin
-export $(grep -v '^#' /opt/sbx/deploy/.env.prod | xargs)
+grep -v '^#' /opt/sbx/deploy/.env.prod | grep -v '^$' > .env.production.local
 pnpm build
+
+# Build Demo
+echo "--- Building Demo..."
+cd /opt/sbx/apps/demo-nextjs
+grep -v '^#' /opt/sbx/deploy/.env.prod | grep -v '^$' > .env.production.local
+pnpm build
+
+# Update nginx config and reload
+echo "--- Updating nginx config..."
+cp /opt/sbx/deploy/nginx.conf /etc/nginx/sites-available/sbx
+ln -sf /etc/nginx/sites-available/sbx /etc/nginx/sites-enabled/sbx
+nginx -t && systemctl reload nginx
 
 # Start/restart apps with PM2
 echo "--- Restarting apps..."

@@ -1,3 +1,6 @@
+'use client'
+
+import { useState } from 'react'
 import { cn } from '@/lib/utils'
 
 const COLORS = [
@@ -45,13 +48,16 @@ interface UserAvatarProps {
 }
 
 export function UserAvatar({ name, src, size = 'md', className }: UserAvatarProps) {
-  if (src) {
+  const [imgError, setImgError] = useState(false)
+
+  if (src && !imgError) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
         src={src}
         alt={name}
         className={cn(sizes[size], 'rounded-full object-cover shrink-0', className)}
+        onError={() => setImgError(true)}
       />
     )
   }

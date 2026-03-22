@@ -1,6 +1,12 @@
 'use client'
 
 import { Folder, CircleDot, Circle, AlertCircle } from 'lucide-react'
+import { UserAvatar } from '@/components/ui/user-avatar'
+
+export type StoryUser = {
+  name: string
+  avatar: string | null
+}
 
 export type Story = {
   id: number
@@ -42,22 +48,10 @@ function formatDate(iso: string) {
     ' ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
 }
 
-function AuthorAvatar({ authorId }: { authorId: number | null }) {
-  if (!authorId) return <div className="w-7 h-7 rounded-full bg-gray-200 dark:bg-gray-700" />
-  const initials = String(authorId).slice(-2)
-  const colors = [
-    'bg-blue-500', 'bg-purple-500', 'bg-green-500', 'bg-orange-500', 'bg-pink-500', 'bg-teal-500',
-  ]
-  const color = colors[authorId % colors.length]
-  return (
-    <div className={`w-7 h-7 rounded-full ${color} flex items-center justify-center text-white text-xs font-medium`}>
-      {initials}
-    </div>
-  )
-}
 
 interface StoryListProps {
   stories: Story[]
+  usersMap: Record<number, StoryUser>
   isLoading: boolean
   selectedIds: Set<number>
   onSelectionChange: (ids: Set<number>) => void
@@ -65,7 +59,7 @@ interface StoryListProps {
   onOpen?: (story: Story) => void
 }
 
-export function StoryList({ stories, isLoading, selectedIds, onSelectionChange, onNavigate, onOpen }: StoryListProps) {
+export function StoryList({ stories, usersMap, isLoading, selectedIds, onSelectionChange, onNavigate, onOpen }: StoryListProps) {
   const allSelected = stories.length > 0 && stories.every((s) => selectedIds.has(s.id))
   const someSelected = stories.some((s) => selectedIds.has(s.id))
 
@@ -190,7 +184,15 @@ export function StoryList({ stories, isLoading, selectedIds, onSelectionChange, 
               {story.updated_at ? formatDate(story.updated_at) : '—'}
             </td>
             <td className="py-3 pr-4">
-              <AuthorAvatar authorId={story.last_author_id} />
+              {story.last_author_id && usersMap[story.last_author_id] ? (
+                <UserAvatar
+                  name={usersMap[story.last_author_id].name}
+                  src={usersMap[story.last_author_id].avatar}
+                  size="sm"
+                />
+              ) : (
+                <div className="size-7 rounded-full bg-gray-200 dark:bg-gray-700" />
+              )}
             </td>
           </tr>
         ))}

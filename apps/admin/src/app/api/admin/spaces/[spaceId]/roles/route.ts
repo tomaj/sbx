@@ -24,3 +24,19 @@ export async function GET(
   const data = await res.json()
   return NextResponse.json(data, { status: res.status })
 }
+
+export async function POST(
+  req: NextRequest,
+  { params }: { params: Promise<{ spaceId: string }> },
+) {
+  const { spaceId } = await params
+  const token = await getSessionToken()
+  const body = await req.json()
+  const res = await fetch(`${API_URL}/v1/admin/spaces/${spaceId}/roles`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  const data = await res.json()
+  return NextResponse.json(data, { status: res.status })
+}

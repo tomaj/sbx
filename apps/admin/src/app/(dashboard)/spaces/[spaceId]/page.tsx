@@ -1,7 +1,6 @@
-export default function Page({ params }: { params: Promise<{ spaceId: string }> }) {
-  return (
-    <div className="p-8">
-      <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Dashboard</h1>
-    </div>
-  )
-}
+import type { Metadata } from 'next'
+import PageContent from './page.client'
+
+export const metadata: Metadata = { title: 'Space Overview' }
+
+export default PageContent

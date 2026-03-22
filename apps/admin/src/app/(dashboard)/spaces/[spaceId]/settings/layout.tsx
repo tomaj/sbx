@@ -35,12 +35,6 @@ const NAV_SECTIONS = [
       { label: 'Pipelines', href: 'pipelines' },
     ],
   },
-  {
-    label: 'Misc',
-    items: [
-      { label: 'Maintenance mode', href: 'maintenance-mode' },
-    ],
-  },
 ]
 
 export default function SettingsLayout({ children }: { children: React.ReactNode }) {

@@ -10,7 +10,7 @@ interface Props {
 
 export function FieldLabel({ label, required, description }: Props) {
   return (
-    <div className="flex items-center gap-1 mb-1">
+    <div className="flex items-center gap-1 mb-2">
       <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
         {label}
         {required && <span className="text-red-500 ml-1">*</span>}

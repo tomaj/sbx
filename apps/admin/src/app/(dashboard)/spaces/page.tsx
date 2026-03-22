@@ -1,6 +1,9 @@
+import type { Metadata } from 'next'
 import { cookies } from 'next/headers'
 import { SpaceCard } from '@/components/spaces/space-card'
 import { Plus } from 'lucide-react'
+
+export const metadata: Metadata = { title: 'Spaces' }
 
 async function getSpaces(sessionToken: string) {
   const apiUrl = process.env.API_URL ?? 'http://localhost:3000'

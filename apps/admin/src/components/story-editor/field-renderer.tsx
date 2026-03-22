@@ -63,10 +63,10 @@ export function FieldRenderer({ fieldKey, def, value, onChange, allComponents, a
       return <LinkField fieldKey={fieldKey} def={def} value={value} onChange={onChange} />
 
     case 'asset':
-      return <AssetField fieldKey={fieldKey} def={def} value={value} onChange={onChange} />
+      return <AssetField fieldKey={fieldKey} def={def} value={value} onChange={onChange} spaceId={spaceId} />
 
     case 'multiasset':
-      return <MultiassetField fieldKey={fieldKey} def={def} value={value} onChange={onChange} />
+      return <MultiassetField fieldKey={fieldKey} def={def} value={value} onChange={onChange} spaceId={spaceId} />
 
     case 'table':
       return <TableField fieldKey={fieldKey} def={def} value={value} onChange={onChange} />

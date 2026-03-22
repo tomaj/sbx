@@ -10,7 +10,7 @@ export class StoriesCdnService {
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
 
-  private formatStory(s: typeof stories.$inferSelect) {
+  private formatStory(s: typeof stories.$inferSelect, version: 'published' | 'draft' = 'published') {
     return {
       id: Number(s.id),
       uuid: s.uuid,
@@ -24,7 +24,7 @@ export class StoriesCdnService {
       is_startpage: s.isStartpage,
       sort_by_date: s.sortByDate ? s.sortByDate.toISOString() : null,
       tag_list: s.tagList as string[],
-      content: s.content,
+      content: version === 'draft' ? this.addEditableMetadata(s.content as any, s.spaceId!, Number(s.id)) : s.content,
       created_at: s.createdAt.toISOString(),
       updated_at: s.updatedAt.toISOString(),
       published_at: s.publishedAt?.toISOString() ?? null,
@@ -37,6 +37,30 @@ export class StoriesCdnService {
       release_id: null,
       default_full_slug: null,
     };
+  }
+
+  private addEditableMetadata(content: any, spaceId: number, storyId: number): any {
+    if (!content || typeof content !== 'object') return content;
+    if (Array.isArray(content)) {
+      return content.map((item) => this.addEditableMetadata(item, spaceId, storyId));
+    }
+    const result: Record<string, any> = {};
+    for (const [key, val] of Object.entries(content)) {
+      if (typeof val === 'object' && val !== null) {
+        result[key] = this.addEditableMetadata(val, spaceId, storyId);
+      } else {
+        result[key] = val;
+      }
+    }
+    if (result._uid && result.component) {
+      result._editable = `<!--#storyblok#${JSON.stringify({
+        name: result.component,
+        space: String(spaceId),
+        uid: result._uid,
+        id: storyId,
+      })}-->`;
+    }
+    return result;
   }
 
   // ── List stories ─────────────────────────────────────────────────────────────
@@ -171,7 +195,7 @@ export class StoriesCdnService {
       .limit(1);
 
     return {
-      stories: rows.map((s) => this.formatStory(s)),
+      stories: rows.map((s) => this.formatStory(s, version)),
       cv: space?.version ?? 0,
       rels: [],
       links: [],
@@ -198,15 +222,18 @@ export class StoriesCdnService {
     }
 
     // Match by full_slug, slug, uuid, or id
+    // Normalize: try both with and without trailing slash
     const isNumeric = /^\d+$/.test(slugOrId);
     if (isNumeric) {
       conditions.push(eq(stories.id, BigInt(slugOrId)));
     } else {
+      const s = slugOrId.replace(/\/$/, '');
       conditions.push(
         or(
-          eq(stories.fullSlug, slugOrId),
-          eq(stories.slug, slugOrId),
-          eq(stories.uuid, slugOrId),
+          eq(stories.fullSlug, s),
+          eq(stories.fullSlug, s + '/'),
+          eq(stories.slug, s),
+          eq(stories.uuid, s),
         ),
       );
     }
@@ -226,7 +253,7 @@ export class StoriesCdnService {
       .limit(1);
 
     return {
-      story: this.formatStory(row),
+      story: this.formatStory(row, version),
       cv: space?.version ?? 0,
       rels: [],
       links: [],

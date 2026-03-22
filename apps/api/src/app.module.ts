@@ -20,8 +20,10 @@ import { StoriesModule } from './stories/stories.module';
 import { TasksModule } from './tasks/tasks.module';
 import { WorkflowsModule } from './workflows/workflows.module';
 import { FieldTypesModule } from './field-types/field-types.module';
+import { BridgeModule } from './bridge/bridge.module';
+import { PipelinesModule } from './pipelines/pipelines.module';
 
 @Module({
-  imports: [DbModule, StorageModule, AuthModule, DatasourcesModule, SpacesModule, UsersModule, TagsModule, ComponentsModule, AccessTokensModule, SpaceRolesModule, WebhooksModule, PresetsModule, ActivitiesModule, PersonalTokensModule, AssetsModule, BranchesModule, ReleasesModule, StoriesModule, TasksModule, WorkflowsModule, FieldTypesModule],
+  imports: [DbModule, StorageModule, AuthModule, DatasourcesModule, SpacesModule, UsersModule, TagsModule, ComponentsModule, AccessTokensModule, SpaceRolesModule, WebhooksModule, PresetsModule, ActivitiesModule, PersonalTokensModule, AssetsModule, BranchesModule, ReleasesModule, StoriesModule, TasksModule, WorkflowsModule, FieldTypesModule, BridgeModule, PipelinesModule],
 })
 export class AppModule {}
