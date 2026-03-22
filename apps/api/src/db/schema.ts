@@ -484,7 +484,7 @@ export const datasourceEntries = pgTable(
 export const branches = pgTable(
   'branches',
   {
-    id: integer('id').primaryKey(),
+    id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
     spaceId: integer('space_id')
       .notNull()
       .references(() => spaces.id, { onDelete: 'cascade' }),
