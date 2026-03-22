@@ -23,6 +23,7 @@ import {
   branches,
   releases,
   tasks,
+  fieldTypes,
 } from './schema';
 
 const pool = new Pool({
@@ -710,6 +711,40 @@ async function seedTasks() {
   }
 }
 
+async function seedFieldTypes() {
+  console.log('Seeding field types...');
+  const listFile = path.join(GOLDEN, 'field_types.json');
+  if (!fs.existsSync(listFile)) return;
+
+  const list = JSON.parse(fs.readFileSync(listFile, 'utf-8'));
+  const items = list.field_types ?? [];
+
+  for (const ft of items) {
+    const detailFile = path.join(GOLDEN, 'field_types', `${ft.id}.json`);
+    const detail = fs.existsSync(detailFile)
+      ? JSON.parse(fs.readFileSync(detailFile, 'utf-8'))
+      : ft;
+
+    await db
+      .insert(fieldTypes)
+      .values({
+        id: ft.id,
+        name: ft.name,
+        body: '',
+        compiledBody: '',
+        spaceIds: detail.space_ids ?? [],
+        options: detail.options ?? [],
+        belongsToOrg: detail.belongs_to_org ?? true,
+        approvedVersion: detail.approved_version ?? null,
+      })
+      .onConflictDoUpdate({
+        target: fieldTypes.name,
+        set: { spaceIds: detail.space_ids ?? [], options: detail.options ?? [] },
+      });
+  }
+  console.log(`  ✓ ${items.length} field types`);
+}
+
 async function seedAdminUser() {
   console.log('Seeding admin user...');
   const [user] = await db
@@ -751,6 +786,7 @@ async function main() {
   await seedBranches();
   await seedReleases();
   await seedTasks();
+  await seedFieldTypes();
   await seedAdminUser();
   console.log('\nDone ✓');
   await pool.end();

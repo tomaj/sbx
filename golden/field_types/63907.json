@@ -1,0 +1,919 @@
+{
+  "id": 63907,
+  "name": "telekom-variant-picker",
+  "space_ids": [],
+  "options": [],
+  "last_versions": [
+    {
+      "id": 230342469,
+      "event": "update",
+      "created_at": "2024-07-04T12:43:53.848Z",
+      "author_id": "233927",
+      "author": "Tomas Majer",
+      "item_id": 63907,
+      "is_draft": true
+    },
+    {
+      "id": 230342034,
+      "event": "update",
+      "created_at": "2024-07-04T12:41:43.248Z",
+      "author_id": "233927",
+      "author": "Tomas Majer",
+      "item_id": 63907,
+      "is_draft": true
+    }
+  ],
+  "belongs_to_partner": false,
+  "belongs_to_org": true,
+  "user": {
+    "userid": "tomaj",
+    "email": "tomas1.majer@telekom.sk",
+    "organization": null,
+    "username": "tomaj",
+    "use_username": true,
+    "alt_email": null,
+    "firstname": "Tomas",
+    "lastname": "Majer",
+    "phone": null,
+    "id": 233927,
+    "login_strategy": "password",
+    "created_at": "2024-03-14T16:35:47.860Z",
+    "org_role": "admin",
+    "has_org": true,
+    "has_partner": false,
+    "partner_status": null,
+    "org": {
+      "settings": {
+        "logo": "https://a.storyblok.com/f/285922/397x397/2035f5fb18/t_logo_carrier_surface_rgb_n.png",
+        "aad_tenant": "",
+        "users_info": {
+          "users_on_spaces": {
+            "233927": {
+              "user_id": 233927,
+              "space_ids": [
+                327730,
+                285923,
+                285922
+              ],
+              "space_roles": {
+                "285922": [
+                  "owner"
+                ],
+                "285923": [
+                  "owner"
+                ],
+                "327730": [
+                  "owner"
+                ]
+              }
+            },
+            "234229": {
+              "user_id": 234229,
+              "space_ids": [
+                285922,
+                285923,
+                327730
+              ],
+              "space_roles": {
+                "285922": [
+                  "admin"
+                ],
+                "285923": [
+                  "admin"
+                ],
+                "327730": [
+                  "admin"
+                ]
+              }
+            },
+            "237368": {
+              "user_id": 237368,
+              "space_ids": [
+                285922,
+                285923
+              ],
+              "space_roles": {
+                "285922": [
+                  "admin"
+                ],
+                "285923": [
+                  "admin"
+                ]
+              }
+            },
+            "237384": {
+              "user_id": 237384,
+              "space_ids": [
+                285923,
+                285922
+              ],
+              "space_roles": {
+                "285922": [
+                  "admin"
+                ],
+                "285923": [
+                  "admin"
+                ]
+              }
+            },
+            "237854": {
+              "user_id": 237854,
+              "space_ids": [
+                285922,
+                285923
+              ],
+              "space_roles": {
+                "285922": [
+                  "admin"
+                ],
+                "285923": [
+                  "admin"
+                ]
+              }
+            },
+            "238335": {
+              "user_id": 238335,
+              "space_ids": [
+                285922,
+                285923,
+                327730
+              ],
+              "space_roles": {
+                "285922": [
+                  "admin"
+                ],
+                "285923": [
+                  "admin"
+                ],
+                "327730": [
+                  "admin"
+                ]
+              }
+            },
+            "238456": {
+              "user_id": 238456,
+              "space_ids": [
+                285922,
+                285923
+              ],
+              "space_roles": {
+                "285922": [
+                  "admin"
+                ],
+                "285923": [
+                  "admin"
+                ]
+              }
+            },
+            "238457": {
+              "user_id": 238457,
+              "space_ids": [
+                285923,
+                285922,
+                327730
+              ],
+              "space_roles": {
+                "285922": [
+                  "admin"
+                ],
+                "285923": [
+                  "admin"
+                ],
+                "327730": [
+                  "admin"
+                ]
+              }
+            },
+            "238458": {
+              "user_id": 238458,
+              "space_ids": [
+                285923,
+                285922
+              ],
+              "space_roles": {
+                "285922": [
+                  "admin"
+                ],
+                "285923": [
+                  "admin"
+                ]
+              }
+            },
+            "238459": {
+              "user_id": 238459,
+              "space_ids": [
+                285923,
+                285922
+              ],
+              "space_roles": {
+                "285922": [
+                  "admin"
+                ],
+                "285923": [
+                  "admin"
+                ]
+              }
+            },
+            "238460": {
+              "user_id": 238460,
+              "space_ids": [
+                285923,
+                285922
+              ],
+              "space_roles": {
+                "285922": [
+                  "admin"
+                ],
+                "285923": [
+                  "admin"
+                ]
+              }
+            },
+            "238461": {
+              "user_id": 238461,
+              "space_ids": [
+                285923,
+                285922
+              ],
+              "space_roles": {
+                "285922": [
+                  "admin"
+                ],
+                "285923": [
+                  "admin"
+                ]
+              }
+            },
+            "238462": {
+              "user_id": 238462,
+              "space_ids": [
+                285922
+              ],
+              "space_roles": {
+                "285922": [
+                  "admin"
+                ]
+              }
+            },
+            "239426": {
+              "user_id": 239426,
+              "space_ids": [],
+              "space_roles": {}
+            },
+            "247885": {
+              "user_id": 247885,
+              "space_ids": [
+                285922,
+                285923,
+                327730
+              ],
+              "space_roles": {
+                "285922": [
+                  "admin"
+                ],
+                "285923": [
+                  "admin"
+                ],
+                "327730": [
+                  "admin"
+                ]
+              }
+            },
+            "259343": {
+              "user_id": 259343,
+              "space_ids": [
+                285922,
+                285923
+              ],
+              "space_roles": {
+                "285922": [
+                  "admin"
+                ],
+                "285923": [
+                  "B2C biznis specialista"
+                ]
+              }
+            },
+            "259369": {
+              "user_id": 259369,
+              "space_ids": [
+                285922,
+                285923
+              ],
+              "space_roles": {
+                "285922": [
+                  "editor"
+                ],
+                "285923": [
+                  "B2C biznis specialista"
+                ]
+              }
+            },
+            "259370": {
+              "user_id": 259370,
+              "space_ids": [],
+              "space_roles": {}
+            },
+            "279237": {
+              "user_id": 279237,
+              "space_ids": [
+                285923,
+                285922
+              ],
+              "space_roles": {
+                "285922": [
+                  "Biznis specialista"
+                ],
+                "285923": [
+                  "B2C biznis specialista"
+                ]
+              }
+            },
+            "279238": {
+              "user_id": 279238,
+              "space_ids": [
+                285923,
+                285922,
+                327730
+              ],
+              "space_roles": {
+                "285922": [
+                  "Biznis specialista"
+                ],
+                "285923": [
+                  "B2C biznis specialista"
+                ],
+                "327730": [
+                  "telekom apps - translator"
+                ]
+              }
+            },
+            "279239": {
+              "user_id": 279239,
+              "space_ids": [
+                285923,
+                285922
+              ],
+              "space_roles": {
+                "285922": [
+                  "Biznis specialista"
+                ],
+                "285923": [
+                  "B2C biznis specialista"
+                ]
+              }
+            },
+            "279240": {
+              "user_id": 279240,
+              "space_ids": [
+                285922,
+                327730,
+                285923
+              ],
+              "space_roles": {
+                "285922": [
+                  "Biznis specialista"
+                ],
+                "285923": [
+                  "B2C biznis specialista"
+                ],
+                "327730": [
+                  "telekom apps - translator"
+                ]
+              }
+            },
+            "279241": {
+              "user_id": 279241,
+              "space_ids": [
+                285922,
+                285923,
+                327730
+              ],
+              "space_roles": {
+                "285922": [
+                  "Biznis specialista"
+                ],
+                "285923": [
+                  "B2C biznis specialista"
+                ],
+                "327730": [
+                  "telekom apps - translator"
+                ]
+              }
+            },
+            "289887": {
+              "user_id": 289887,
+              "space_ids": [
+                285923,
+                285922
+              ],
+              "space_roles": {
+                "285922": [
+                  "B2B Admin"
+                ],
+                "285923": [
+                  "B2B Admin"
+                ]
+              }
+            },
+            "289888": {
+              "user_id": 289888,
+              "space_ids": [
+                285922,
+                285923
+              ],
+              "space_roles": {
+                "285922": [
+                  "B2B Admin"
+                ],
+                "285923": [
+                  "B2B Admin"
+                ]
+              }
+            },
+            "289889": {
+              "user_id": 289889,
+              "space_ids": [
+                285922,
+                285923
+              ],
+              "space_roles": {
+                "285922": [
+                  "B2B Admin"
+                ],
+                "285923": [
+                  "B2B Admin"
+                ]
+              }
+            },
+            "289890": {
+              "user_id": 289890,
+              "space_ids": [
+                285922,
+                285923
+              ],
+              "space_roles": {
+                "285922": [
+                  "B2B Admin"
+                ],
+                "285923": [
+                  "B2B Admin"
+                ]
+              }
+            },
+            "289900": {
+              "user_id": 289900,
+              "space_ids": [
+                285923,
+                285922,
+                327730
+              ],
+              "space_roles": {
+                "285922": [
+                  "Biznis specialista"
+                ],
+                "285923": [
+                  "B2C biznis specialista"
+                ],
+                "327730": [
+                  "telekom apps - translator"
+                ]
+              }
+            },
+            "289901": {
+              "user_id": 289901,
+              "space_ids": [
+                285923,
+                285922
+              ],
+              "space_roles": {
+                "285922": [
+                  "Biznis specialista"
+                ],
+                "285923": [
+                  "B2C biznis specialista"
+                ]
+              }
+            },
+            "289902": {
+              "user_id": 289902,
+              "space_ids": [
+                285923,
+                285922
+              ],
+              "space_roles": {
+                "285922": [
+                  "Biznis specialista"
+                ],
+                "285923": [
+                  "B2C biznis specialista"
+                ]
+              }
+            },
+            "289903": {
+              "user_id": 289903,
+              "space_ids": [
+                285923,
+                285922
+              ],
+              "space_roles": {
+                "285922": [
+                  "Biznis specialista"
+                ],
+                "285923": [
+                  "B2C biznis specialista"
+                ]
+              }
+            },
+            "290472": {
+              "user_id": 290472,
+              "space_ids": [
+                327730,
+                285923
+              ],
+              "space_roles": {
+                "285923": [
+                  "B2C biznis specialista"
+                ],
+                "327730": [
+                  "editor"
+                ]
+              }
+            },
+            "292303": {
+              "user_id": 292303,
+              "space_ids": [
+                285923,
+                285922
+              ],
+              "space_roles": {
+                "285922": [
+                  "B2B Admin"
+                ],
+                "285923": [
+                  "B2B Admin"
+                ]
+              }
+            },
+            "293748": {
+              "user_id": 293748,
+              "space_ids": [
+                285923,
+                285922
+              ],
+              "space_roles": {
+                "285922": [
+                  "Biznis specialista"
+                ],
+                "285923": [
+                  "B2C biznis specialista"
+                ]
+              }
+            },
+            "89309221021752": {
+              "user_id": 89309221021752,
+              "space_ids": [
+                285923,
+                285922
+              ],
+              "space_roles": {
+                "285922": [
+                  "admin"
+                ],
+                "285923": [
+                  "admin"
+                ]
+              }
+            },
+            "89675317082355": {
+              "user_id": 89675317082355,
+              "space_ids": [],
+              "space_roles": {}
+            },
+            "89675444525300": {
+              "user_id": 89675444525300,
+              "space_ids": [
+                285923
+              ],
+              "space_roles": {
+                "285923": [
+                  "B2B asset manager"
+                ]
+              }
+            },
+            "89675595057398": {
+              "user_id": 89675595057398,
+              "space_ids": [
+                285923
+              ],
+              "space_roles": {
+                "285923": [
+                  "B2B asset manager"
+                ]
+              }
+            },
+            "89675726338297": {
+              "user_id": 89675726338297,
+              "space_ids": [
+                285923
+              ],
+              "space_roles": {
+                "285923": [
+                  "B2B Admin"
+                ]
+              }
+            },
+            "91476438416355": {
+              "user_id": 91476438416355,
+              "space_ids": [
+                285923,
+                285922,
+                327730
+              ],
+              "space_roles": {
+                "285922": [
+                  "admin"
+                ],
+                "285923": [
+                  "admin"
+                ],
+                "327730": [
+                  "admin"
+                ]
+              }
+            },
+            "94958229311862": {
+              "user_id": 94958229311862,
+              "space_ids": [
+                285923,
+                285922
+              ],
+              "space_roles": {
+                "285922": [
+                  "admin"
+                ],
+                "285923": [
+                  "admin"
+                ]
+              }
+            },
+            "98916026226342": {
+              "user_id": 98916026226342,
+              "space_ids": [
+                285923,
+                285922
+              ],
+              "space_roles": {
+                "285922": [
+                  "Biznis specialista"
+                ],
+                "285923": [
+                  "B2C biznis specialista"
+                ]
+              }
+            },
+            "99579854096379": {
+              "user_id": 99579854096379,
+              "space_ids": [
+                285923,
+                285922
+              ],
+              "space_roles": {
+                "285922": [
+                  "Biznis specialista"
+                ],
+                "285923": [
+                  "B2C biznis specialista"
+                ]
+              }
+            },
+            "99579946924028": {
+              "user_id": 99579946924028,
+              "space_ids": [
+                285923,
+                285922,
+                327730
+              ],
+              "space_roles": {
+                "285922": [
+                  "Biznis specialista"
+                ],
+                "285923": [
+                  "B2C biznis specialista"
+                ],
+                "327730": [
+                  "telekom apps - translator"
+                ]
+              }
+            },
+            "111600987852036": {
+              "user_id": 111600987852036,
+              "space_ids": [
+                285923,
+                327730
+              ],
+              "space_roles": {
+                "285923": [
+                  "B2C biznis specialista"
+                ],
+                "327730": [
+                  "telekom apps - translator"
+                ]
+              }
+            },
+            "111616691010835": {
+              "user_id": 111616691010835,
+              "space_ids": [
+                327730,
+                285923,
+                285922
+              ],
+              "space_roles": {
+                "285922": [
+                  "admin"
+                ],
+                "285923": [
+                  "admin"
+                ],
+                "327730": [
+                  "admin"
+                ]
+              }
+            },
+            "153762590423498": {
+              "user_id": 153762590423498,
+              "space_ids": [
+                285923
+              ],
+              "space_roles": {
+                "285923": [
+                  "B2B Admin"
+                ]
+              }
+            }
+          },
+          "saved_sso_users_ids": [],
+          "saved_invitations_ids": [],
+          "saved_sso_users_count": 0,
+          "saved_invitations_count": 0,
+          "saved_disabled_users_ids": [
+            238456,
+            238459,
+            238462,
+            290472,
+            89675317082355,
+            239426,
+            259370
+          ],
+          "saved_external_users_ids": [],
+          "saved_internal_users_ids": [
+            89309221021752,
+            279240,
+            279241,
+            234229,
+            153762590423498,
+            238458,
+            259343,
+            259369,
+            238335,
+            292303,
+            289890,
+            279238,
+            279239,
+            289887,
+            289888,
+            289901,
+            289902,
+            289903,
+            293748,
+            89675444525300,
+            89675595057398,
+            89675726338297,
+            91476438416355,
+            94958229311862,
+            98916026226342,
+            99579854096379,
+            99579946924028,
+            111600987852036,
+            289889,
+            237368,
+            237384,
+            237854,
+            289900,
+            238461,
+            238457,
+            111616691010835,
+            247885,
+            238460,
+            233927,
+            279237
+          ],
+          "saved_disabled_users_count": 7,
+          "saved_external_users_count": 0,
+          "saved_internal_users_count": 40
+        },
+        "merge_users": false,
+        "spaces_info": {
+          "pro_spaces_ids": [],
+          "pro_spaces_count": 0,
+          "standard_spaces_ids": [],
+          "standard_spaces_count": 0
+        },
+        "strong_auth": false,
+        "share_plugins": false,
+        "sso_role_merge": false,
+        "s3_asset_bucket": "",
+        "token_timeout_in": "",
+        "track_statistics": false,
+        "new_merge_enabled": false,
+        "sign_saml_request": false,
+        "restricted_regions": [
+          "eu-central-1"
+        ],
+        "flow_motion_api_key": "",
+        "force_org_ai_styles": false,
+        "sso_servers_webhook": "",
+        "concept_room_enabled": true,
+        "allow_space_ai_styles": true,
+        "ideation_room_enabled": true,
+        "ai_translation_enabled": true,
+        "disable_private_spaces": false,
+        "flow_motion_identifier": "https://c2xvdmfrlxrlbgvrb20tchjklwv1yze.flowmotion.storyblok.com/",
+        "is_saml_sso_using_path": false,
+        "yearly_ai_credits_used": 94342,
+        "ai_translation_disabled": false,
+        "azure_ad_custom_service": false,
+        "default_server_location": "eu-central-1",
+        "propagate_field_removal": false,
+        "propagate_field_defaults": false,
+        "custom_upload_limit_in_mb": null,
+        "preserve_empty_cached_url": false,
+        "ai_text_generator_disabled": false,
+        "case_insensitive_saml_email": false,
+        "trigger_release_webhook_first": true,
+        "cdn_force_filter_from_releases": false,
+        "ai_style_space_composition_mode": "combine",
+        "idea_room_beta_feature_disabled": false,
+        "ai_text_generator_feature_disabled": false,
+        "confidentiality_disclaimer_enabled": false,
+        "confidentiality_disclaimer_message": ""
+      },
+      "name": "Slovak Telekom",
+      "status": "active"
+    },
+    "timezone": "UTC",
+    "avatar": "avatars/233927/6c588a3ccc/img_7503.jpg",
+    "friendly_name": "Tomas Majer",
+    "notified": [
+      "demo-space-tour-modal-closed",
+      "visual-editor-tour",
+      "demo-space-tour-completed",
+      "first-entry-modal-closed",
+      "content-browser-density-compact",
+      "datasource_entry_autosave",
+      "tip-restrict-content-types",
+      "tip-list-stories-pipelines",
+      "tip-trashcan-button",
+      "tip-move-row",
+      "hide_release_notification-143669",
+      "tip-ideas",
+      "writing-room-tour",
+      "hide_quickstart-285924",
+      "hide_quickstart-285923",
+      "hide_quickstart-285922",
+      "form-mode-293665",
+      "welcome-modal-closed",
+      "terms_and_conditions",
+      "form-mode-285922",
+      "whats-new-modal-2025-09-16T08:39:14"
+    ],
+    "lang": "en",
+    "partner_role": null,
+    "favourite_spaces": [
+      285924,
+      285923
+    ],
+    "favourite_ideas": [],
+    "role": null,
+    "beta_user": true,
+    "track_statistics": true,
+    "ui_theme": {
+      "theme": "sync-system"
+    },
+    "is_editor": false,
+    "sso": false,
+    "job_role": "developer",
+    "job_title": null,
+    "totp_factor_verified": false,
+    "configured_2fa_options": [
+      "otp_email"
+    ],
+    "disclaimer_ids": [
+      1,
+      2
+    ],
+    "company_name": "Telekom.sk",
+    "live_chat_enabled": true,
+    "confirmed": true
+  }
+}

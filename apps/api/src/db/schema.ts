@@ -432,3 +432,17 @@ export const tasks = pgTable('tasks', {
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
+
+export const fieldTypes = pgTable('field_types', {
+  id: bigserial('id', { mode: 'number' }).primaryKey(),
+  name: text('name').notNull().unique(),
+  body: text('body').notNull().default(''),
+  compiledBody: text('compiled_body').notNull().default(''),
+  spaceIds: json('space_ids').notNull().default([]),
+  options: json('options').notNull().default([]),
+  belongsToOrg: boolean('belongs_to_org').notNull().default(false),
+  approvedVersion: bigint('approved_version', { mode: 'number' }),
+  userId: bigint('user_id', { mode: 'number' }),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});

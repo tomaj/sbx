@@ -19,8 +19,9 @@ import { ReleasesModule } from './releases/releases.module';
 import { StoriesModule } from './stories/stories.module';
 import { TasksModule } from './tasks/tasks.module';
 import { WorkflowsModule } from './workflows/workflows.module';
+import { FieldTypesModule } from './field-types/field-types.module';
 
 @Module({
-  imports: [DbModule, StorageModule, AuthModule, DatasourcesModule, SpacesModule, UsersModule, TagsModule, ComponentsModule, AccessTokensModule, SpaceRolesModule, WebhooksModule, PresetsModule, ActivitiesModule, PersonalTokensModule, AssetsModule, BranchesModule, ReleasesModule, StoriesModule, TasksModule, WorkflowsModule],
+  imports: [DbModule, StorageModule, AuthModule, DatasourcesModule, SpacesModule, UsersModule, TagsModule, ComponentsModule, AccessTokensModule, SpaceRolesModule, WebhooksModule, PresetsModule, ActivitiesModule, PersonalTokensModule, AssetsModule, BranchesModule, ReleasesModule, StoriesModule, TasksModule, WorkflowsModule, FieldTypesModule],
 })
 export class AppModule {}

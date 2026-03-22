@@ -1,0 +1,29 @@
+{
+  "field_types": [
+    {
+      "id": 63561,
+      "name": "variant-picker",
+      "approved_version": null
+    },
+    {
+      "id": 63906,
+      "name": "telekom-icon-picker",
+      "approved_version": null
+    },
+    {
+      "id": 63907,
+      "name": "telekom-variant-picker",
+      "approved_version": null
+    },
+    {
+      "id": 66648,
+      "name": "telekom-icon-list",
+      "approved_version": null
+    },
+    {
+      "id": 91837523215869,
+      "name": "telekom-slug",
+      "approved_version": null
+    }
+  ]
+}
