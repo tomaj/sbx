@@ -2,12 +2,12 @@
 
 import { useState } from 'react'
 import { ChevronDown, ChevronRight, Plus, Trash2, GripVertical, Copy, Scissors } from 'lucide-react'
-function uuidv4() {
-  return crypto.randomUUID()
-}
+import { parseSchema } from '@/components/block-library/edit-block-modal/types'
+function uuidv4() { return crypto.randomUUID() }
 import type { BloksFieldDef } from '@/components/block-library/edit-block-modal/types'
-import type { ComponentMeta } from '../types'
+import type { ComponentMeta, ComponentGroup } from '../types'
 import { FieldRenderer } from '../field-renderer'
+import { InsertBlockPanel } from '../insert-block-panel'
 
 interface BlockItem {
   _uid: string
@@ -21,10 +21,17 @@ interface Props {
   value: BlockItem[] | undefined
   onChange: (v: BlockItem[]) => void
   allComponents: ComponentMeta[]
+  allGroups: ComponentGroup[]
+  spaceId: string
 }
 
-function getBlockPreview(block: BlockItem, schema: Record<string, any> | undefined): string {
+function getBlockPreview(block: BlockItem, schema: Record<string, any> | undefined, previewField: string | null): string {
   if (!schema) return ''
+  if (previewField && block[previewField] != null) {
+    const val = block[previewField]
+    if (typeof val === 'string') return val
+    if (typeof val === 'number') return String(val)
+  }
   const entries = Object.entries(schema)
     .filter(([, def]) => def.type === 'text' || def.type === 'textarea')
     .sort(([, a], [, b]) => (a.pos ?? 0) - (b.pos ?? 0))
@@ -36,9 +43,115 @@ function getBlockPreview(block: BlockItem, schema: Record<string, any> | undefin
   return ''
 }
 
+function renderPreviewTmpl(tmpl: string, data: Record<string, any>): string {
+  return tmpl
+    // {{@image(it.field.prop)/}} or {{@image(it.field)/}}
+    .replace(/\{\{@image\(it\.(\w+)(?:\.(\w+))?\)\s*\/?\}\}/g, (_, key, prop) => {
+      const obj = data[key]
+      if (!obj) return ''
+      const url = prop
+        ? (obj && typeof obj === 'object' ? obj[prop] : null)
+        : (typeof obj === 'string' ? obj : obj?.filename)
+      if (!url || typeof url !== 'string') return ''
+      return `<img src="${url}" style="max-width:120px;max-height:80px;object-fit:cover;border-radius:4px;margin-top:4px;" />`
+    })
+    // {{it.field.length}}
+    .replace(/\{\{\s*it\.(\w+)\.length\s*\}\}/g, (_, key) => {
+      const val = data[key]
+      return Array.isArray(val) ? String(val.length) : '0'
+    })
+    // {{it.field.prop}}
+    .replace(/\{\{\s*it\.(\w+)\.(\w+)\s*\}\}/g, (_, key, prop) => {
+      const obj = data[key]
+      if (obj && typeof obj === 'object' && obj[prop] != null) return String(obj[prop])
+      return ''
+    })
+    // {{it.field}}
+    .replace(/\{\{\s*it\.(\w+)\s*\}\}/g, (_, key) => {
+      const val = data[key]
+      if (val === undefined || val === null) return ''
+      if (typeof val === 'string') return val
+      return String(val)
+    })
+}
+
+// ── BlockFields with tabs support ────────────────────────────────────────────
+
+function BlockFields({
+  schema,
+  data,
+  allComponents,
+  allGroups,
+  spaceId,
+  onChange,
+}: {
+  schema: Record<string, any>
+  data: Record<string, any>
+  allComponents: ComponentMeta[]
+  allGroups: ComponentGroup[]
+  spaceId: string
+  onChange: (key: string, value: any) => void
+}) {
+  const [activeTab, setActiveTab] = useState(0)
+  const { tabs, fields } = parseSchema(schema)
+  const visibleTabs = tabs.filter((t) => fields.some((f) => f.tabKey === t.key))
+  const hasTabs = visibleTabs.length > 1
+
+  const currentTab = hasTabs ? (visibleTabs[activeTab] ?? visibleTabs[0]) : visibleTabs[0]
+  const visibleFields = hasTabs
+    ? fields.filter((f) => f.tabKey === currentTab?.key)
+    : fields
+
+  if (visibleFields.length === 0 && !hasTabs) {
+    return <p className="text-sm text-gray-400">No fields defined</p>
+  }
+
+  return (
+    <div>
+      {hasTabs && (
+        <div className="flex border-b border-gray-200 dark:border-gray-700 -mx-4 px-4 mb-4">
+          {visibleTabs.map((tab, i) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setActiveTab(i)}
+              className={`px-3 py-2 text-xs font-medium border-b-2 transition-colors whitespace-nowrap -mb-px ${
+                i === activeTab
+                  ? 'border-teal-600 text-teal-600 dark:text-teal-400'
+                  : 'border-transparent text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
+              }`}
+            >
+              {tab.name}
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="space-y-4">
+        {visibleFields.map((field) => (
+          <FieldRenderer
+            key={field.key}
+            fieldKey={field.key}
+            def={field.def}
+            value={data[field.key]}
+            onChange={(v) => onChange(field.key, v)}
+            allComponents={allComponents}
+            allGroups={allGroups}
+            spaceId={spaceId}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ── BlockRow ──────────────────────────────────────────────────────────────────
+
 interface BlockRowProps {
   block: BlockItem
   allComponents: ComponentMeta[]
+  allGroups: ComponentGroup[]
+  spaceId: string
+  isLast: boolean
   onUpdate: (block: BlockItem) => void
   onRemove: () => void
   onDuplicate: () => void
@@ -53,6 +166,9 @@ interface BlockRowProps {
 function BlockRow({
   block,
   allComponents,
+  allGroups,
+  spaceId,
+  isLast,
   onUpdate,
   onRemove,
   onDuplicate,
@@ -68,7 +184,8 @@ function BlockRow({
   const componentMeta = allComponents.find((c) => c.name === block.component)
   const schema = componentMeta?.schema
   const displayName = componentMeta?.display_name || block.component
-  const preview = getBlockPreview(block, schema)
+  const previewTmpl = componentMeta?.preview_tmpl
+  const preview = previewTmpl ? null : getBlockPreview(block, schema, componentMeta?.preview_field ?? null)
 
   function handleFieldChange(key: string, value: any) {
     onUpdate({ ...block, [key]: value })
@@ -76,12 +193,8 @@ function BlockRow({
 
   return (
     <div
-      className={`group border rounded-lg overflow-hidden transition-all ${
-        isDragging
-          ? 'opacity-40 border-gray-300 dark:border-gray-600'
-          : isDragOver
-          ? 'border-teal-400 dark:border-teal-500 shadow-sm'
-          : 'border-gray-200 dark:border-gray-700'
+      className={`group transition-all ${isDragging ? 'opacity-40' : ''} ${
+        isDragOver ? 'ring-2 ring-teal-400 ring-inset' : ''
       }`}
       draggable
       onDragStart={onDragStart}
@@ -91,20 +204,17 @@ function BlockRow({
     >
       {/* Block header */}
       <div
-        className={`flex items-center gap-2 px-3 py-3 cursor-pointer select-none hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors ${
-          expanded ? 'bg-gray-50 dark:bg-gray-800/30 border-b border-gray-200 dark:border-gray-700' : ''
+        className={`flex items-center gap-2 px-3 py-2.5 cursor-pointer select-none hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors ${
+          expanded ? 'bg-gray-50 dark:bg-gray-800/30' : ''
         }`}
         onClick={() => setExpanded(!expanded)}
       >
+        {/* Grip — hover only */}
         <GripVertical
-          className="w-4 h-4 text-gray-300 dark:text-gray-600 flex-shrink-0 cursor-grab active:cursor-grabbing"
+          className="w-4 h-4 text-gray-300 dark:text-gray-600 flex-shrink-0 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity"
           onClick={(e) => e.stopPropagation()}
         />
-        <input
-          type="checkbox"
-          className="w-4 h-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500 flex-shrink-0"
-          onClick={(e) => e.stopPropagation()}
-        />
+
         {expanded ? (
           <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />
         ) : (
@@ -113,167 +223,70 @@ function BlockRow({
 
         <div className="flex-1 min-w-0">
           <div className="text-sm font-semibold text-gray-800 dark:text-gray-200">{displayName}</div>
-          {preview && (
+          {previewTmpl ? (
+            <div
+              className="text-xs text-gray-400 dark:text-gray-500 mt-0.5"
+              dangerouslySetInnerHTML={{ __html: renderPreviewTmpl(previewTmpl, block) }}
+            />
+          ) : preview ? (
             <div className="text-xs text-gray-400 dark:text-gray-500 truncate mt-0.5">{preview}</div>
-          )}
+          ) : null}
         </div>
 
-        {/* Actions — visible on hover */}
+        {/* Actions — hover only */}
         <div
           className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
           onClick={(e) => e.stopPropagation()}
         >
-          <button
-            type="button"
-            title="Duplicate"
-            onClick={onDuplicate}
-            className="p-1.5 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-          >
+          <button type="button" title="Duplicate" onClick={onDuplicate}
+            className="p-1.5 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors">
             <Copy className="w-3.5 h-3.5" />
           </button>
-          <button
-            type="button"
-            title="Cut"
-            onClick={onRemove}
-            className="p-1.5 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-          >
+          <button type="button" title="Cut" onClick={onRemove}
+            className="p-1.5 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors">
             <Scissors className="w-3.5 h-3.5" />
           </button>
-          <button
-            type="button"
-            title="Delete"
-            onClick={onRemove}
-            className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
-          >
+          <button type="button" title="Delete" onClick={onRemove}
+            className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors">
             <Trash2 className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
 
-      {/* Block fields — expanded */}
+      {/* Expanded fields */}
       {expanded && schema && (
-        <div className="p-4 space-y-4 bg-white dark:bg-gray-900">
+        <div className="px-4 py-4 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800">
           <BlockFields
             schema={schema}
             data={block}
             allComponents={allComponents}
+            allGroups={allGroups}
+            spaceId={spaceId}
             onChange={handleFieldChange}
           />
         </div>
       )}
-
       {expanded && !schema && (
-        <div className="p-3 text-sm text-gray-400 bg-white dark:bg-gray-900">
+        <div className="px-4 py-3 text-sm text-gray-400 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800">
           Component schema not found for &quot;{block.component}&quot;
         </div>
       )}
-    </div>
-  )
-}
 
-function BlockFields({
-  schema,
-  data,
-  allComponents,
-  onChange,
-}: {
-  schema: Record<string, any>
-  data: Record<string, any>
-  allComponents: ComponentMeta[]
-  onChange: (key: string, value: any) => void
-}) {
-  const fields = Object.entries(schema)
-    .filter(([, def]) => def.type !== 'tab')
-    .sort(([, a], [, b]) => (a.pos ?? 0) - (b.pos ?? 0))
-
-  if (fields.length === 0) {
-    return <p className="text-sm text-gray-400">No fields defined</p>
-  }
-
-  return (
-    <>
-      {fields.map(([key, def]) => (
-        <FieldRenderer
-          key={key}
-          fieldKey={key}
-          def={def}
-          value={data[key]}
-          onChange={(v) => onChange(key, v)}
-          allComponents={allComponents}
-        />
-      ))}
-    </>
-  )
-}
-
-interface AddBlockMenuProps {
-  allowedComponents: ComponentMeta[]
-  onAdd: (componentName: string) => void
-}
-
-function AddBlockMenu({ allowedComponents, onAdd }: AddBlockMenuProps) {
-  const [open, setOpen] = useState(false)
-  const [search, setSearch] = useState('')
-
-  const filtered = allowedComponents.filter(
-    (c) => c.name.toLowerCase().includes(search.toLowerCase()) ||
-      (c.display_name ?? '').toLowerCase().includes(search.toLowerCase())
-  )
-
-  return (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 px-3 py-2 text-sm text-teal-600 dark:text-teal-400 border border-dashed border-teal-400 dark:border-teal-600 rounded-lg hover:bg-teal-50 dark:hover:bg-teal-900/20 transition-colors w-full justify-center"
-      >
-        <Plus className="w-4 h-4" />
-        Add block
-      </button>
-
-      {open && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute bottom-full mb-1 left-0 right-0 z-20 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg overflow-hidden">
-            <div className="p-2 border-b border-gray-100 dark:border-gray-700">
-              <input
-                type="text"
-                placeholder="Search blocks..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                autoFocus
-                className="w-full px-2 py-1 text-sm border border-gray-200 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-teal-500"
-              />
-            </div>
-            <div className="max-h-48 overflow-y-auto">
-              {filtered.length === 0 && (
-                <p className="px-3 py-2 text-sm text-gray-400">No blocks found</p>
-              )}
-              {filtered.map((c) => (
-                <button
-                  key={c.name}
-                  type="button"
-                  onClick={() => { onAdd(c.name); setOpen(false); setSearch('') }}
-                  className="w-full text-left px-3 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
-                >
-                  <span className="font-medium">{c.display_name || c.name}</span>
-                  {c.display_name && c.display_name !== c.name && (
-                    <span className="ml-2 text-gray-400 text-xs">{c.name}</span>
-                  )}
-                </button>
-              ))}
-            </div>
-          </div>
-        </>
+      {/* Divider — except after last item */}
+      {!isLast && (
+        <div className="border-b border-gray-100 dark:border-gray-800 mx-0" />
       )}
     </div>
   )
 }
 
-export function BloksField({ fieldKey, def, value, onChange, allComponents }: Props) {
+// ── BloksField ────────────────────────────────────────────────────────────────
+
+export function BloksField({ fieldKey, def, value, onChange, allComponents, allGroups, spaceId }: Props) {
   const blocks = value ?? []
   const [draggingIdx, setDraggingIdx] = useState<number | null>(null)
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null)
+  const [panelOpen, setPanelOpen] = useState(false)
 
   let allowedComponents = allComponents
   if (def.restrict_components && def.component_whitelist && def.component_whitelist.length > 0) {
@@ -288,18 +301,14 @@ export function BloksField({ fieldKey, def, value, onChange, allComponents }: Pr
     const meta = allComponents.find((c) => c.name === componentName)
     if (meta?.schema) {
       Object.entries(meta.schema).forEach(([key, fieldDef]: [string, any]) => {
-        if (fieldDef.default_value !== undefined) {
-          newBlock[key] = fieldDef.default_value
-        }
+        if (fieldDef.default_value !== undefined) newBlock[key] = fieldDef.default_value
       })
     }
     onChange([...blocks, newBlock])
   }
 
   function updateBlock(index: number, updated: BlockItem) {
-    const next = [...blocks]
-    next[index] = updated
-    onChange(next)
+    const next = [...blocks]; next[index] = updated; onChange(next)
   }
 
   function removeBlock(index: number) {
@@ -307,25 +316,19 @@ export function BloksField({ fieldKey, def, value, onChange, allComponents }: Pr
   }
 
   function duplicateBlock(index: number) {
-    const original = blocks[index]
-    const copy: BlockItem = { ...original, _uid: uuidv4() }
-    const next = [...blocks]
-    next.splice(index + 1, 0, copy)
-    onChange(next)
+    const copy: BlockItem = { ...blocks[index], _uid: uuidv4() }
+    const next = [...blocks]; next.splice(index + 1, 0, copy); onChange(next)
   }
 
   function handleDrop(toIndex: number) {
     if (draggingIdx === null || draggingIdx === toIndex) {
-      setDraggingIdx(null)
-      setDragOverIdx(null)
-      return
+      setDraggingIdx(null); setDragOverIdx(null); return
     }
     const next = [...blocks]
     const [item] = next.splice(draggingIdx, 1)
     next.splice(toIndex, 0, item)
     onChange(next)
-    setDraggingIdx(null)
-    setDragOverIdx(null)
+    setDraggingIdx(null); setDragOverIdx(null)
   }
 
   const atMax = def.maximum !== undefined && blocks.length >= def.maximum
@@ -345,28 +348,49 @@ export function BloksField({ fieldKey, def, value, onChange, allComponents }: Pr
         <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">{def.description}</p>
       )}
 
-      <div className="space-y-1.5">
-        {blocks.map((block, i) => (
-          <BlockRow
-            key={block._uid}
-            block={block}
-            allComponents={allComponents}
-            onUpdate={(updated) => updateBlock(i, updated)}
-            onRemove={() => removeBlock(i)}
-            onDuplicate={() => duplicateBlock(i)}
-            isDragging={draggingIdx === i}
-            isDragOver={dragOverIdx === i && draggingIdx !== i}
-            onDragStart={() => setDraggingIdx(i)}
-            onDragEnd={() => { setDraggingIdx(null); setDragOverIdx(null) }}
-            onDragOver={(e) => { e.preventDefault(); setDragOverIdx(i) }}
-            onDrop={() => handleDrop(i)}
-          />
-        ))}
+      {blocks.length > 0 && (
+        <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+          {blocks.map((block, i) => (
+            <BlockRow
+              key={block._uid}
+              block={block}
+              allComponents={allComponents}
+              allGroups={allGroups}
+              spaceId={spaceId}
+              isLast={i === blocks.length - 1}
+              onUpdate={(updated) => updateBlock(i, updated)}
+              onRemove={() => removeBlock(i)}
+              onDuplicate={() => duplicateBlock(i)}
+              isDragging={draggingIdx === i}
+              isDragOver={dragOverIdx === i && draggingIdx !== i}
+              onDragStart={() => setDraggingIdx(i)}
+              onDragEnd={() => { setDraggingIdx(null); setDragOverIdx(null) }}
+              onDragOver={(e) => { e.preventDefault(); setDragOverIdx(i) }}
+              onDrop={() => handleDrop(i)}
+            />
+          ))}
+        </div>
+      )}
 
-        {!atMax && (
-          <AddBlockMenu allowedComponents={allowedComponents} onAdd={addBlock} />
-        )}
-      </div>
+      {!atMax && (
+        <>
+          <button
+            type="button"
+            onClick={() => setPanelOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-2 text-sm text-teal-600 dark:text-teal-400 border border-dashed border-teal-400 dark:border-teal-600 rounded-lg hover:bg-teal-50 dark:hover:bg-teal-900/20 transition-colors w-full justify-center mt-2"
+          >
+            <Plus className="w-4 h-4" />
+            Add block
+          </button>
+          <InsertBlockPanel
+            open={panelOpen}
+            allowedComponents={allowedComponents}
+            allGroups={allGroups}
+            onAdd={addBlock}
+            onClose={() => setPanelOpen(false)}
+          />
+        </>
+      )}
     </div>
   )
 }

@@ -2,6 +2,17 @@ export interface ComponentMeta {
   name: string
   display_name: string | null
   schema: Record<string, any>
+  preview_field: string | null
+  preview_tmpl: string | null
+  color: string | null
+  icon: string | null
+  description: string | null
+  component_group_uuid: string | null
+}
+
+export interface ComponentGroup {
+  uuid: string
+  name: string
 }
 
 export interface StoryDetail {

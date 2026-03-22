@@ -46,6 +46,10 @@ export function EditBlockModal({ open, block, spaceId, groups, onClose, onSaved 
   const [description, setDescription] = useState('')
   const [blockType, setBlockType] = useState<BlockType>('nestable')
   const [groupUuid, setGroupUuid] = useState<string | null>(null)
+  const [previewField, setPreviewField] = useState<string | null>(null)
+  const [previewTmpl, setPreviewTmpl] = useState('')
+  const [internalTags, setInternalTags] = useState<string[]>([])
+  const [color, setColor] = useState<string | null>(null)
 
   // ─── Navigation state ──────────────────────────────────────────────────────
   const [mainTab, setMainTab] = useState<MainTab>('fields')
@@ -67,6 +71,10 @@ export function EditBlockModal({ open, block, spaceId, groups, onClose, onSaved 
     setDescription(block.description ?? '')
     setBlockType(blockTypeOf(block))
     setGroupUuid(block.component_group_uuid)
+    setPreviewField(block.preview_field ?? null)
+    setPreviewTmpl(block.preview_tmpl ?? '')
+    setInternalTags((block.internal_tags_list ?? []).map((t) => t.name))
+    setColor(block.color ?? null)
     setView('fields')
     setMainTab('fields')
     setEditingFieldKey(null)
@@ -137,6 +145,10 @@ export function EditBlockModal({ open, block, spaceId, groups, onClose, onSaved 
           is_nestable: isNestable,
           is_root: isRoot,
           component_group_uuid: groupUuid,
+          preview_field: previewField || null,
+          preview_tmpl: previewTmpl || null,
+          internal_tags_list: internalTags.map((name, i) => ({ id: i + 1, name })),
+          color: color || null,
         }),
       })
 
@@ -278,10 +290,19 @@ export function EditBlockModal({ open, block, spaceId, groups, onClose, onSaved 
               blockType={blockType}
               groupUuid={groupUuid}
               groups={groups}
+              schemaFields={fields}
+              previewField={previewField}
+              previewTmpl={previewTmpl}
+              internalTags={internalTags}
+              color={color}
               onDisplayNameChange={setDisplayName}
               onDescriptionChange={setDescription}
               onBlockTypeChange={setBlockType}
               onGroupUuidChange={setGroupUuid}
+              onPreviewFieldChange={setPreviewField}
+              onPreviewTmplChange={setPreviewTmpl}
+              onInternalTagsChange={setInternalTags}
+              onColorChange={setColor}
             />
           )}
 

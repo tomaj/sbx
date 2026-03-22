@@ -1,6 +1,8 @@
 'use client'
 
 import type { LinkFieldDef, MultilinkFieldDef } from '@/components/block-library/edit-block-modal/types'
+import { fieldLabel } from '../field-label'
+import { FieldLabel } from '../FieldLabel'
 
 // Storyblok link value shape
 interface LinkValue {
@@ -31,13 +33,7 @@ export function LinkField({ fieldKey, def, value, onChange }: Props) {
 
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-        {def.display_name || fieldKey}
-        {def.required && <span className="text-red-500 ml-1">*</span>}
-      </label>
-      {def.description && (
-        <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{def.description}</p>
-      )}
+      <FieldLabel label={fieldLabel(def.display_name, fieldKey)} required={def.required} description={def.description} />
 
       {/* Link type selector */}
       <div className="flex gap-1 mb-2">

@@ -1,8 +1,8 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { SQL, and, asc, count, desc, eq, ilike, isNull, isNotNull, sql } from 'drizzle-orm';
+import { SQL, and, asc, count, desc, eq, ilike, isNull, isNotNull, sql, inArray } from 'drizzle-orm';
 import { DB } from '../db/db.module';
 import type { DbType } from '../db/db.module';
-import { stories, tags, components } from '../db/schema';
+import { stories, tags, components, componentGroups } from '../db/schema';
 
 @Injectable()
 export class StoriesService {
@@ -16,25 +16,29 @@ export class StoriesService {
       search?: string;
       sortField?: string;
       sortDir?: 'asc' | 'desc';
-      parentId?: bigint | null;
+      parentId?: bigint | null | undefined;
       contentType?: string;
       tag?: string;
       block?: string;
       published?: boolean;
+      uuid?: string;
+      storyId?: number;
     } = {},
   ) {
     const {
       page = 1, perPage = 25, search, sortField = 'position', sortDir = 'asc',
-      parentId = null, contentType, tag, block, published,
+      parentId, contentType, tag, block, published, uuid, storyId,
     } = opts;
 
     const conditions: (SQL | undefined)[] = [
       eq(stories.spaceId, spaceId),
       isNull(stories.deletedAt),
       search?.trim() ? ilike(stories.name, `%${search.trim()}%`) : undefined,
-      parentId === null
-        ? isNull(stories.parentId)
-        : eq(stories.parentId, parentId),
+      parentId === undefined
+        ? undefined
+        : parentId === null
+          ? isNull(stories.parentId)
+          : eq(stories.parentId, parentId),
       contentType?.trim() ? ilike(stories.contentType, `%${contentType.trim()}%`) : undefined,
       tag?.trim()
         ? sql`${stories.tagList}::text ilike ${'%' + tag.trim() + '%'}`
@@ -43,6 +47,8 @@ export class StoriesService {
         ? sql`${stories.content}::text ilike ${'%"component":"' + block.trim() + '"%'}`
         : undefined,
       published !== undefined ? eq(stories.published, published) : undefined,
+      uuid?.trim() ? eq(stories.uuid, uuid.trim()) : undefined,
+      storyId !== undefined ? eq(stories.id, BigInt(storyId)) : undefined,
     ];
 
     const where = and(...conditions);
@@ -145,11 +151,28 @@ export class StoriesService {
       if (comp) componentSchema = comp.schema as Record<string, any>;
     }
 
-    const allComponents = await this.db
-      .select({ name: components.name, displayName: components.displayName, schema: components.schema })
-      .from(components)
-      .where(eq(components.spaceId, spaceId))
-      .orderBy(asc(components.name));
+    const [allComponents, allGroups] = await Promise.all([
+      this.db
+        .select({
+          name: components.name,
+          displayName: components.displayName,
+          schema: components.schema,
+          previewField: components.previewField,
+          previewTmpl: components.previewTmpl,
+          color: components.color,
+          icon: components.icon,
+          description: components.description,
+          componentGroupUuid: components.componentGroupUuid,
+        })
+        .from(components)
+        .where(eq(components.spaceId, spaceId))
+        .orderBy(asc(components.name)),
+      this.db
+        .select({ uuid: componentGroups.uuid, name: componentGroups.name })
+        .from(componentGroups)
+        .where(eq(componentGroups.spaceId, spaceId))
+        .orderBy(asc(componentGroups.name)),
+    ]);
 
     return {
       story: this.formatStoryWithContent(story),
@@ -158,7 +181,14 @@ export class StoriesService {
         name: c.name,
         display_name: c.displayName,
         schema: c.schema as Record<string, any>,
+        preview_field: c.previewField ?? null,
+        preview_tmpl: c.previewTmpl ?? null,
+        color: c.color ?? null,
+        icon: c.icon ?? null,
+        description: c.description ?? null,
+        component_group_uuid: c.componentGroupUuid ?? null,
       })),
+      all_groups: allGroups.map((g) => ({ uuid: g.uuid, name: g.name })),
     };
   }
 

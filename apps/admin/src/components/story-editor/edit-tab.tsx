@@ -3,16 +3,18 @@
 import { useState } from 'react'
 import { parseSchema } from '@/components/block-library/edit-block-modal/types'
 import { FieldRenderer } from './field-renderer'
-import type { ComponentMeta } from './types'
+import type { ComponentMeta, ComponentGroup } from './types'
 
 interface Props {
+  spaceId: string
   schema: Record<string, any> | null
   content: Record<string, any>
   allComponents: ComponentMeta[]
+  allGroups: ComponentGroup[]
   onChange: (key: string, value: any) => void
 }
 
-export function EditTab({ schema, content, allComponents, onChange }: Props) {
+export function EditTab({ spaceId, schema, content, allComponents, allGroups, onChange }: Props) {
   const [activeTab, setActiveTab] = useState(0)
 
   const componentName = content?.component as string | undefined
@@ -75,6 +77,8 @@ export function EditTab({ schema, content, allComponents, onChange }: Props) {
             value={content[field.key]}
             onChange={(v) => onChange(field.key, v)}
             allComponents={allComponents}
+            allGroups={allGroups}
+            spaceId={spaceId}
           />
         ))}
       </div>

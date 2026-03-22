@@ -1,6 +1,8 @@
 'use client'
 
 import type { TextareaFieldDef } from '@/components/block-library/edit-block-modal/types'
+import { fieldLabel } from '../field-label'
+import { FieldLabel } from '../FieldLabel'
 
 interface Props {
   fieldKey: string
@@ -12,13 +14,7 @@ interface Props {
 export function TextareaField({ fieldKey, def, value, onChange }: Props) {
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-        {def.display_name || fieldKey}
-        {def.required && <span className="text-red-500 ml-1">*</span>}
-      </label>
-      {def.description && (
-        <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{def.description}</p>
-      )}
+      <FieldLabel label={fieldLabel(def.display_name, fieldKey)} required={def.required} description={def.description} />
       <textarea
         value={value ?? ''}
         onChange={(e) => onChange(e.target.value)}

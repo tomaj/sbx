@@ -2,6 +2,8 @@
 
 import { ImageIcon } from 'lucide-react'
 import type { AssetFieldDef, MultiassetFieldDef } from '@/components/block-library/edit-block-modal/types'
+import { fieldLabel } from '../field-label'
+import { FieldLabel } from '../FieldLabel'
 
 interface AssetValue {
   id?: number
@@ -48,13 +50,7 @@ function AssetPreview({ value }: { value: AssetValue | undefined }) {
 export function AssetField({ fieldKey, def, value, onChange }: SingleProps) {
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-        {def.display_name || fieldKey}
-        {def.required && <span className="text-red-500 ml-1">*</span>}
-      </label>
-      {def.description && (
-        <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{def.description}</p>
-      )}
+      <FieldLabel label={fieldLabel(def.display_name, fieldKey)} required={def.required} description={def.description} />
       <input
         type="text"
         placeholder="Asset URL or filename"
@@ -72,13 +68,7 @@ export function MultiassetField({ fieldKey, def, value, onChange }: MultiProps) 
   const assets = value ?? []
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-        {def.display_name || fieldKey}
-        {def.required && <span className="text-red-500 ml-1">*</span>}
-      </label>
-      {def.description && (
-        <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{def.description}</p>
-      )}
+      <FieldLabel label={fieldLabel(def.display_name, fieldKey)} required={def.required} description={def.description} />
       <div className="space-y-2">
         {assets.map((asset, i) => (
           <div key={i} className="flex items-center gap-2">

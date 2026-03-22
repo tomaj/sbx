@@ -1,5 +1,5 @@
 import { Inject, Injectable, ConflictException } from '@nestjs/common';
-import { and, eq, ilike, or, sql, count } from 'drizzle-orm';
+import { and, asc, eq, ilike, notInArray, or, sql, count } from 'drizzle-orm';
 import { randomBytes } from 'crypto';
 import { DB } from '../db/db.module';
 import type { DbType } from '../db/db.module';
@@ -160,6 +160,127 @@ export class UsersService {
       email: created.email,
       disabled: created.disabled,
       createdAt: created.createdAt,
+    };
+  }
+
+  async getSpaceMembers(spaceId: number) {
+    const rows = await this.db
+      .select()
+      .from(spaceMembers)
+      .innerJoin(users, eq(spaceMembers.userId, users.id))
+      .where(eq(spaceMembers.spaceId, spaceId))
+      .orderBy(asc(users.firstname));
+
+    return {
+      collaborators: rows.map((r) => ({
+        id: r.space_members.id,
+        userId: r.users.id,
+        role: r.space_members.role,
+        spaceRoleId: r.space_members.spaceRoleId ? Number(r.space_members.spaceRoleId) : null,
+        spaceRoleIds: (r.space_members.spaceRoleIds as number[]) ?? [],
+        user: {
+          id: r.users.id,
+          firstname: r.users.firstname,
+          lastname: r.users.lastname,
+          email: r.users.email,
+          avatar: r.users.avatar,
+          disabled: r.users.disabled,
+        },
+      })),
+    };
+  }
+
+  async addSpaceMember(
+    spaceId: number,
+    userId: number,
+    role: string,
+    spaceRoleId?: number | null,
+    spaceRoleIds?: number[],
+  ) {
+    const [existing] = await this.db
+      .select()
+      .from(spaceMembers)
+      .where(and(eq(spaceMembers.spaceId, spaceId), eq(spaceMembers.userId, userId)))
+      .limit(1);
+
+    if (existing) throw new ConflictException('User is already a member of this space');
+
+    const [created] = await this.db
+      .insert(spaceMembers)
+      .values({
+        spaceId,
+        userId,
+        role,
+        spaceRoleId: spaceRoleId ? BigInt(spaceRoleId) : null,
+        spaceRoleIds: spaceRoleIds ?? [],
+      })
+      .returning();
+
+    return { id: created.id };
+  }
+
+  async updateSpaceMember(
+    spaceId: number,
+    memberId: number,
+    dto: { role?: string; spaceRoleId?: number | null; spaceRoleIds?: number[] },
+  ) {
+    const [updated] = await this.db
+      .update(spaceMembers)
+      .set({
+        ...(dto.role !== undefined && { role: dto.role }),
+        ...(dto.spaceRoleId !== undefined && { spaceRoleId: dto.spaceRoleId ? BigInt(dto.spaceRoleId) : null }),
+        ...(dto.spaceRoleIds !== undefined && { spaceRoleIds: dto.spaceRoleIds }),
+      })
+      .where(and(eq(spaceMembers.id, memberId), eq(spaceMembers.spaceId, spaceId)))
+      .returning();
+
+    return { id: updated.id };
+  }
+
+  async removeSpaceMember(spaceId: number, memberId: number) {
+    await this.db
+      .delete(spaceMembers)
+      .where(and(eq(spaceMembers.id, memberId), eq(spaceMembers.spaceId, spaceId)));
+
+    return { success: true };
+  }
+
+  async searchUsersForSpace(spaceId: number, query: string) {
+    const q = `%${query}%`;
+
+    const members = await this.db
+      .select({ userId: spaceMembers.userId })
+      .from(spaceMembers)
+      .where(eq(spaceMembers.spaceId, spaceId));
+
+    const memberUserIds = members.map((m) => m.userId);
+
+    const searchCond = or(
+      ilike(users.firstname, q),
+      ilike(users.lastname, q),
+      ilike(users.email, q),
+    ) as ReturnType<typeof eq>;
+
+    const conditions = [searchCond, eq(users.disabled, false)] as ReturnType<typeof eq>[];
+    if (memberUserIds.length > 0) {
+      conditions.push(notInArray(users.id, memberUserIds) as ReturnType<typeof eq>);
+    }
+
+    const rows = await this.db
+      .select()
+      .from(users)
+      .where(and(...conditions))
+      .orderBy(asc(users.firstname))
+      .limit(20);
+
+    return {
+      users: rows.map((u) => ({
+        id: u.id,
+        firstname: u.firstname,
+        lastname: u.lastname,
+        email: u.email,
+        avatar: u.avatar,
+      })),
     };
   }
 

@@ -1,6 +1,8 @@
 'use client'
 
 import type { BooleanFieldDef } from '@/components/block-library/edit-block-modal/types'
+import { fieldLabel } from '../field-label'
+import { FieldLabel } from '../FieldLabel'
 
 interface Props {
   fieldKey: string
@@ -13,7 +15,8 @@ export function BooleanField({ fieldKey, def, value, onChange }: Props) {
   const checked = value ?? def.default_value ?? false
 
   return (
-    <div className="flex items-center gap-3">
+    <div>
+      <FieldLabel label={fieldLabel(def.display_name, fieldKey)} required={def.required} description={def.description} />
       <button
         type="button"
         role="switch"
@@ -29,13 +32,6 @@ export function BooleanField({ fieldKey, def, value, onChange }: Props) {
           }`}
         />
       </button>
-      <label className="text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer" onClick={() => onChange(!checked)}>
-        {def.display_name || fieldKey}
-        {def.required && <span className="text-red-500 ml-1">*</span>}
-      </label>
-      {def.description && (
-        <span className="text-xs text-gray-500 dark:text-gray-400">{def.description}</span>
-      )}
     </div>
   )
 }

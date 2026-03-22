@@ -29,6 +29,13 @@ export const spaces = pgTable('spaces', {
   version: bigint('version', { mode: 'number' }).notNull().default(0),
   firstToken: text('first_token'),
   defaultRoot: text('default_root'),
+  // Visual Editor settings
+  previewUrls: json('preview_urls').notNull().default([]),
+  encodeUrl: boolean('encode_url').notNull().default(false),
+  mobileWidth: integer('mobile_width').notNull().default(360),
+  visualEditorDisabled: boolean('visual_editor_disabled').notNull().default(false),
+  // Asset Library settings
+  assetLibrarySettings: json('asset_library_settings').notNull().default({}),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
@@ -58,6 +65,7 @@ export const spaceMembers = pgTable(
       .references(() => users.id, { onDelete: 'cascade' }),
     role: text('role').notNull().default('editor'),
     spaceRoleId: bigint('space_role_id', { mode: 'bigint' }),
+    spaceRoleIds: json('space_role_ids').notNull().default([]),
     permissions: json('permissions').notNull().default([]),
     allowedPath: text('allowed_path').notNull().default(''),
   },
@@ -193,6 +201,57 @@ export const webhookEndpoints = pgTable('webhook_endpoints', {
   actions: json('actions').notNull().default([]),
   activated: boolean('activated').notNull().default(true),
   deletedAt: timestamp('deleted_at'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+export const webhookLogs = pgTable('webhook_logs', {
+  id: bigserial('id', { mode: 'number' }).primaryKey(),
+  webhookEndpointId: integer('webhook_endpoint_id')
+    .notNull()
+    .references(() => webhookEndpoints.id, { onDelete: 'cascade' }),
+  spaceId: integer('space_id')
+    .notNull()
+    .references(() => spaces.id, { onDelete: 'cascade' }),
+  action: text('action').notNull(),
+  status: text('status').notNull().default('pending'), // 'success' | 'failed'
+  requestBody: json('request_body'),
+  responseBody: text('response_body'),
+  responseStatus: integer('response_status'),
+  executedAt: timestamp('executed_at').notNull().defaultNow(),
+});
+
+export const workflows = pgTable('workflows', {
+  id: integer('id').primaryKey(),
+  spaceId: integer('space_id').notNull().references(() => spaces.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  contentTypes: json('content_types').notNull().default([]),
+  isDefault: boolean('is_default').notNull().default(false),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+export const workflowStages = pgTable('workflow_stages', {
+  id: integer('id').primaryKey(),
+  workflowId: integer('workflow_id').notNull().references(() => workflows.id, { onDelete: 'cascade' }),
+  spaceId: integer('space_id').notNull().references(() => spaces.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  color: text('color').notNull().default('#babcb6'),
+  position: integer('position').notNull().default(0),
+  isDefault: boolean('is_default').notNull().default(false),
+  allowPublish: boolean('allow_publish').notNull().default(false),
+  allowAllStages: boolean('allow_all_stages').notNull().default(true),
+  allowAdminPublish: boolean('allow_admin_publish').notNull().default(false),
+  allowAllUsers: boolean('allow_all_users').notNull().default(true),
+  allowAdminChange: boolean('allow_admin_change').notNull().default(false),
+  allowEditorChange: boolean('allow_editor_change').notNull().default(false),
+  storyEditingLocked: boolean('story_editing_locked').notNull().default(false),
+  allowNoneForNextStages: boolean('allow_none_for_next_stages').notNull().default(false),
+  autoRemoveAssignee: boolean('auto_remove_assignee').notNull().default(false),
+  afterPublishId: integer('after_publish_id'),
+  userIds: json('user_ids').notNull().default([]),
+  spaceRoleIds: json('space_role_ids').notNull().default([]),
+  workflowStageIds: json('workflow_stage_ids').notNull().default([]),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });

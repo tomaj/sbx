@@ -3,7 +3,7 @@
 import { use, useEffect, useState } from 'react'
 import { notFound } from 'next/navigation'
 import { StoryEditor } from '@/components/story-editor'
-import type { ComponentMeta, StoryDetail } from '@/components/story-editor/types'
+import type { ComponentMeta, ComponentGroup, StoryDetail } from '@/components/story-editor/types'
 
 interface PageProps {
   params: Promise<{ spaceId: string; storyId: string }>
@@ -13,6 +13,7 @@ interface StoryData {
   story: StoryDetail
   component_schema: Record<string, any> | null
   all_components: ComponentMeta[]
+  all_groups: ComponentGroup[]
 }
 
 export default function StoryDetailPage({ params }: PageProps) {
@@ -50,6 +51,7 @@ export default function StoryDetailPage({ params }: PageProps) {
       story={data.story}
       componentSchema={data.component_schema}
       allComponents={data.all_components}
+      allGroups={data.all_groups ?? []}
     />
   )
 }

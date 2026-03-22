@@ -1,7 +1,7 @@
 'use client'
 
 import type { AnyFieldDef } from '@/components/block-library/edit-block-modal/types'
-import type { ComponentMeta } from './types'
+import type { ComponentMeta, ComponentGroup } from './types'
 import { TextField } from './fields/text-field'
 import { TextareaField } from './fields/textarea-field'
 import { RichtextField } from './fields/richtext-field'
@@ -16,6 +16,8 @@ import { AssetField, MultiassetField } from './fields/asset-field'
 import { SectionField } from './fields/section-field'
 import { TableField } from './fields/table-field'
 import { BloksField } from './fields/bloks-field'
+import { fieldLabel } from './field-label'
+import { FieldLabel } from './FieldLabel'
 
 interface Props {
   fieldKey: string
@@ -23,9 +25,11 @@ interface Props {
   value: any
   onChange: (v: any) => void
   allComponents: ComponentMeta[]
+  allGroups: ComponentGroup[]
+  spaceId: string
 }
 
-export function FieldRenderer({ fieldKey, def, value, onChange, allComponents }: Props) {
+export function FieldRenderer({ fieldKey, def, value, onChange, allComponents, allGroups, spaceId }: Props) {
   switch (def.type) {
     case 'text':
       return <TextField fieldKey={fieldKey} def={def} value={value} onChange={onChange} />
@@ -49,7 +53,7 @@ export function FieldRenderer({ fieldKey, def, value, onChange, allComponents }:
       return <DatetimeField fieldKey={fieldKey} def={def} value={value} onChange={onChange} />
 
     case 'option':
-      return <OptionField fieldKey={fieldKey} def={def} value={value} onChange={onChange} />
+      return <OptionField fieldKey={fieldKey} def={def} value={value} onChange={onChange} spaceId={spaceId} />
 
     case 'options':
       return <OptionsField fieldKey={fieldKey} def={def} value={value} onChange={onChange} />
@@ -78,15 +82,15 @@ export function FieldRenderer({ fieldKey, def, value, onChange, allComponents }:
           value={value}
           onChange={onChange}
           allComponents={allComponents}
+          allGroups={allGroups}
+          spaceId={spaceId}
         />
       )
 
     case 'custom':
       return (
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            {def.display_name || fieldKey}
-          </label>
+          <FieldLabel label={fieldLabel(def.display_name, fieldKey)} description={(def as any).description} />
           <div className="px-3 py-2 text-sm text-gray-400 border border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
             Custom plugin field — not yet supported
           </div>

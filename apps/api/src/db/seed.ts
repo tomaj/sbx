@@ -51,6 +51,9 @@ async function seedSpaces() {
     }
 
     const languageCodes = (s.languages ?? []).map((l: any) => l.code);
+    const previewUrls = (s.environments ?? []).map((e: any) => ({ name: e.name, location: e.location }));
+    const encodeUrl = s.options?.encode_preview_urls ?? false;
+    const mobileWidth = s.options?.mobile_size ?? 360;
 
     await db
       .insert(spaces)
@@ -62,10 +65,22 @@ async function seedSpaces() {
         version,
         languageCodes,
         firstToken: s.first_token,
+        previewUrls,
+        encodeUrl,
+        mobileWidth,
       })
       .onConflictDoUpdate({
         target: spaces.id,
-        set: { name: s.name, domain: s.domain ?? null, version, languageCodes, firstToken: s.first_token },
+        set: {
+          name: s.name,
+          domain: s.domain ?? null,
+          version,
+          languageCodes,
+          firstToken: s.first_token,
+          previewUrls,
+          encodeUrl,
+          mobileWidth,
+        },
       });
 
     console.log(`  ✓ ${s.id}: ${s.name}`);

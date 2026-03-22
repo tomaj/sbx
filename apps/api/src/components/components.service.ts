@@ -170,6 +170,9 @@ export class ComponentsService {
       image?: string | null;
       color?: string | null;
       icon?: string | null;
+      preview_field?: string | null;
+      preview_tmpl?: string | null;
+      internal_tags_list?: { id: string | number; name: string }[];
     },
   ) {
     const set: Record<string, any> = { updatedAt: new Date() };
@@ -183,6 +186,12 @@ export class ComponentsService {
     if ('image' in data) set.image = data.image;
     if ('color' in data) set.color = data.color;
     if ('icon' in data) set.icon = data.icon;
+    if ('preview_field' in data) set.previewField = data.preview_field;
+    if ('preview_tmpl' in data) set.previewTmpl = data.preview_tmpl;
+    if ('internal_tags_list' in data) {
+      set.internalTagsList = data.internal_tags_list;
+      set.internalTagIds = (data.internal_tags_list ?? []).map((t) => String(t.id));
+    }
 
     const [row] = await this.db
       .update(components)

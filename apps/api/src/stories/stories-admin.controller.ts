@@ -30,8 +30,10 @@ export class StoriesAdminController {
     @Query('tag') tag?: string,
     @Query('block') block?: string,
     @Query('published') published?: string,
+    @Query('uuid') uuid?: string,
+    @Query('story_id') storyId?: string,
   ) {
-    const resolvedParentId = parentId ? BigInt(parentId) : null;
+    const resolvedParentId = parentId === undefined ? undefined : (parentId ? BigInt(parentId) : null);
     const resolvedPublished =
       published === 'true' ? true : published === 'false' ? false : undefined;
 
@@ -46,6 +48,8 @@ export class StoriesAdminController {
       tag,
       block,
       published: resolvedPublished,
+      uuid,
+      storyId: storyId ? parseInt(storyId) : undefined,
     });
   }
 

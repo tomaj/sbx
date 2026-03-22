@@ -69,18 +69,41 @@ export class SpacesService {
         name: space.name,
         domain: space.domain ?? '',
         defaultRoot: space.defaultRoot ?? null,
+        previewUrls: (space.previewUrls as { name: string; location: string }[]) ?? [],
+        encodeUrl: space.encodeUrl,
+        mobileWidth: space.mobileWidth,
+        visualEditorDisabled: space.visualEditorDisabled,
+        assetLibrarySettings: (space.assetLibrarySettings as Record<string, unknown>) ?? {},
         createdAt: space.createdAt,
         updatedAt: space.updatedAt,
       },
     };
   }
 
-  async updateSpace(spaceId: number, data: { name?: string; defaultRoot?: string | null }) {
+  async updateSpace(
+    spaceId: number,
+    data: {
+      name?: string;
+      defaultRoot?: string | null;
+      domain?: string | null;
+      previewUrls?: { name: string; location: string }[];
+      encodeUrl?: boolean;
+      mobileWidth?: number;
+      visualEditorDisabled?: boolean;
+      assetLibrarySettings?: Record<string, unknown>;
+    },
+  ) {
     const [updated] = await this.db
       .update(spaces)
       .set({
         ...(data.name !== undefined && { name: data.name }),
         ...(data.defaultRoot !== undefined && { defaultRoot: data.defaultRoot }),
+        ...(data.domain !== undefined && { domain: data.domain }),
+        ...(data.previewUrls !== undefined && { previewUrls: data.previewUrls }),
+        ...(data.encodeUrl !== undefined && { encodeUrl: data.encodeUrl }),
+        ...(data.mobileWidth !== undefined && { mobileWidth: data.mobileWidth }),
+        ...(data.visualEditorDisabled !== undefined && { visualEditorDisabled: data.visualEditorDisabled }),
+        ...(data.assetLibrarySettings !== undefined && { assetLibrarySettings: data.assetLibrarySettings }),
         updatedAt: new Date(),
       })
       .where(eq(spaces.id, spaceId))
@@ -95,6 +118,11 @@ export class SpacesService {
         name: updated.name,
         domain: updated.domain ?? '',
         defaultRoot: updated.defaultRoot ?? null,
+        previewUrls: (updated.previewUrls as { name: string; location: string }[]) ?? [],
+        encodeUrl: updated.encodeUrl,
+        mobileWidth: updated.mobileWidth,
+        visualEditorDisabled: updated.visualEditorDisabled,
+        assetLibrarySettings: (updated.assetLibrarySettings as Record<string, unknown>) ?? {},
         createdAt: updated.createdAt,
         updatedAt: updated.updatedAt,
       },

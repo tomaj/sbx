@@ -149,7 +149,7 @@ export default function ContentPage({ params }: { params: Promise<{ spaceId: str
       qs.set('page', String(page))
       qs.set('per_page', String(perPage))
       if (search.trim()) qs.set('search', search.trim())
-      if (currentParentId !== null) qs.set('parent_id', String(currentParentId))
+      qs.set('parent_id', currentParentId !== null ? String(currentParentId) : '')
 
       const { field, dir } = parseSortOption(sort)
       qs.set('sort_field', field)

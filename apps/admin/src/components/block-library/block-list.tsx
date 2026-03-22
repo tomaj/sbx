@@ -18,6 +18,9 @@ export interface Block {
   created_at: string
   updated_at: string
   schema: Record<string, any>
+  preview_field: string | null
+  preview_tmpl: string | null
+  internal_tags_list: { id: string | number; name: string }[]
 }
 
 function formatDate(iso: string): string {

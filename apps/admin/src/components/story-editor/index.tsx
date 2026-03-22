@@ -9,13 +9,14 @@ import {
 import { EditTab } from './edit-tab'
 import { InfoTab } from './info-tab'
 import { ConfigTab } from './config-tab'
-import type { ComponentMeta, StoryDetail } from './types'
+import type { ComponentMeta, ComponentGroup, StoryDetail } from './types'
 
 interface Props {
   spaceId: string
   story: StoryDetail
   componentSchema: Record<string, any> | null
   allComponents: ComponentMeta[]
+  allGroups: ComponentGroup[]
 }
 
 type PanelTab = 'edit' | 'info' | 'workflow' | 'comment' | 'config'
@@ -38,7 +39,7 @@ function PublishStatus({ story }: { story: StoryDetail }) {
   return <span className="w-3 h-3 rounded-full border-2 border-gray-400 inline-block" title="Draft" />
 }
 
-export function StoryEditor({ spaceId, story: initialStory, componentSchema, allComponents }: Props) {
+export function StoryEditor({ spaceId, story: initialStory, componentSchema, allComponents, allGroups }: Props) {
   const router = useRouter()
   const [story, setStory] = useState<StoryDetail>(initialStory)
   const [content, setContent] = useState<Record<string, any>>(initialStory.content ?? {})
@@ -250,9 +251,11 @@ export function StoryEditor({ spaceId, story: initialStory, componentSchema, all
           <div className="flex-1 flex flex-col border-r border-gray-200 dark:border-gray-700 overflow-hidden">
             {activePanel === 'edit' && (
               <EditTab
+                spaceId={spaceId}
                 schema={componentSchema}
                 content={content}
                 allComponents={allComponents}
+                allGroups={allGroups}
                 onChange={handleFieldChange}
               />
             )}

@@ -103,6 +103,10 @@ Golden dáta: `golden/{space_id}/`
 
 **Mimo MVP:** Workflow stages
 
+## UI konvencie (apps/admin)
+
+- **Skeleton loading vždy** — pri načítaní dát používame skeleton placeholders (`animate-pulse` bloky v tvare obsahu), nie text "Loading...", nadpis "Loading" ani spinner/preloader.
+
 ## DB migrácie
 
 ```bash
