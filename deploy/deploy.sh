@@ -94,10 +94,8 @@ cd /opt/sbx/apps/demo-nextjs
 grep -v '^#' /opt/sbx/deploy/.env.prod | grep -v '^$' > .env.production.local
 pnpm build
 
-# Update nginx config and reload
-echo "--- Updating nginx config..."
-cp /opt/sbx/deploy/nginx.conf /etc/nginx/sites-available/sbx
-ln -sf /etc/nginx/sites-available/sbx /etc/nginx/sites-enabled/sbx
+# Reload nginx (certbot manages /etc/nginx/sites-available/sbx, do not overwrite)
+echo "--- Reloading nginx..."
 nginx -t && systemctl reload nginx
 
 # Start/restart apps with PM2
