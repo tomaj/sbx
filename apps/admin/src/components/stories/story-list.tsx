@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect } from 'react'
-import { Folder, CircleDot, Circle, AlertCircle, Star, Home } from 'lucide-react'
+import { Folder, Star, Home } from 'lucide-react'
 import { UserAvatar } from '@/components/ui/user-avatar'
+import { StoryStatusIcon } from './story-status-icon'
 
 export type StoryUser = {
   name: string
@@ -36,13 +37,7 @@ function StatusIcon({ story }: { story: Story }) {
   if (story.is_folder) {
     return <Folder className="w-4 h-4 text-gray-400" />
   }
-  if (story.published && !story.unpublished_changes) {
-    return <CircleDot className="w-4 h-4 text-teal-500" />
-  }
-  if (story.published && story.unpublished_changes) {
-    return <AlertCircle className="w-4 h-4 text-amber-500" />
-  }
-  return <Circle className="w-4 h-4 text-gray-300" />
+  return <StoryStatusIcon published={story.published} unpublishedChanges={story.unpublished_changes} />
 }
 
 function formatDate(iso: string) {

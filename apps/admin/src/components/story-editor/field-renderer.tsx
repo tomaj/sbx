@@ -63,11 +63,11 @@ export function FieldRenderer({ fieldKey, def, value, onChange, allComponents, a
       return <OptionField fieldKey={fieldKey} def={def} value={value} onChange={onChange} spaceId={spaceId} />
 
     case 'options':
-      return <OptionsField fieldKey={fieldKey} def={def} value={value} onChange={onChange} />
+      return <OptionsField fieldKey={fieldKey} def={def} value={value} onChange={onChange} spaceId={spaceId} />
 
     case 'link':
     case 'multilink':
-      return <LinkField fieldKey={fieldKey} def={def} value={value} onChange={onChange} />
+      return <LinkField fieldKey={fieldKey} def={def} value={value} onChange={onChange} spaceId={spaceId} />
 
     case 'asset':
       return <AssetField fieldKey={fieldKey} def={def} value={value} onChange={onChange} spaceId={spaceId} />
