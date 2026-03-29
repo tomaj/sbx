@@ -24,6 +24,7 @@ import {
   releases,
   tasks,
   fieldTypes,
+  internalTags,
 } from './schema';
 
 const pool = new Pool({
@@ -246,6 +247,30 @@ async function seedTags() {
         });
     }
     console.log(`  ✓ Space ${spaceId}: ${tagList.length} tags`);
+  }
+}
+
+async function seedInternalTags() {
+  console.log('Seeding internal tags...');
+  for (const spaceId of SPACE_IDS) {
+    const filePath = path.join(GOLDEN, String(spaceId), 'internal_tags.json');
+    if (!fs.existsSync(filePath)) continue;
+
+    const raw = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    const list: any[] = raw.internal_tags ?? [];
+
+    for (const t of list) {
+      await db
+        .insert(internalTags)
+        .values({ id: t.id, spaceId, name: t.name, objectType: t.object_type ?? 'component' })
+        .onConflictDoNothing();
+    }
+    // Advance sequence past max imported ID to avoid future collisions
+    if (list.length > 0) {
+      const maxId = Math.max(...list.map((t: any) => t.id));
+      await db.execute(sql`SELECT setval(pg_get_serial_sequence('internal_tags', 'id'), GREATEST(nextval(pg_get_serial_sequence('internal_tags', 'id')), ${maxId + 1}))`).catch(() => {});
+    }
+    console.log(`  ✓ Space ${spaceId}: ${list.length} internal tags`);
   }
 }
 
@@ -778,6 +803,7 @@ async function main() {
   await seedUsers();
   await seedCollaborators();
   await seedTags();
+  await seedInternalTags();
   await seedDatasources();
   await seedDatasourceEntries();
   await seedComponentGroups();

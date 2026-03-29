@@ -11,9 +11,8 @@ export class InternalTagsController {
   list(
     @Param('spaceId') spaceId: string,
     @Query('by_object_type') byObjectType?: string,
-    @Query('object_type') objectType?: string,
   ) {
-    return this.service.listTags(parseInt(spaceId), byObjectType ?? objectType);
+    return this.service.listTags(parseInt(spaceId), byObjectType);
   }
 
   @Post('internal_tags')

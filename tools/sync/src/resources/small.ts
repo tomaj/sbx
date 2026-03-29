@@ -24,6 +24,7 @@ const SMALL_RESOURCES: SmallResource[] = [
   { name: 'branches',          endpoint: 'branches',          key: 'branches'          },
   { name: 'releases',          endpoint: 'releases',          key: 'releases'          },
   { name: 'tasks',             endpoint: 'tasks',             key: 'tasks'             },
+  { name: 'internal_tags',    endpoint: 'internal_tags',     key: 'internal_tags'     },
 ];
 
 /** Fetch all pages of a resource (handles pagination automatically). */
