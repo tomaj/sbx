@@ -14,11 +14,15 @@ import {
 } from '@nestjs/common';
 import { SessionOrTokenGuard } from '../auth/session-or-token.guard';
 import { ComponentsService } from './components.service';
+import { ComponentVersionsService } from './component-versions.service';
 
 @Controller('v1/spaces/:spaceId')
 @UseGuards(SessionOrTokenGuard)
 export class ComponentsController {
-  constructor(private readonly componentsService: ComponentsService) {}
+  constructor(
+    private readonly componentsService: ComponentsService,
+    private readonly componentVersionsService: ComponentVersionsService,
+  ) {}
 
   // ─── Component Groups ────────────────────────────────────────────────────────
 
@@ -114,7 +118,7 @@ export class ComponentsController {
       };
     },
   ) {
-    return this.componentsService.createComponent(req.space.id, body.component);
+    return this.componentsService.createComponent(req.space.id, body.component, req.user?.id ?? null);
   }
 
   @Put('components/:id')
@@ -136,7 +140,7 @@ export class ComponentsController {
       };
     },
   ) {
-    return this.componentsService.updateComponent(req.space.id, parseInt(id), body.component);
+    return this.componentsService.updateComponent(req.space.id, parseInt(id), body.component, req.user?.id ?? null);
   }
 
   @Delete('components/:id')
@@ -144,5 +148,50 @@ export class ComponentsController {
   async deleteComponent(@Req() req: any, @Param('id') id: string) {
     await this.componentsService.deleteComponent(req.space.id, parseInt(id));
     return {};
+  }
+
+  // ─── Component Versions ───────────────────────────────────────────────────
+
+  /** Unified versions endpoint: GET /v1/spaces/:spaceId/versions?model=components&model_id=:id */
+  @Get('versions')
+  async listVersions(
+    @Req() req: any,
+    @Query('model') model: string,
+    @Query('model_id') modelId: string,
+    @Query('page') page = '1',
+    @Query('per_page') perPage = '25',
+  ) {
+    if (model === 'components') {
+      return this.componentVersionsService.listVersions({
+        spaceId: req.space.id,
+        componentId: parseInt(modelId),
+        page: Math.max(1, parseInt(page) || 1),
+        perPage: Math.min(100, parseInt(perPage) || 25),
+      });
+    }
+    return { versions: [] };
+  }
+
+  @Get('components/:id/component_versions/:versionId')
+  async getComponentVersion(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Param('versionId') versionId: string,
+  ) {
+    return this.componentVersionsService.getVersion(req.space.id, parseInt(id), parseInt(versionId));
+  }
+
+  @Put('components/:id/versions/:versionId/restore')
+  async restoreComponentVersion(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Param('versionId') versionId: string,
+  ) {
+    return this.componentsService.restoreComponentVersion(
+      req.space.id,
+      parseInt(id),
+      parseInt(versionId),
+      req.user?.id ?? null,
+    );
   }
 }

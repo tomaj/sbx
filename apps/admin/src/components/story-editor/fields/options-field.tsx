@@ -5,16 +5,20 @@ import { ChevronDown, ChevronUp, Search, GripVertical, X } from 'lucide-react'
 import type { OptionsFieldDef } from '@/components/block-library/edit-block-modal/types'
 import { fieldLabel } from '../field-label'
 import { FieldLabel } from '../FieldLabel'
+import { StoryPickerMultiModal } from '../StoryPickerMultiModal'
 
 interface Props {
   fieldKey: string
   def: OptionsFieldDef
   value: string[] | undefined
   onChange: (v: string[]) => void
+  spaceId?: string
 }
 
-export function OptionsField({ fieldKey, def, value, onChange }: Props) {
-  const options = def.options ?? []
+export function OptionsField({ fieldKey, def, value, onChange, spaceId }: Props) {
+  const isInternalStories = def.source === 'internal_stories'
+  const staticOptions = def.options ?? []
+
   const selected = value ?? []
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
@@ -22,7 +26,27 @@ export function OptionsField({ fieldKey, def, value, onChange }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const dragIndex = useRef<number | null>(null)
 
+  // For internal_stories: display names keyed by story id/uuid
+  const [selectedLabels, setSelectedLabels] = useState<Record<string, string>>({})
+
   useEffect(() => { setPending(value ?? []) }, [value])
+
+  // Fetch display names for already-selected story IDs
+  useEffect(() => {
+    if (!isInternalStories || !selected.length || !spaceId) return
+    const missing = selected.filter(v => !selectedLabels[v])
+    if (!missing.length) return
+    const params = new URLSearchParams({ per_page: '50', by_ids: missing.join(',') })
+    fetch(`/api/admin/spaces/${spaceId}/stories?${params}`)
+      .then(r => r.json())
+      .then(data => {
+        const map: Record<string, string> = {}
+        for (const s of (data.stories ?? [])) map[String(s.id)] = s.name
+        setSelectedLabels(prev => ({ ...prev, ...map }))
+      })
+      .catch(() => {})
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isInternalStories, spaceId, selected.join(',')])
 
   useEffect(() => {
     if (!open) return
@@ -36,7 +60,7 @@ export function OptionsField({ fieldKey, def, value, onChange }: Props) {
     return () => document.removeEventListener('mousedown', handler)
   }, [open])
 
-  const filtered = options.filter(o =>
+  const filtered = staticOptions.filter(o =>
     !search.trim() || o.name.toLowerCase().includes(search.toLowerCase())
   )
 
@@ -55,6 +79,7 @@ export function OptionsField({ fieldKey, def, value, onChange }: Props) {
   function clearAll() {
     onChange([])
     setPending([])
+    setSelectedLabels({})
   }
 
   function removeItem(val: string) {
@@ -77,7 +102,6 @@ export function OptionsField({ fieldKey, def, value, onChange }: Props) {
     onChange(next)
   }
 
-  // Drag handlers
   function onDragStart(i: number) {
     dragIndex.current = i
   }
@@ -97,18 +121,94 @@ export function OptionsField({ fieldKey, def, value, onChange }: Props) {
     dragIndex.current = null
   }
 
-  const selectedOptions = options.filter(o => selected.includes(o.value))
-  // Preserve order from selected array
-  const orderedSelected = selected
-    .map(val => options.find(o => o.value === val))
-    .filter(Boolean) as typeof options
+  const orderedSelected = isInternalStories
+    ? selected.map(val => ({ value: val, name: selectedLabels[val] ?? val }))
+    : selected
+        .map(val => staticOptions.find(o => o.value === val))
+        .filter(Boolean)
+        .map(o => ({ value: o!.value, name: o!.name }))
 
+  // ── internal_stories: modal-based picker ────────────────────────────────────
+  if (isInternalStories) {
+    return (
+      <>
+        <div>
+          <FieldLabel label={fieldLabel(def.display_name, fieldKey)} required={def.required} description={def.description} />
+          <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+
+            {orderedSelected.length > 0 && (
+              <div className="border-b border-gray-200 dark:border-gray-700">
+                <div className="flex items-center gap-3 px-3 py-2 text-xs text-gray-500 dark:text-gray-400">
+                  <span>{orderedSelected.length} item{orderedSelected.length !== 1 ? 's' : ''}</span>
+                  <button type="button" onClick={clearAll} className="text-teal-600 dark:text-teal-400 hover:underline">
+                    Clear selected
+                  </button>
+                </div>
+                {orderedSelected.map((opt, i) => (
+                  <div
+                    key={opt.value}
+                    draggable
+                    onDragStart={() => onDragStart(i)}
+                    onDragOver={e => onDragOver(e, i)}
+                    onDragEnd={onDragEnd}
+                    className="group flex items-center gap-2 px-3 py-2.5 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-grab active:cursor-grabbing select-none"
+                  >
+                    <GripVertical className="w-4 h-4 text-gray-300 dark:text-gray-600 flex-shrink-0" />
+                    <span className="flex-1 text-sm text-gray-800 dark:text-gray-200">{opt.name}</span>
+                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button type="button" onClick={() => removeItem(opt.value)} title="Remove"
+                        className="p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                      <button type="button" onClick={() => moveUp(i)} disabled={i === 0} title="Move up"
+                        className="p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-30">
+                        <ChevronUp className="w-3.5 h-3.5" />
+                      </button>
+                      <button type="button" onClick={() => moveDown(i)} disabled={i === orderedSelected.length - 1} title="Move down"
+                        className="p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-30">
+                        <ChevronDown className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setOpen(true)}
+              className="w-full flex items-center justify-between px-3 py-2.5 text-sm text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+            >
+              <span>Choose one or more...</span>
+              <ChevronDown className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {open && spaceId && (
+          <StoryPickerMultiModal
+            spaceId={spaceId}
+            title={fieldLabel(def.display_name, fieldKey)}
+            filterContentType={def.filter_content_type}
+            useUuid={def.use_uuid}
+            value={selected}
+            onSelect={(values, names) => {
+              setSelectedLabels(prev => ({ ...prev, ...names }))
+              onChange(values)
+            }}
+            onClose={() => setOpen(false)}
+          />
+        )}
+      </>
+    )
+  }
+
+  // ── static options: inline dropdown ─────────────────────────────────────────
   return (
     <div>
       <FieldLabel label={fieldLabel(def.display_name, fieldKey)} required={def.required} description={def.description} />
       <div ref={containerRef} className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
 
-        {/* Selected items with drag & drop */}
         {orderedSelected.length > 0 && (
           <div className="border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center gap-3 px-3 py-2 text-xs text-gray-500 dark:text-gray-400">
@@ -128,33 +228,17 @@ export function OptionsField({ fieldKey, def, value, onChange }: Props) {
               >
                 <GripVertical className="w-4 h-4 text-gray-300 dark:text-gray-600 flex-shrink-0" />
                 <span className="flex-1 text-sm text-gray-800 dark:text-gray-200">{opt.name}</span>
-
-                {/* Hover actions */}
                 <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button
-                    type="button"
-                    onClick={() => removeItem(opt.value)}
-                    title="Remove"
-                    className="p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                  >
+                  <button type="button" onClick={() => removeItem(opt.value)} title="Remove"
+                    className="p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
                     <X className="w-3.5 h-3.5" />
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => moveUp(i)}
-                    disabled={i === 0}
-                    title="Move up"
-                    className="p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-30"
-                  >
+                  <button type="button" onClick={() => moveUp(i)} disabled={i === 0} title="Move up"
+                    className="p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-30">
                     <ChevronUp className="w-3.5 h-3.5" />
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => moveDown(i)}
-                    disabled={i === orderedSelected.length - 1}
-                    title="Move down"
-                    className="p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-30"
-                  >
+                  <button type="button" onClick={() => moveDown(i)} disabled={i === orderedSelected.length - 1} title="Move down"
+                    className="p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-30">
                     <ChevronDown className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -163,7 +247,6 @@ export function OptionsField({ fieldKey, def, value, onChange }: Props) {
           </div>
         )}
 
-        {/* Closed trigger */}
         {!open ? (
           <button
             type="button"
@@ -175,7 +258,6 @@ export function OptionsField({ fieldKey, def, value, onChange }: Props) {
           </button>
         ) : (
           <div>
-            {/* Search */}
             <div className="relative border-b border-gray-200 dark:border-gray-700 ring-2 ring-teal-500 ring-inset">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
               <input
@@ -187,8 +269,6 @@ export function OptionsField({ fieldKey, def, value, onChange }: Props) {
                 className="w-full pl-9 pr-4 py-2.5 text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-400 outline-none"
               />
             </div>
-
-            {/* Options list */}
             <div className="max-h-56 overflow-y-auto">
               {filtered.length === 0 ? (
                 <p className="px-3 py-3 text-sm text-gray-400">No options found</p>
@@ -207,8 +287,6 @@ export function OptionsField({ fieldKey, def, value, onChange }: Props) {
                 </label>
               ))}
             </div>
-
-            {/* Add button */}
             <div className="border-t border-gray-200 dark:border-gray-700">
               <button
                 type="button"

@@ -2,7 +2,7 @@ import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { SQL, and, asc, count, desc, eq, gt, gte, ilike, isNull, isNotNull, lt, lte, ne, notInArray, or, sql, inArray } from 'drizzle-orm';
 import { DB } from '../db/db.module';
 import type { DbType } from '../db/db.module';
-import { stories, tags, components, componentGroups, storyReleases, releases, users, workflowStageChanges } from '../db/schema';
+import { stories, tags, components, componentGroups, storyReleases, storyVersions, releases, users, workflowStageChanges } from '../db/schema';
 import { JobsClient } from '@sbx/jobs';
 import { JOBS_CLIENT } from '../jobs/jobs.module';
 import { WebhooksService } from '../webhooks/webhooks.service';
@@ -15,6 +15,38 @@ export class StoriesService {
     @Inject(JOBS_CLIENT) private jobs: JobsClient,
     private readonly webhooks: WebhooksService,
   ) {}
+
+  private logVersion(params: {
+    storyId: number;
+    spaceId: number;
+    userId?: number | null;
+    releaseId?: number | null;
+    action: 'create' | 'save' | 'publish' | 'unpublish';
+    status: 'draft' | 'published' | 'unpublished';
+    name: string;
+    slug: string;
+    fullSlug: string;
+    content: Record<string, any>;
+    tagList: any;
+    path?: string | null;
+    isStartpage?: boolean;
+  }) {
+    void this.db.insert(storyVersions).values({
+      storyId: params.storyId,
+      spaceId: params.spaceId,
+      userId: params.userId ?? null,
+      releaseId: params.releaseId ?? null,
+      action: params.action,
+      status: params.status,
+      name: params.name,
+      slug: params.slug,
+      fullSlug: params.fullSlug,
+      content: params.content,
+      tagList: params.tagList ?? [],
+      path: params.path ?? null,
+      isStartpage: params.isStartpage ?? false,
+    }).catch(() => { /* non-critical — never block main flow */ });
+  }
 
   async listStoriesAdmin(
     spaceId: number,
@@ -86,7 +118,14 @@ export class StoriesService {
             : parentId === null
               ? isNull(stories.parentId)
               : eq(stories.parentId, parentId),
-      contentType?.trim() ? ilike(stories.contentType, `%${contentType.trim()}%`) : undefined,
+      contentType?.trim()
+        ? (() => {
+            const types = contentType.split(',').map((t) => t.trim()).filter(Boolean);
+            return types.length === 1
+              ? eq(stories.contentType, types[0])
+              : inArray(stories.contentType, types);
+          })()
+        : undefined,
       tag?.trim()
         ? sql`${stories.tagList}::text ilike ${'%' + tag.trim() + '%'}`
         : undefined,
@@ -473,6 +512,17 @@ export class StoriesService {
       });
     }
 
+    this.logVersion({
+      storyId, spaceId, userId: authorId, action: 'save', status: 'draft',
+      name: result.story.name,
+      slug: result.story.slug,
+      fullSlug: result.story.full_slug,
+      content: (result.story.content ?? {}) as Record<string, any>,
+      tagList: result.story.tag_list ?? [],
+      path: result.story.path,
+      isStartpage: result.story.is_startpage,
+    });
+
     return result;
   }
 
@@ -561,10 +611,18 @@ export class StoriesService {
         .where(eq(stories.id, BigInt(storyId)));
     }
 
+    this.logVersion({
+      storyId, spaceId, releaseId, action: 'save', status: 'draft',
+      name: snapshot.name, slug: snapshot.slug, fullSlug: snapshot.full_slug,
+      content: (snapshot.content ?? {}) as Record<string, any>,
+      tagList: snapshot.tag_list ?? [],
+      path: snapshot.path, isStartpage: snapshot.is_startpage,
+    });
+
     return this.getStoryAdmin(spaceId, storyId);
   }
 
-  async publishStory(spaceId: number, storyId: number) {
+  async publishStory(spaceId: number, storyId: number, userId?: number | null) {
     const [current] = await this.db
       .select({
         firstPublishedAt: stories.firstPublishedAt, name: stories.name, fullSlug: stories.fullSlug,
@@ -606,10 +664,20 @@ export class StoriesService {
       text: `Story "${current?.name ?? storyId}" was published.`,
     });
 
+    if (current) {
+      this.logVersion({
+        storyId, spaceId, userId, action: 'publish', status: 'published',
+        name: current.name, slug: current.slug, fullSlug: current.fullSlug,
+        content: (current.content ?? {}) as Record<string, any>,
+        tagList: current.tagList ?? [],
+        path: current.path, isStartpage: current.isStartpage,
+      });
+    }
+
     return this.getStoryAdmin(spaceId, storyId);
   }
 
-  async unpublishStory(spaceId: number, storyId: number) {
+  async unpublishStory(spaceId: number, storyId: number, userId?: number | null) {
     const [current] = await this.db
       .select({ name: stories.name, fullSlug: stories.fullSlug })
       .from(stories)
@@ -628,6 +696,14 @@ export class StoriesService {
       full_slug: current?.fullSlug ?? '',
       text: `Story "${current?.name ?? storyId}" was unpublished.`,
     });
+
+    if (current) {
+      this.logVersion({
+        storyId, spaceId, userId, action: 'unpublish', status: 'unpublished',
+        name: current.name, slug: '', fullSlug: current.fullSlug,
+        content: {}, tagList: [],
+      });
+    }
 
     return this.getStoryAdmin(spaceId, storyId);
   }
@@ -695,6 +771,13 @@ export class StoriesService {
       story_id: Number(id),
       full_slug: fullSlug,
       text: `Story "${data.name}" was created.`,
+    });
+
+    this.logVersion({
+      storyId: Number(id), spaceId, userId: authorId, action: 'create', status: 'draft',
+      name: data.name, slug: data.slug, fullSlug,
+      content: data.content ?? {}, tagList: data.tag_list ?? [],
+      path: data.path, isStartpage: data.is_startpage,
     });
 
     return this.getStoryAdmin(spaceId, Number(id));

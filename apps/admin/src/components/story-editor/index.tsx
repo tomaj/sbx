@@ -14,6 +14,7 @@ import { ConfigTab } from './config-tab'
 import { CommentTab } from './comment-tab'
 import { FieldDiscussionPanel } from './field-discussion-panel'
 import { LayersPanel } from './layers-panel'
+import { StoryHistoryPanel } from './story-history-panel'
 import type { ComponentMeta, ComponentGroup, StoryDetail } from './types'
 
 interface PreviewUrl {
@@ -101,6 +102,7 @@ export function StoryEditor({
   const [activeDiscussionRect, setActiveDiscussionRect] = useState<DOMRect | null>(null)
   const [discussionCounts, setDiscussionCounts] = useState<Record<string, number>>({})
   const [openDiscussionCount, setOpenDiscussionCount] = useState(0)
+  const [showHistory, setShowHistory] = useState(false)
   const [showScheduleModal, setShowScheduleModal] = useState(false)
   const [scheduleDate, setScheduleDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [scheduleTime, setScheduleTime] = useState(() => new Date().toTimeString().slice(0, 5))
@@ -403,6 +405,7 @@ export function StoryEditor({
 
         <button
           type="button"
+          onClick={() => setShowHistory(true)}
           className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-gray-700 dark:text-gray-300 flex-shrink-0"
         >
           <History className="w-4 h-4" />
@@ -950,6 +953,18 @@ export function StoryEditor({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Story history overlay */}
+      {showHistory && story && (
+        <StoryHistoryPanel
+          spaceId={spaceId}
+          storyId={story.id}
+          storyName={story.name}
+          previewUrl={fullPreviewUrl || undefined}
+          onClose={() => setShowHistory(false)}
+          onRestore={() => { setStory(null); router.refresh() }}
+        />
       )}
 
       {/* Field discussion panel overlay */}

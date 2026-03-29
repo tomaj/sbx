@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ChevronDown, ChevronRight, Plus, Trash2, GripVertical, Copy, Scissors } from 'lucide-react'
+import { ChevronDown, ChevronRight, Plus, Trash2, GripVertical, Copy, Scissors, MessageSquare } from 'lucide-react'
 import { parseSchema } from '@/components/block-library/edit-block-modal/types'
 function uuidv4() { return crypto.randomUUID() }
 import type { BloksFieldDef } from '@/components/block-library/edit-block-modal/types'
@@ -23,6 +23,9 @@ interface Props {
   allComponents: ComponentMeta[]
   allGroups: ComponentGroup[]
   spaceId: string
+  onOpenDiscussion?: (fieldKey: string, rect: DOMRect) => void
+  discussionCount?: number
+  isActiveDiscussion?: boolean
 }
 
 function getBlockPreview(block: BlockItem, schema: Record<string, any> | undefined, previewField: string | null): string {
@@ -326,7 +329,7 @@ function BlockRow({
 
 // ── BloksField ────────────────────────────────────────────────────────────────
 
-export function BloksField({ fieldKey, def, value, onChange, allComponents, allGroups, spaceId }: Props) {
+export function BloksField({ fieldKey, def, value, onChange, allComponents, allGroups, spaceId, onOpenDiscussion, discussionCount, isActiveDiscussion }: Props) {
   const blocks = value ?? []
   const [draggingIdx, setDraggingIdx] = useState<number | null>(null)
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null)
@@ -392,9 +395,28 @@ export function BloksField({ fieldKey, def, value, onChange, allComponents, allG
           {def.display_name || fieldKey}
           {def.required && <span className="text-red-500 ml-1">*</span>}
         </label>
-        <span className="text-xs text-gray-400">
-          {blocks.length}{def.maximum ? ` / ${def.maximum}` : ''} block{blocks.length !== 1 ? 's' : ''}
-        </span>
+        <div className="flex items-center gap-1.5">
+          {onOpenDiscussion && (
+            <button
+              type="button"
+              onClick={(e) => onOpenDiscussion(fieldKey, (e.currentTarget as HTMLElement).getBoundingClientRect())}
+              title="Start a discussion"
+              className={`group-hover:opacity-100 flex items-center gap-1 p-0.5 rounded transition-all ${
+                isActiveDiscussion
+                  ? 'opacity-100 text-teal-600 dark:text-teal-400'
+                  : 'text-gray-400 opacity-0 hover:text-teal-600 dark:hover:text-teal-400'
+              }`}
+            >
+              {discussionCount != null && discussionCount > 0 && (
+                <span className="text-[10px] font-bold text-red-500">{discussionCount}</span>
+              )}
+              <MessageSquare className="w-3.5 h-3.5" />
+            </button>
+          )}
+          <span className="text-xs text-gray-400">
+            {blocks.length}{def.maximum ? ` / ${def.maximum}` : ''} block{blocks.length !== 1 ? 's' : ''}
+          </span>
+        </div>
       </div>
       {def.description && (
         <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">{def.description}</p>

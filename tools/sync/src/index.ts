@@ -13,6 +13,7 @@ import { syncSmall } from './resources/small';
 import { syncActivities } from './resources/activities';
 import { syncStories } from './resources/stories';
 import { syncAssets } from './resources/assets';
+import { syncStoryVersions } from './resources/story_versions';
 import { MAPI_TOKEN } from './utils';
 
 const SPACES = [
@@ -61,10 +62,11 @@ async function main() {
   for (const space of spaces) {
     console.log(`\n[${space.id}] ${space.name}`);
 
-    const runSmall = !argResource || !['activities', 'stories', 'assets'].includes(argResource);
+    const runSmall = !argResource || !['activities', 'stories', 'assets', 'story_versions'].includes(argResource);
     const runActivities = !argResource || argResource === 'activities';
     const runStories = !argResource || argResource === 'stories';
     const runAssets = !argResource || argResource === 'assets';
+    const runStoryVersions = !argResource || argResource === 'story_versions';
 
     if (runSmall) {
       console.log('  small resources:');
@@ -83,6 +85,11 @@ async function main() {
 
     if (runAssets) {
       await syncAssets(space.id, token, full);
+    }
+
+    if (runStoryVersions) {
+      console.log('  story_versions:');
+      await syncStoryVersions(space.id, token, full);
     }
   }
 

@@ -1,11 +1,15 @@
 import { Body, Controller, Delete, Get, HttpCode, NotFoundException, Param, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
 import { SessionOrTokenGuard } from '../auth/session-or-token.guard';
 import { StoriesService } from './stories.service';
+import { StoryVersionsService } from './story-versions.service';
 
 @Controller('v1/spaces/:spaceId/stories')
 @UseGuards(SessionOrTokenGuard)
 export class StoriesController {
-  constructor(private readonly storiesService: StoriesService) {}
+  constructor(
+    private readonly storiesService: StoriesService,
+    private readonly storyVersionsService: StoryVersionsService,
+  ) {}
 
   @Get()
   async list(
@@ -103,6 +107,15 @@ export class StoriesController {
     return this.storiesService.getAncestors(parseInt(spaceId), BigInt(storyId));
   }
 
+  @Get(':id/compare')
+  compareStory(
+    @Param('spaceId') spaceId: string,
+    @Param('id') id: string,
+    @Query('version_v2') versionV2: string,
+  ) {
+    return this.storyVersionsService.compareVersions(parseInt(spaceId), parseInt(id), parseInt(versionV2));
+  }
+
   @Get(':id')
   async getStory(
     @Param('spaceId') spaceId: string,
@@ -154,13 +167,13 @@ export class StoriesController {
   }
 
   @Post(':id/publish')
-  publishStory(@Param('spaceId') spaceId: string, @Param('id') id: string) {
-    return this.storiesService.publishStory(parseInt(spaceId), parseInt(id));
+  publishStory(@Param('spaceId') spaceId: string, @Param('id') id: string, @Req() req: any) {
+    return this.storiesService.publishStory(parseInt(spaceId), parseInt(id), req.adminUser?.sbxUserId);
   }
 
   @Post(':id/unpublish')
-  unpublishStory(@Param('spaceId') spaceId: string, @Param('id') id: string) {
-    return this.storiesService.unpublishStory(parseInt(spaceId), parseInt(id));
+  unpublishStory(@Param('spaceId') spaceId: string, @Param('id') id: string, @Req() req: any) {
+    return this.storiesService.unpublishStory(parseInt(spaceId), parseInt(id), req.adminUser?.sbxUserId);
   }
 
   @Post(':id/partial_update')

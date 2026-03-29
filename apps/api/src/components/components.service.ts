@@ -3,10 +3,14 @@ import { SQL, and, asc, count, desc, eq, ilike, inArray, isNull } from 'drizzle-
 import { DB } from '../db/db.module';
 import type { DbType } from '../db/db.module';
 import { componentGroups, components } from '../db/schema';
+import { ComponentVersionsService } from './component-versions.service';
 
 @Injectable()
 export class ComponentsService {
-  constructor(@Inject(DB) private db: DbType) {}
+  constructor(
+    @Inject(DB) private db: DbType,
+    private readonly componentVersionsService: ComponentVersionsService,
+  ) {}
 
   // ─── CDN / read-only ────────────────────────────────────────────────────────
 
@@ -167,6 +171,7 @@ export class ComponentsService {
       color?: string | null;
       icon?: string | null;
     },
+    userId?: number | null,
   ) {
     const id = BigInt(Date.now() * 1000 + Math.floor(Math.random() * 1000));
     const [row] = await this.db
@@ -186,6 +191,17 @@ export class ComponentsService {
         icon: data.icon ?? null,
       })
       .returning();
+
+    this.componentVersionsService.saveVersion({
+      componentId: Number(row.id),
+      spaceId,
+      userId,
+      event: 'create',
+      schema: (data.schema ?? {}) as Record<string, any>,
+      name: row.name,
+      displayName: row.displayName,
+    });
+
     return { component: this.formatComponent(row) };
   }
 
@@ -207,6 +223,7 @@ export class ComponentsService {
       preview_tmpl?: string | null;
       internal_tags_list?: { id: string | number; name: string }[];
     },
+    userId?: number | null,
   ) {
     const set: Record<string, any> = { updatedAt: new Date() };
     if (data.name !== undefined) set.name = data.name;
@@ -232,6 +249,43 @@ export class ComponentsService {
       .where(and(eq(components.id, BigInt(id)), eq(components.spaceId, spaceId)))
       .returning();
     if (!row) throw new NotFoundException('Component not found');
+
+    this.componentVersionsService.saveVersion({
+      componentId: id,
+      spaceId,
+      userId,
+      event: 'update',
+      schema: (row.schema ?? {}) as Record<string, any>,
+      name: row.name,
+      displayName: row.displayName,
+    });
+
+    return { component: this.formatComponent(row) };
+  }
+
+  async restoreComponentVersion(spaceId: number, componentId: number, versionId: number, userId?: number | null) {
+    const version = await this.componentVersionsService.getVersionForRestore(spaceId, componentId, versionId);
+
+    const [row] = await this.db
+      .update(components)
+      .set({
+        schema: version.schema as Record<string, any>,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(components.id, BigInt(componentId)), eq(components.spaceId, spaceId)))
+      .returning();
+    if (!row) throw new NotFoundException('Component not found');
+
+    this.componentVersionsService.saveVersion({
+      componentId,
+      spaceId,
+      userId,
+      event: 'update',
+      schema: version.schema as Record<string, any>,
+      name: row.name,
+      displayName: row.displayName,
+    });
+
     return { component: this.formatComponent(row) };
   }
 

@@ -574,6 +574,51 @@ export const storyReleases = pgTable(
   ],
 );
 
+export const storyVersions = pgTable(
+  'story_versions',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    storyId: bigint('story_id', { mode: 'number' }).notNull().references(() => stories.id, { onDelete: 'cascade' }),
+    spaceId: integer('space_id').notNull().references(() => spaces.id, { onDelete: 'cascade' }),
+    releaseId: bigint('release_id', { mode: 'number' }),
+    userId: bigint('user_id', { mode: 'number' }),
+    action: text('action').notNull(), // 'create' | 'save' | 'publish' | 'unpublish'
+    status: text('status').notNull(), // 'draft' | 'published' | 'unpublished'
+    name: text('name').notNull(),
+    slug: text('slug').notNull(),
+    fullSlug: text('full_slug').notNull(),
+    content: json('content').notNull().default({}),
+    tagList: json('tag_list').notNull().default([]),
+    path: text('path'),
+    isStartpage: boolean('is_startpage').notNull().default(false),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (t) => [
+    index('idx_story_versions_story_id').on(t.storyId, t.createdAt),
+    index('idx_story_versions_space_id').on(t.spaceId),
+  ],
+);
+
+export const componentVersions = pgTable(
+  'component_versions',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    componentId: bigint('component_id', { mode: 'number' }).notNull().references(() => components.id, { onDelete: 'cascade' }),
+    spaceId: integer('space_id').notNull().references(() => spaces.id, { onDelete: 'cascade' }),
+    userId: bigint('user_id', { mode: 'number' }),
+    event: text('event').notNull().default('update'),
+    schema: json('schema').notNull().default({}),
+    name: text('name').notNull(),
+    displayName: text('display_name'),
+    isDraft: boolean('is_draft').notNull().default(true),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (t) => [
+    index('idx_component_versions_component_id').on(t.componentId, t.createdAt),
+    index('idx_component_versions_space_id').on(t.spaceId),
+  ],
+);
+
 export const tasks = pgTable(
   'tasks',
   {

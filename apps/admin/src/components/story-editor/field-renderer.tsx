@@ -17,6 +17,7 @@ import { AssetField, MultiassetField } from './fields/asset-field'
 import { SectionField } from './fields/section-field'
 import { TableField } from './fields/table-field'
 import { BloksField } from './fields/bloks-field'
+import { CustomPluginField } from './fields/custom-plugin-field'
 import { fieldLabel } from './field-label'
 import { FieldLabel } from './FieldLabel'
 
@@ -91,17 +92,21 @@ export function FieldRenderer({ fieldKey, def, value, onChange, allComponents, a
           allComponents={allComponents}
           allGroups={allGroups}
           spaceId={spaceId}
+          onOpenDiscussion={onOpenDiscussion}
+          discussionCount={discussionCount}
+          isActiveDiscussion={isActiveDiscussion}
         />
       )
 
     case 'custom':
       return (
-        <div>
-          <FieldLabel label={fieldLabel(def.display_name, fieldKey)} description={(def as any).description} />
-          <div className="px-3 py-2 text-sm text-gray-400 border border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
-            Custom plugin field — not yet supported
-          </div>
-        </div>
+        <CustomPluginField
+          fieldKey={fieldKey}
+          def={def}
+          value={value}
+          onChange={onChange}
+          spaceId={spaceId}
+        />
       )
 
     case 'tab':
@@ -121,7 +126,7 @@ export function FieldRenderer({ fieldKey, def, value, onChange, allComponents, a
 
   return (
     <div className={`group relative rounded-lg transition-colors ${isActiveDiscussion ? 'bg-gray-100 dark:bg-gray-800/80' : ''}`}>
-      {onOpenDiscussion && (
+      {onOpenDiscussion && def.type !== 'bloks' && (
         <button
           type="button"
           onClick={(e) => onOpenDiscussion(fieldKey, (e.currentTarget as HTMLElement).getBoundingClientRect())}
