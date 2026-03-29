@@ -1,6 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { StorageService } from '../storage/storage.service';
-import { CacheService } from '../cache/cache.service';
 import { splitOnMarker, parseOperations } from './url-parser';
 import { processImage, ProcessResult } from './sharp-processor';
 
@@ -72,12 +71,7 @@ export interface AssetRequest {
 
 @Injectable()
 export class AssetService {
-  private readonly logger = new Logger(AssetService.name);
-
-  constructor(
-    private readonly storage: StorageService,
-    private readonly cache: CacheService,
-  ) {}
+  constructor(private readonly storage: StorageService) {}
 
   async handle(req: AssetRequest): Promise<ProcessResult> {
     const { urlPath, accept, viewerCountry } = req;
@@ -95,59 +89,50 @@ export class AssetService {
     return this.handleRawAsset(urlPath, ext);
   }
 
-  // ── Image path ────────────────────────────────────────────────────────────
-
   private async handleImage(urlPath: string, accept: string): Promise<ProcessResult> {
     const parts = splitOnMarker(urlPath);
 
     if (!parts) {
-      return this.fetchRaw(urlPath, getExtension(urlPath), false);
+      return this.fetchRaw(urlPath, getExtension(urlPath));
     }
 
     const [assetPath, opsString] = parts;
-    const cacheKey = buildCacheKey(urlPath, accept);
-
-    const cached = await this.cache.getWithMime(cacheKey);
-    if (cached) {
-      this.logger.debug(`Cache HIT: ${cacheKey}`);
-      return { ...cached, fromCache: true };
-    }
-
-    this.logger.debug(`Cache MISS: ${cacheKey}`);
-
     const objectKey = toObjectKey(assetPath);
-    const original = await this.storage.getObject(objectKey);
+    const original = await this.fetchBuffer(objectKey, assetPath);
     const ops = parseOperations(opsString);
-    const result = await processImage(original, ops, accept);
-
-    await this.cache.set(cacheKey, result.buffer, result.contentType);
-    return { ...result, fromCache: false };
+    return processImage(original, ops, accept);
   }
-
-  // ── Non-image path ────────────────────────────────────────────────────────
 
   private async handleRawAsset(urlPath: string, ext: string): Promise<ProcessResult> {
-    const assetPath = stripTransformSuffix(urlPath);
-    const cacheKey = `asset:${assetPath}`;
-
-    const cached = await this.cache.getWithMime(cacheKey);
-    if (cached) {
-      this.logger.debug(`Cache HIT: ${cacheKey}`);
-      return { ...cached, fromCache: true };
-    }
-
-    this.logger.debug(`Cache MISS: ${cacheKey}`);
-
-    const result = await this.fetchRaw(assetPath, ext, false);
-    await this.cache.set(cacheKey, result.buffer, result.contentType);
-    return result;
+    return this.fetchRaw(urlPath, ext);
   }
 
-  private async fetchRaw(urlPath: string, ext: string, fromCache: boolean): Promise<ProcessResult> {
+  private async fetchRaw(urlPath: string, ext: string): Promise<ProcessResult> {
     const objectKey = toObjectKey(stripTransformSuffix(urlPath));
-    const buffer = await this.storage.getObject(objectKey);
+    const buffer = await this.fetchBuffer(objectKey, stripTransformSuffix(urlPath));
     const contentType = MIME_TYPES[ext] ?? 'application/octet-stream';
-    return { buffer, contentType, fromCache };
+    return { buffer, contentType };
+  }
+
+  /**
+   * Fetches a buffer from MinIO. If the object is not found, falls back to
+   * fetching from the Storyblok origin (a.storyblok.com) so that assets
+   * that have not yet been migrated to our storage continue to work.
+   */
+  private async fetchBuffer(objectKey: string, urlPath: string): Promise<Buffer> {
+    try {
+      return await this.storage.getObject(objectKey);
+    } catch (err) {
+      if (!(err instanceof NotFoundException)) throw err;
+    }
+
+    // Origin fallback: reconstruct Storyblok URL from the /f/<spaceId>/... path
+    const originUrl = `https://a.storyblok.com${urlPath.startsWith('/f/') ? urlPath : `/f/${objectKey}`}`;
+    const response = await fetch(originUrl);
+    if (!response.ok) {
+      throw new NotFoundException(`Asset not found in storage or origin: ${objectKey}`);
+    }
+    return Buffer.from(await response.arrayBuffer());
   }
 }
 
@@ -163,9 +148,4 @@ function toObjectKey(urlPath: string): string {
 function stripTransformSuffix(urlPath: string): string {
   const idx = urlPath.indexOf('/m/');
   return idx === -1 ? urlPath : urlPath.slice(0, idx);
-}
-
-function buildCacheKey(urlPath: string, accept: string): string {
-  const variant = accept?.includes('image/webp') ? 'webp' : 'native';
-  return `img:${urlPath}:${variant}`;
 }

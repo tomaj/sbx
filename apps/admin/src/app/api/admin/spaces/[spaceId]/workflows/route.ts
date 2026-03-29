@@ -15,7 +15,7 @@ async function getSessionToken() {
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ spaceId: string }> }) {
   const { spaceId } = await params
   const token = await getSessionToken()
-  const res = await fetch(`${API_URL}/v1/admin/spaces/${spaceId}/workflows`, {
+  const res = await fetch(`${API_URL}/v1/spaces/${spaceId}/workflows`, {
     headers: { Authorization: `Bearer ${token}` },
   })
   const data = await res.json()
@@ -26,10 +26,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ spa
   const { spaceId } = await params
   const token = await getSessionToken()
   const body = await req.json()
-  const res = await fetch(`${API_URL}/v1/admin/spaces/${spaceId}/workflows`, {
+  const res = await fetch(`${API_URL}/v1/spaces/${spaceId}/workflows`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ workflow: { name: body.name, content_types: body.contentTypes, is_default: body.isDefault } }),
   })
   const data = await res.json()
   return NextResponse.json(data, { status: res.status })

@@ -12,6 +12,19 @@ async function getSessionToken() {
 
 const API_URL = process.env.API_URL ?? 'http://localhost:3000'
 
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  const token = await getSessionToken()
+  const body = await req.json()
+  const res = await fetch(`${API_URL}/v1/admin/me/tokens/${id}`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  const data = await res.json()
+  return NextResponse.json(data)
+}
+
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const token = await getSessionToken()

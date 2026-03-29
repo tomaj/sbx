@@ -18,7 +18,7 @@ export async function GET(
 ) {
   const { spaceId, logId } = await params
   const token = await getSessionToken()
-  const res = await fetch(`${API_URL}/v1/admin/spaces/${spaceId}/webhooks/logs/${logId}`, {
+  const res = await fetch(`${API_URL}/v1/spaces/${spaceId}/webhook_endpoints/logs/${logId}`, {
     headers: { Authorization: `Bearer ${token}` },
   })
   const data = await res.json()
@@ -32,7 +32,7 @@ export async function POST(
   const { spaceId, logId } = await params
   const token = await getSessionToken()
   const res = await fetch(
-    `${API_URL}/v1/admin/spaces/${spaceId}/webhooks/logs/${logId}/retry`,
+    `${API_URL}/v1/spaces/${spaceId}/webhook_endpoints/logs/${logId}/retry`,
     {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },

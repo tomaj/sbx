@@ -4,7 +4,6 @@ import { ImageOps, CropOp } from './url-parser';
 export interface ProcessResult {
   buffer: Buffer;
   contentType: string;
-  fromCache: boolean;
 }
 
 const MAX_DIMENSION = 4000;
@@ -239,22 +238,22 @@ async function encodeOutput(
   switch (format) {
     case 'webp':
       img = img.webp({ quality });
-      return { buffer: await img.toBuffer(), contentType: 'image/webp', fromCache: false };
+      return { buffer: await img.toBuffer(), contentType: 'image/webp' };
 
     case 'avif':
       img = img.avif({ quality });
-      return { buffer: await img.toBuffer(), contentType: 'image/avif', fromCache: false };
+      return { buffer: await img.toBuffer(), contentType: 'image/avif' };
 
     case 'png':
       img = img.png({ quality });
-      return { buffer: await img.toBuffer(), contentType: 'image/png', fromCache: false };
+      return { buffer: await img.toBuffer(), contentType: 'image/png' };
 
     case 'gif' as any:
-      return { buffer: await img.toBuffer(), contentType: 'image/gif', fromCache: false };
+      return { buffer: await img.toBuffer(), contentType: 'image/gif' };
 
     case 'jpeg':
     default:
       img = img.jpeg({ quality });
-      return { buffer: await img.toBuffer(), contentType: 'image/jpeg', fromCache: false };
+      return { buffer: await img.toBuffer(), contentType: 'image/jpeg' };
   }
 }

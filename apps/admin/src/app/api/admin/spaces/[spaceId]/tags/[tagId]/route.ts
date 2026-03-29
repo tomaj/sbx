@@ -12,17 +12,24 @@ async function getSessionToken() {
   )
 }
 
-type Params = { params: Promise<{ spaceId: string; tagId: string }> }
-
-export async function PATCH(req: NextRequest, { params }: Params) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ spaceId: string; tagId: string }> }) {
   const { spaceId, tagId } = await params
   const token = await getSessionToken()
   const body = await req.json()
-  const res = await fetch(`${API_URL}/v1/admin/spaces/${spaceId}/tags/${tagId}`, {
-    method: 'PATCH',
+  const res = await fetch(`${API_URL}/v1/spaces/${spaceId}/tags/${tagId}`, {
+    method: 'PUT',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ tag: body }),
   })
-  const data = await res.json()
-  return NextResponse.json(data, { status: res.status })
+  return NextResponse.json(await res.json(), { status: res.status })
+}
+
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ spaceId: string; tagId: string }> }) {
+  const { spaceId, tagId } = await params
+  const token = await getSessionToken()
+  const res = await fetch(`${API_URL}/v1/spaces/${spaceId}/tags/${tagId}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  return NextResponse.json(await res.json(), { status: res.status })
 }

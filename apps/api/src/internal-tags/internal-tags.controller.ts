@@ -1,0 +1,41 @@
+import { Body, Controller, Delete, Get, HttpCode, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
+import { SessionOrTokenGuard } from '../auth/session-or-token.guard';
+import { InternalTagsService } from './internal-tags.service';
+
+@Controller('v1/spaces/:spaceId')
+@UseGuards(SessionOrTokenGuard)
+export class InternalTagsController {
+  constructor(private readonly service: InternalTagsService) {}
+
+  @Get('internal_tags')
+  list(
+    @Param('spaceId') spaceId: string,
+    @Query('by_object_type') byObjectType?: string,
+    @Query('object_type') objectType?: string,
+  ) {
+    return this.service.listTags(parseInt(spaceId), byObjectType ?? objectType);
+  }
+
+  @Post('internal_tags')
+  create(
+    @Param('spaceId') spaceId: string,
+    @Body() body: { internal_tag: { name: string; object_type?: string } },
+  ) {
+    return this.service.createTag(parseInt(spaceId), body.internal_tag.name, body.internal_tag.object_type);
+  }
+
+  @Put('internal_tags/:id')
+  update(
+    @Param('spaceId') spaceId: string,
+    @Param('id') id: string,
+    @Body() body: { internal_tag: { name: string } },
+  ) {
+    return this.service.updateTag(parseInt(spaceId), parseInt(id), body.internal_tag.name);
+  }
+
+  @Delete('internal_tags/:id')
+  @HttpCode(200)
+  delete(@Param('spaceId') spaceId: string, @Param('id') id: string) {
+    return this.service.deleteTag(parseInt(spaceId), parseInt(id));
+  }
+}

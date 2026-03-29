@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { authClient } from '@/lib/auth-client'
 import { Check, HelpCircle } from 'lucide-react'
+import { UserAvatar } from '@/components/ui/user-avatar'
 
 const ROLES = [
   { value: 'developer', label: '💻 Developer' },
@@ -18,6 +19,9 @@ export default function AccountPage() {
   const [role, setRole] = useState('developer')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [avatar, setAvatar] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (session?.user?.name) {
@@ -26,6 +30,26 @@ export default function AccountPage() {
       setLastname(parts.slice(1).join(' ') ?? '')
     }
   }, [session])
+
+  useEffect(() => {
+    fetch('/api/admin/user/me')
+      .then((r) => r.json())
+      .then((data) => { if (data?.user?.avatar) setAvatar(data.user.avatar) })
+      .catch(() => {})
+  }, [])
+
+  async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    const form = new FormData()
+    form.append('file', file)
+    const res = await fetch('/api/admin/user/avatar', { method: 'POST', body: form })
+    const data = await res.json()
+    if (data?.avatar) setAvatar(data.avatar)
+    setUploading(false)
+    e.target.value = ''
+  }
 
   async function handleSave() {
     setSaving(true)
@@ -51,11 +75,26 @@ export default function AccountPage() {
 
       {/* Avatar */}
       <div className="flex items-center gap-4 mb-8">
-        <div className="size-16 rounded-full bg-teal-500 flex items-center justify-center text-white text-xl font-medium">
-          {(firstname[0] ?? session?.user?.email?.[0] ?? '?').toUpperCase()}
-        </div>
+        <UserAvatar
+          name={`${firstname} ${lastname}`.trim() || session?.user?.email}
+          src={avatar}
+          size="xl"
+        />
         <div>
-          <button className="text-sm text-teal-600 hover:underline font-medium">Upload photo</button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            className="hidden"
+            onChange={handleAvatarChange}
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            className="text-sm text-teal-600 hover:underline font-medium disabled:opacity-50"
+          >
+            {uploading ? 'Uploading…' : 'Upload photo'}
+          </button>
           <p className="text-xs text-gray-400 mt-0.5">Recommended: 500px x 500px (JPG or PNG)</p>
         </div>
       </div>

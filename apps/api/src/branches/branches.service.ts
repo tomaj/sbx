@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { asc, eq } from 'drizzle-orm';
+import { asc, desc, eq } from 'drizzle-orm';
 import { DB } from '../db/db.module';
 import type { DbType } from '../db/db.module';
 import { branches } from '../db/schema';
@@ -19,9 +19,11 @@ export class BranchesService {
   }
 
   async create(spaceId: number, data: { name: string; url?: string }) {
+    const [last] = await this.db.select({ id: branches.id }).from(branches).orderBy(desc(branches.id)).limit(1);
+    const nextId = last ? last.id + 1 : 1;
     const [row] = await this.db
       .insert(branches)
-      .values({ spaceId, name: data.name, url: data.url ?? null })
+      .values({ id: nextId, spaceId, name: data.name, url: data.url ?? null })
       .returning();
     return { branch: this.format(row) };
   }

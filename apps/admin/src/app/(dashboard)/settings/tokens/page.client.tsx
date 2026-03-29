@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Pencil, Trash2, TriangleAlert } from 'lucide-react'
 import { SelectDropdown } from '@/components/ui/select-dropdown'
+import { ConfirmModal } from '@/components/ui/confirm-modal'
+import { RightSidebar } from '@/components/ui/right-sidebar'
 
 interface Token {
   id: number
@@ -36,6 +38,11 @@ export default function TokensPage() {
   const [newToken, setNewToken] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
 
+  const [deleteId, setDeleteId] = useState<number | null>(null)
+  const [editToken, setEditToken] = useState<Token | null>(null)
+  const [editName, setEditName] = useState('')
+  const [saving, setSaving] = useState(false)
+
   const fetchTokens = useCallback(async () => {
     const res = await fetch('/api/admin/tokens')
     if (res.ok) {
@@ -63,9 +70,29 @@ export default function TokensPage() {
     setGenerating(false)
   }
 
-  async function handleDelete(id: number) {
-    await fetch(`/api/admin/tokens/${id}`, { method: 'DELETE' })
+  async function handleDelete() {
+    if (deleteId === null) return
+    await fetch(`/api/admin/tokens/${deleteId}`, { method: 'DELETE' })
+    setDeleteId(null)
     fetchTokens()
+  }
+
+  async function handleSaveEdit() {
+    if (!editToken || !editName.trim()) return
+    setSaving(true)
+    await fetch(`/api/admin/tokens/${editToken.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: editName }),
+    })
+    setSaving(false)
+    setEditToken(null)
+    fetchTokens()
+  }
+
+  function openEdit(token: Token) {
+    setEditToken(token)
+    setEditName(token.name)
   }
 
   function handleCopy() {
@@ -112,11 +139,14 @@ export default function TokensPage() {
               )}
             </div>
             <div className="flex items-center gap-2 shrink-0 ml-4">
-              <button className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 transition-colors">
+              <button
+                onClick={() => openEdit(token)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 transition-colors"
+              >
                 <Pencil className="size-4" />
               </button>
               <button
-                onClick={() => handleDelete(token.id)}
+                onClick={() => setDeleteId(token.id)}
                 className="text-gray-400 hover:text-red-500 p-1 transition-colors"
               >
                 <Trash2 className="size-4" />
@@ -217,6 +247,50 @@ export default function TokensPage() {
           </button>
         </div>
       )}
+
+      {/* Delete confirm modal */}
+      <ConfirmModal
+        open={deleteId !== null}
+        title="Delete token"
+        message="Are you sure you want to delete this token? This action cannot be undone."
+        confirmLabel="Delete"
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteId(null)}
+      />
+
+      {/* Edit sidebar */}
+      <RightSidebar
+        open={editToken !== null}
+        onClose={() => setEditToken(null)}
+        header={<span className="text-base font-semibold text-gray-900 dark:text-gray-100">Edit token</span>}
+        footer={
+          <div className="flex gap-3">
+            <button
+              onClick={handleSaveEdit}
+              disabled={saving || !editName.trim()}
+              className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-60"
+            >
+              {saving ? 'Saving...' : 'Save'}
+            </button>
+            <button
+              onClick={() => setEditToken(null)}
+              className="px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        }
+      >
+        <div>
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-1.5">Name</label>
+          <input
+            type="text"
+            value={editName}
+            onChange={(e) => setEditName(e.target.value)}
+            className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
+          />
+        </div>
+      </RightSidebar>
     </div>
   )
 }

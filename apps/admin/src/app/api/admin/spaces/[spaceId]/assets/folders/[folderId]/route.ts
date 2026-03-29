@@ -20,11 +20,11 @@ export async function PATCH(
   const token = await getSessionToken()
   const body = await req.json()
   const res = await fetch(
-    `${API_URL}/v1/admin/spaces/${spaceId}/assets/folders/${folderId}`,
+    `${API_URL}/v1/spaces/${spaceId}/asset_folders/${folderId}`,
     {
-      method: 'PATCH',
+      method: 'PUT',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      body: JSON.stringify({ asset_folder: body }),
     },
   )
   const data = await res.json()
@@ -38,7 +38,7 @@ export async function DELETE(
   const { spaceId, folderId } = await params
   const token = await getSessionToken()
   const res = await fetch(
-    `${API_URL}/v1/admin/spaces/${spaceId}/assets/folders/${folderId}`,
+    `${API_URL}/v1/spaces/${spaceId}/asset_folders/${folderId}`,
     {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${token}` },

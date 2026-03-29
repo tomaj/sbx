@@ -19,13 +19,19 @@ export async function PATCH(
   const { spaceId, tokenId } = await params
   const token = await getSessionToken()
   const body = await req.json()
-  const res = await fetch(`${API_URL}/v1/admin/spaces/${spaceId}/access-tokens/${tokenId}`, {
-    method: 'PATCH',
+  const res = await fetch(`${API_URL}/v1/spaces/${spaceId}/api_keys/${tokenId}`, {
+    method: 'PUT',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify({
+      api_key: {
+        name: body.name,
+        token_type: body.access,
+        branch_id: body.branchId,
+        min_cache: body.minCache,
+      },
+    }),
   })
-  const data = await res.json()
-  return NextResponse.json(data, { status: res.status })
+  return NextResponse.json(await res.json(), { status: res.status })
 }
 
 export async function DELETE(
@@ -34,10 +40,9 @@ export async function DELETE(
 ) {
   const { spaceId, tokenId } = await params
   const token = await getSessionToken()
-  const res = await fetch(`${API_URL}/v1/admin/spaces/${spaceId}/access-tokens/${tokenId}`, {
+  const res = await fetch(`${API_URL}/v1/spaces/${spaceId}/api_keys/${tokenId}`, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${token}` },
   })
-  const data = await res.json()
-  return NextResponse.json(data, { status: res.status })
+  return NextResponse.json(await res.json(), { status: res.status })
 }

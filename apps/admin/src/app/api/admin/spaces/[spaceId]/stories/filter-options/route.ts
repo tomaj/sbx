@@ -18,10 +18,8 @@ export async function GET(
 ) {
   const { spaceId } = await params
   const token = await getSessionToken()
-  const res = await fetch(
-    `${API_URL}/v1/admin/spaces/${spaceId}/stories/filter-options`,
-    { headers: { Authorization: `Bearer ${token}` } },
-  )
-  const data = await res.json()
-  return NextResponse.json(data, { status: res.status })
+  const res = await fetch(`${API_URL}/v1/spaces/${spaceId}/stories/filter-options`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  return NextResponse.json(await res.json(), { status: res.status })
 }

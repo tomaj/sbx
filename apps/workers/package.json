@@ -1,0 +1,42 @@
+{
+  "name": "workers",
+  "version": "0.0.1",
+  "description": "SBX background job workers",
+  "author": "",
+  "private": true,
+  "license": "UNLICENSED",
+  "scripts": {
+    "build": "nest build",
+    "start": "nest start",
+    "dev": "nest start --watch",
+    "start:prod": "node dist/main"
+  },
+  "dependencies": {
+    "@bull-board/api": "^6.10.2",
+    "@bull-board/express": "^6.10.2",
+    "@bull-board/nestjs": "^6.10.2",
+    "@nestjs/bullmq": "^11.0.2",
+    "@nestjs/common": "^11.0.1",
+    "@nestjs/core": "^11.0.1",
+    "@nestjs/platform-express": "^11.0.1",
+    "@nestjs/schedule": "^5.0.1",
+    "@sbx/jobs": "workspace:*",
+    "bullmq": "^5.56.0",
+    "drizzle-orm": "^0.45.1",
+    "dotenv": "^17.3.1",
+    "nodemailer": "^7.0.3",
+    "pg": "^8.20.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^11.0.0",
+    "@nestjs/schematics": "^11.0.0",
+    "@types/node": "^22.10.7",
+    "@types/nodemailer": "^6.4.17",
+    "@types/pg": "^8.18.0",
+    "ts-node": "^10.9.2",
+    "tsconfig-paths": "^4.2.0",
+    "typescript": "^5.7.3"
+  }
+}

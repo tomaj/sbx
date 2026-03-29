@@ -1,8 +1,8 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, asc, desc, eq, ilike } from 'drizzle-orm';
+import { and, asc, desc, eq, ilike, sql } from 'drizzle-orm';
 import { DB } from '../db/db.module';
 import type { DbType } from '../db/db.module';
-import { tags } from '../db/schema';
+import { stories, tags } from '../db/schema';
 
 @Injectable()
 export class TagsService {
@@ -19,6 +19,98 @@ export class TagsService {
       tags: rows.map((t) => ({
         name: t.name,
         taggings_count: t.taggingsCount,
+      })),
+    };
+  }
+
+  async findAllCdn(
+    spaceId: number,
+    opts: { startsWith?: string; version?: 'published' | 'draft' } = {},
+  ) {
+    const { startsWith, version = 'published' } = opts;
+
+    if (startsWith?.trim()) {
+      // When starts_with is given, derive tags from stories matching the prefix
+      const storyConditions: any[] = [
+        eq(stories.spaceId, spaceId),
+        ilike(stories.fullSlug, `${startsWith.trim()}%`),
+        sql`${stories.deletedAt} IS NULL`,
+        eq(stories.isFolder, false),
+      ];
+      if (version === 'published') {
+        storyConditions.push(eq(stories.published, true));
+      }
+
+      const rows = await this.db
+        .select({ tagList: stories.tagList })
+        .from(stories)
+        .where(and(...storyConditions));
+
+      // Aggregate tag counts
+      const tagCounts = new Map<string, number>();
+      for (const row of rows) {
+        const tagList = row.tagList as string[];
+        if (Array.isArray(tagList)) {
+          for (const tag of tagList) {
+            if (tag) tagCounts.set(tag, (tagCounts.get(tag) ?? 0) + 1);
+          }
+        }
+      }
+
+      const result = Array.from(tagCounts.entries())
+        .map(([name, count]) => ({ name, taggings_count: count }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+      return { tags: result };
+    }
+
+    // No starts_with — query tags table directly
+    const rows = await this.db
+      .select()
+      .from(tags)
+      .where(eq(tags.spaceId, spaceId))
+      .orderBy(asc(tags.name));
+
+    return {
+      tags: rows.map((t) => ({
+        name: t.name,
+        taggings_count: t.taggingsCount,
+      })),
+    };
+  }
+
+  async listMapi(
+    spaceId: number,
+    opts: { search?: string; sortBy?: string } = {},
+  ) {
+    const conditions: ReturnType<typeof eq>[] = [eq(tags.spaceId, spaceId)];
+    if (opts.search) {
+      conditions.push(ilike(tags.name, `%${opts.search}%`) as any);
+    }
+
+    let orderBy: ReturnType<typeof asc>;
+    if (opts.sortBy === 'taggings_count:desc') {
+      orderBy = desc(tags.taggingsCount) as any;
+    } else if (opts.sortBy === 'taggings_count:asc') {
+      orderBy = asc(tags.taggingsCount);
+    } else if (opts.sortBy === 'name:desc') {
+      orderBy = desc(tags.name) as any;
+    } else {
+      orderBy = asc(tags.name);
+    }
+
+    const rows = await this.db
+      .select()
+      .from(tags)
+      .where(and(...conditions))
+      .orderBy(orderBy);
+
+    return {
+      tags: rows.map((t) => ({
+        id: t.id,
+        name: t.name,
+        taggings_count: t.taggingsCount,
+        created_at: t.createdAt,
       })),
     };
   }
@@ -72,5 +164,16 @@ export class TagsService {
     if (!row) throw new NotFoundException('Tag not found');
 
     return { tag: { id: row.id, name: row.name, taggings_count: row.taggingsCount } };
+  }
+
+  async deleteTag(id: number, spaceId: number) {
+    const [row] = await this.db
+      .delete(tags)
+      .where(and(eq(tags.id, id), eq(tags.spaceId, spaceId)))
+      .returning();
+
+    if (!row) throw new NotFoundException('Tag not found');
+
+    return {};
   }
 }

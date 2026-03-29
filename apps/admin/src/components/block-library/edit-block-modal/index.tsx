@@ -48,7 +48,7 @@ export function EditBlockModal({ open, block, spaceId, groups, onClose, onSaved 
   const [groupUuid, setGroupUuid] = useState<string | null>(null)
   const [previewField, setPreviewField] = useState<string | null>(null)
   const [previewTmpl, setPreviewTmpl] = useState('')
-  const [internalTags, setInternalTags] = useState<string[]>([])
+  const [internalTags, setInternalTags] = useState<{ id: number; name: string }[]>([])
   const [color, setColor] = useState<string | null>(null)
 
   // ─── Navigation state ──────────────────────────────────────────────────────
@@ -73,7 +73,7 @@ export function EditBlockModal({ open, block, spaceId, groups, onClose, onSaved 
     setGroupUuid(block.component_group_uuid)
     setPreviewField(block.preview_field ?? null)
     setPreviewTmpl(block.preview_tmpl ?? '')
-    setInternalTags((block.internal_tags_list ?? []).map((t) => t.name))
+    setInternalTags(block.internal_tags_list ?? [])
     setColor(block.color ?? null)
     setView('fields')
     setMainTab('fields')
@@ -147,7 +147,8 @@ export function EditBlockModal({ open, block, spaceId, groups, onClose, onSaved 
           component_group_uuid: groupUuid,
           preview_field: previewField || null,
           preview_tmpl: previewTmpl || null,
-          internal_tags_list: internalTags.map((name, i) => ({ id: i + 1, name })),
+          internal_tags_list: internalTags,
+          internal_tag_ids: internalTags.map((t) => String(t.id)),
           color: color || null,
         }),
       })
@@ -285,6 +286,7 @@ export function EditBlockModal({ open, block, spaceId, groups, onClose, onSaved 
           {/* Config tab */}
           {view === 'config' && (
             <ConfigTab
+              spaceId={spaceId}
               displayName={displayName}
               description={description}
               blockType={blockType}

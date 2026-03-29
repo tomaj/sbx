@@ -15,7 +15,7 @@ async function getSessionToken() {
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ spaceId: string; taskId: string }> }) {
   const { spaceId, taskId } = await params
   const token = await getSessionToken()
-  const res = await fetch(`${API_URL}/v1/admin/spaces/${spaceId}/tasks/${taskId}`, {
+  const res = await fetch(`${API_URL}/v1/spaces/${spaceId}/tasks/${taskId}`, {
     headers: { Authorization: `Bearer ${token}` },
   })
   const data = await res.json()
@@ -26,10 +26,10 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ spac
   const { spaceId, taskId } = await params
   const token = await getSessionToken()
   const body = await req.json()
-  const res = await fetch(`${API_URL}/v1/admin/spaces/${spaceId}/tasks/${taskId}`, {
+  const res = await fetch(`${API_URL}/v1/spaces/${spaceId}/tasks/${taskId}`, {
     method: 'PUT',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ task: body }),
   })
   const data = await res.json()
   return NextResponse.json(data, { status: res.status })
@@ -38,7 +38,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ spac
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ spaceId: string; taskId: string }> }) {
   const { spaceId, taskId } = await params
   const token = await getSessionToken()
-  const res = await fetch(`${API_URL}/v1/admin/spaces/${spaceId}/tasks/${taskId}`, {
+  const res = await fetch(`${API_URL}/v1/spaces/${spaceId}/tasks/${taskId}`, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${token}` },
   })

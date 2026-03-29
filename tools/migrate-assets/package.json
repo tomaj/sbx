@@ -7,7 +7,9 @@
     "export": "tsx export.ts",
     "sync": "tsx sync.ts",
     "import": "tsx import.ts",
-    "seed-from-golden": "tsx seed-from-golden.ts"
+    "seed-from-golden": "tsx seed-from-golden.ts",
+    "import-avatars": "tsx import-avatars.ts",
+    "upload-avatars": "tsx upload-avatars-to-minio.ts"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

@@ -10,20 +10,61 @@ Nahrádzame Storyblok CDN API a Management API vlastnou implementáciou. Migrač
 3. Porovnať odpovede API voči golden dátam → `packages/api-compare`
 4. Prepnúť env var v klientoch
 
+## Aplikácie a porty
+
+| App | Port | Popis |
+|-----|------|-------|
+| `apps/api` | **3000** | NestJS — CDN API (`/v2/cdn/`) + Management API (`/v1/spaces/`) |
+| `apps/admin` | **3001** | Next.js + shadcn — admin UI pre správu obsahu |
+| `apps/cdn` | **3002** | NestJS — asset delivery + transformácia obrázkov cez Sharp |
+| `apps/demo-nextjs` | **3003** | Next.js demo stránka využívajúca `@storyblok/react` |
+| `apps/workers` | **3004** | NestJS — BullMQ workery, background joby; Bull Board UI na `/ui` |
+
+### Spustenie
+
+```bash
+docker compose up -d                    # PostgreSQL, Redis, MinIO
+
+pnpm --filter api dev                   # :3000
+pnpm --filter admin dev                 # :3001
+pnpm --filter cdn dev                   # :3002
+pnpm --filter demo-nextjs dev           # :3003
+pnpm --filter workers dev               # :3004  →  Bull Board: http://localhost:3004/ui
+```
+
+### Roly aplikácií
+
+**`apps/api`** — jadro systému. Obsluhuje CDN API (čítanie obsahu pre klientov) aj Management API (správa obsahu cez admin/MAPI). Pripojené na PostgreSQL, Redis, MinIO.
+
+**`apps/admin`** — admin rozhranie. Next.js + shadcn/ui, komunikuje výlučne cez `apps/api`. Volania z admin UI idú na `/api/admin/...` Next.js route handlery, ktoré proxy-ujú na `apps/api`.
+
+**`apps/cdn`** — image service. Stiahne originál z MinIO, transformuje cez Sharp (resize, quality, format), cachuje v Redis (TTL 1 rok). URL formát: `/f/:spaceId/path/to/img.jpg/m/800x600/filters:quality(80)`.
+
+**`apps/demo-nextjs`** — demo klient. Používa `@storyblok/react` namierený na `apps/api` namiesto Storyblok. Slúži na overenie CDN API kompatibility.
+
+**`apps/workers`** — background joby. Spúšťa BullMQ workery pre:
+- `webhooks` — async HTTP dispatch s retry (exponential backoff)
+- `stories` — plánované publish/expire (`publish_at`, `expire_at`)
+- `releases` — spustenie release v naplánovaný čas
+- `emails` — SMTP notifikácie (invitation, komentáre, approvals, workflow)
+- `workflow-events` — stage transitions, approval lifecycle
+
 ## Monorepo štruktúra
 
 ```
 apps/
-  api/      — NestJS backend (port 3000), hlavné CDN + Management API
-  admin/    — Next.js + shadcn admin UI
-  img/      — NestJS image service (port 3001), Storyblok-kompatibilná transformácia obrázkov
+  api/          — NestJS backend (port 3000)
+  admin/        — Next.js admin UI (port 3001)
+  cdn/          — NestJS image/asset service (port 3002)
+  demo-nextjs/  — demo klient (port 3003)
+  workers/      — BullMQ workery (port 3004)
 packages/
-  types/    — zdieľané TypeScript typy
-  api-compare/ — CLI nástroj na porovnanie API odpovedí voči golden dátam
+  jobs/         — typed JobsClient (@sbx/jobs) — enqueue joby z apps/api do Redis
+  api-compare/  — CLI nástroj na porovnanie API odpovedí voči golden dátam
 tools/
   migrate-export/   — export zo Storyblok
   migrate-import/   — import do SBX
-golden/     — stažené Storyblok API odpovede (pravda, voči ktorej testujeme)
+golden/     — stiahnuté Storyblok API odpovede (pravda, voči ktorej testujeme)
 ```
 
 ## Tech stack
@@ -38,47 +79,83 @@ golden/     — stažené Storyblok API odpovede (pravda, voči ktorej testujeme
 | Fronta     | BullMQ (webhooks, scheduled publish)        |
 | Obrázky    | Sharp (Storyblok-kompatibilný URL formát)   |
 
-## Lokálny vývoj
-
-```bash
-# Spustiť infraštruktúru
-docker compose up -d
-
-# API (apps/api)
-pnpm --filter api dev          # port 3000
-
-# Image service (apps/img)
-pnpm --filter img dev          # port 3001
-
-# Admin (apps/admin)
-pnpm --filter admin dev        # port 3002
-```
-
 ## API autentifikácia
 
 - **CDN API** (`/v2/cdn/...`) — token v query parametri `?token=`, typy `public` / `preview`
 - **Management API** (`/v1/spaces/:id/...`) — `Authorization: Bearer <token>`, typ `management`
+- **Admin UI API** (`/v1/admin/...`) — session cookie (better-auth) alebo Bearer token
 - CDN API vracia **301 redirect** — klienti musia nasledovať presmervania (`curl -L`)
 - Každá odpoveď obsahuje pole `cv` (cache version = unix timestamp) pre cache invalidáciu
 
-## Implementované moduly (apps/api)
+## Čo je implementované
 
-- `auth` — JWT autentifikácia, login
-- `spaces` — správa spaces
-- `users` + `space_members` — používatelia a oprávnenia
-- `api_tokens` — CDN + MAPI tokeny
-- `datasources` + `datasource_entries` — datasources
-- `tags` — CDN tags endpoint
-- `components` — Storyblok komponenty (schema)
+### CDN API (`/v2/cdn/`)
+- `stories` — GET list + GET by slug, rozsiahle filtrovanieq (content_type, tags, uuid, dátumy, strom), `version=draft|published`, `in_release`, `from_release`
+- `spaces/me` — metadata space
+- `datasources` + `datasource_entries` — s dimenziami a stránkovaním
+- `tags` — filtrovanie
+- `links` — stromová štruktúra, GET by uuid
 
-## Image service URL formát (apps/img)
+### Management API (`/v1/spaces/:spaceId/`)
+- `stories` — plný CRUD, publish/unpublish, ancestors, filter-options, `in_release` filter, `release_id` pri update (snapshot)
+- `components` + `component_groups` — plný CRUD, duplicate, component-counts
+- `assets` + `asset_folders` — plný CRUD, sign upload, restore, replace
+- `branches` — plný CRUD
+- `releases` — plný CRUD, `conflict_check`, `do_release` publish (aplikuje snapshots)
+- `workflows` + `workflow_stages` + `workflow_stage_changes` — plný CRUD, stage transitions
+- `approvals` — plný CRUD
+- `discussions` + `comments` — plný CRUD, field discussions, resolve/unresolve, rich text
+- `webhook_endpoints` + logs — plný CRUD, retry, signing, actions list
+- `datasources` + `datasource_entries` — plný CRUD
+- `presets` — plný CRUD
+- `tags` — plný CRUD
+- `tasks` — plný CRUD, execute
+- `space_roles` — plný CRUD
+- `api_keys` — plný CRUD
 
-```
-GET /f/:spaceId/path/to/image.jpg/m/WIDTHxHEIGHT/filters:quality(80)
-```
+### Admin API (`/v1/admin/`)
+- `spaces` — list, roles
+- `users` — CRUD, search
+- `pipelines` — CRUD (per space)
+- `assets` — upload, CRUD, folders, counts
+- `field_types` — CRUD
+- `spaces/:spaceId/preview-token` — generovanie preview tokenov pre Visual Editor
 
-Originál uložený v MinIO: `assets/{spaceId}/path/to/image.jpg`
-Cache v Redis (TTL 1 rok).
+### Visual Editor Bridge
+- `GET /bridge/v2-latest.js` — Storyblok-kompatibilný bridge script
+- postMessage komunikácia s parent framom
+- komponent selection cez `data-blok-uid`
+- Preview token (SHA1 signed, TTL-based)
+
+### Admin UI (37 stránok)
+- **Content** — stories list (breadcrumb, filter, sort, favorites), story editor, release tabs s Preview/Branch switcherom
+- **Assets** — asset library s folder hierarchiou
+- **Block Library** — component management
+- **Datasources** — datasource + entries editor
+- **Tags** — tag management
+- **Activities** — audit log
+- **Tasks** — task management
+- **Settings** — space, users, roles, workflows, access tokens, webhooks + logs, visual editor, asset library, internationalization, maintenance mode, pipelines, history
+- **Organization** — spaces, user management, activities, field types, settings
+- **User settings** — account, security, tokens, appearance
+
+### Background workers (`apps/workers`)
+- `WebhooksProcessor` — HTTP dispatch s retry
+- `StorySchedulerProcessor` — `publish_at` / `expire_at` scheduling
+- `ReleasesProcessor` — release deployment v naplánovaný čas
+- `EmailsProcessor` — SMTP notifikácie
+- `WorkflowEventsProcessor` — workflow state transitions
+- Bull Board monitoring UI na `:3004/ui`
+
+### DB tabuľky (30)
+`spaces`, `users`, `spaceMembers`, `apiTokens`, `stories`, `storyReleases`, `releases`, `assets`, `assetFolders`, `branches`, `pipelines`, `components`, `componentGroups`, `presets`, `fieldTypes`, `datasources`, `datasourceEntries`, `tags`, `workflows`, `workflowStages`, `workflowStageChanges`, `approvals`, `discussions`, `comments`, `webhookEndpoints`, `webhookLogs`, `spaceRoles`, `tasks`, `activities`, `personalAccessTokens`
+
+## Čo ešte chýba / nie je hotové
+
+- **`branches_to_deploy` trigger** — po publish release sa nenotiifikujú CI/CD pipeline hooky
+- **Preview URL z branch** — výber branchy v Content view zatiaľ neovplyvňuje preview link pri otvorení story
+- **Releases v story editore** — UI na editáciu story priamo v kontexte releasu (s `release_id` v payloade)
+- **E2E testy** — test specs existujú ale nie sú kompletné pre všetky nové endpointy
 
 ## Spaces (Storyblok production dáta)
 
@@ -92,20 +169,16 @@ Cache v Redis (TTL 1 rok).
 MAPI token: `.env.local` (v root adresári projektu)
 Golden dáta: `golden/{space_id}/`
 
-## MVP scope
+## Asset URL konvencie
 
-- [x] CDN API (1:1 kompatibilita) ← najvyššia priorita
-- [ ] Management API (core CRUD)
-- [ ] Visual Editor bridge
-- [ ] Releases (content staging)
-- [ ] Webhooks s retry (BullMQ)
-- [ ] Admin UI
-
-**Mimo MVP:** Workflow stages
+- **Nikdy `s3.amazonaws.com` ani `a.storyblok.com`** — všetky asset URL musia vždy ukazovať na náš CDN (`NEXT_PUBLIC_CDN_URL`, default `http://localhost:3002`). Migrované assety z Storybloku môžu mať v DB staré S3/Storyblok URL — vždy ich normalizuj pomocou `normalizeAssetFilename()` z `@/lib/utils` pred uložením do story obsahu.
+- **Formát asset URL**: `${CDN_URL}/f/{spaceId}/{path}` — bez akýchkoľvek externých domén.
 
 ## UI konvencie (apps/admin)
 
 - **Skeleton loading vždy** — pri načítaní dát používame skeleton placeholders (`animate-pulse` bloky v tvare obsahu), nie text "Loading...", nadpis "Loading" ani spinner/preloader.
+- **RightSidebar pre detail/edit/create panely** — nikdy centered overlay modal. Výnimka: ConfirmModal pre deštruktívne akcie.
+- **ConfirmModal pre delete** — každé mazanie musí ísť cez `ConfirmModal`, nie `window.confirm()`.
 
 ## DB migrácie
 

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, use, useRef } from 'react'
 import { Plus, Search, MoreHorizontal, X, ChevronDown, AlertCircle } from 'lucide-react'
+import { UserAvatar } from '@/components/ui/user-avatar'
 
 interface SpaceRole {
   id: number
@@ -31,29 +32,6 @@ interface UserSearchResult {
   avatar: string | null
 }
 
-function Avatar({ user }: { user: { firstname: string; lastname: string; avatar: string | null } }) {
-  const initials = `${user.firstname[0] ?? ''}${user.lastname[0] ?? ''}`.toUpperCase()
-  const colors = [
-    'bg-teal-500', 'bg-blue-500', 'bg-purple-500', 'bg-pink-500',
-    'bg-orange-500', 'bg-green-500', 'bg-indigo-500', 'bg-red-500',
-  ]
-  const color = colors[(user.firstname.charCodeAt(0) + user.lastname.charCodeAt(0)) % colors.length]
-
-  if (user.avatar) {
-    return (
-      <img
-        src={user.avatar}
-        alt={initials}
-        className="w-9 h-9 rounded-full object-cover"
-      />
-    )
-  }
-  return (
-    <div className={`w-9 h-9 rounded-full ${color} flex items-center justify-center text-white text-sm font-semibold flex-shrink-0`}>
-      {initials}
-    </div>
-  )
-}
 
 function RoleBadge({ role }: { role: string }) {
   if (role === 'owner') {
@@ -212,7 +190,7 @@ function AddUserPanel({
             <div className="relative" ref={searchRef}>
               {selectedUser ? (
                 <div className="flex items-center gap-2 w-full px-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800">
-                  <Avatar user={selectedUser} />
+                  <UserAvatar name={`${selectedUser.firstname} ${selectedUser.lastname}`} src={selectedUser.avatar} />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
                       {selectedUser.firstname} {selectedUser.lastname}
@@ -244,7 +222,7 @@ function AddUserPanel({
                           onClick={() => { setSelectedUser(u); setSearch(''); setSearchOpen(false) }}
                           className="flex items-center gap-3 w-full px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-700 text-left transition-colors"
                         >
-                          <Avatar user={u} />
+                          <UserAvatar name={`${u.firstname} ${u.lastname}`} src={u.avatar} />
                           <div className="min-w-0">
                             <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
                               {u.firstname} {u.lastname}
@@ -567,7 +545,7 @@ export default function UsersPage({ params }: { params: Promise<{ spaceId: strin
               >
                 {/* Name */}
                 <div className="flex items-center gap-3 min-w-0">
-                  <Avatar user={c.user} />
+                  <UserAvatar name={`${c.user.firstname} ${c.user.lastname}`} src={c.user.avatar} />
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
                       {c.user.firstname} {c.user.lastname}

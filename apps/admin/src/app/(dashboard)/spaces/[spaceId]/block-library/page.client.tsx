@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect, use } from 'react'
+import { useState, useCallback, useEffect, useMemo, use } from 'react'
 import { FolderPlus, Plus, Search, Copy, Trash2, Move, Files } from 'lucide-react'
 import { Pagination } from '@/components/ui/pagination'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
@@ -9,47 +9,33 @@ import { CreateGroupModal } from '@/components/block-library/create-group-modal'
 import { CreateBlockModal } from '@/components/block-library/create-block-modal'
 import { BlockList, type Block } from '@/components/block-library/block-list'
 import { EditBlockModal } from '@/components/block-library/edit-block-modal'
+import { TagsView, type ComponentInternalTag } from '@/components/block-library/tags-view'
 import type { SortOption } from '@/components/ui/search-filter-bar'
 import { SelectDropdown } from '@/components/ui/select-dropdown'
 
 const SORT_OPTIONS: SortOption[] = [
-  { value: 'name_asc', label: 'Name (A–Z)' },
-  { value: 'name_desc', label: 'Name (Z–A)' },
-  { value: 'created_at_desc', label: 'Created (newest)' },
-  { value: 'created_at_asc', label: 'Created (oldest)' },
-  { value: 'updated_at_desc', label: 'Updated (newest)' },
-  { value: 'updated_at_asc', label: 'Updated (oldest)' },
+  { value: 'name', label: 'Name (A–Z)' },
+  { value: 'updated_at', label: 'Updated (newest)' },
 ]
-
-function parseSortOption(sort: string): { field: string; dir: string } {
-  const last = sort.lastIndexOf('_')
-  return { field: sort.slice(0, last), dir: sort.slice(last + 1) }
-}
 
 export default function BlockLibraryPage({ params }: { params: Promise<{ spaceId: string }> }) {
   const { spaceId } = use(params)
 
   // ─── Data ──────────────────────────────────────────────────────────────────
-  const [blocks, setBlocks] = useState<Block[]>([])
-  const [total, setTotal] = useState(0)
+  const [allBlocks, setAllBlocks] = useState<Block[]>([])
   const [groups, setGroups] = useState<ComponentGroup[]>([])
-  const [counts, setCounts] = useState<{ total: number; by_group: Record<string, number> } | undefined>()
   const [isLoading, setIsLoading] = useState(true)
 
   // ─── UI state ──────────────────────────────────────────────────────────────
   const [selectedGroupUuid, setSelectedGroupUuid] = useState<string | null>(null)
-  // null = all, string = group uuid
 
   // ─── Search / sort ─────────────────────────────────────────────────────────
   const [search, setSearch] = useState('')
-  const [sort, setSort] = useState('name_asc')
+  const [sort, setSort] = useState('name')
 
   // ─── Pagination ────────────────────────────────────────────────────────────
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(25)
-
-  // ─── Group sidebar search ──────────────────────────────────────────────────
-  const [groupSearch, setGroupSearch] = useState('')
 
   // ─── Block modals ──────────────────────────────────────────────────────────
   const [createBlockOpen, setCreateBlockOpen] = useState(false)
@@ -61,6 +47,11 @@ export default function BlockLibraryPage({ params }: { params: Promise<{ spaceId
   const [renameName, setRenameName] = useState('')
   const [deleteGroupTarget, setDeleteGroupTarget] = useState<ComponentGroup | null>(null)
 
+  // ─── Tags view ─────────────────────────────────────────────────────────────
+  const [isTagsView, setIsTagsView] = useState(false)
+  const [tags, setTags] = useState<ComponentInternalTag[]>([])
+  const [tagsLoading, setTagsLoading] = useState(false)
+
   // ─── Multiselect ───────────────────────────────────────────────────────────
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const [deleteBlocksOpen, setDeleteBlocksOpen] = useState(false)
@@ -68,56 +59,89 @@ export default function BlockLibraryPage({ params }: { params: Promise<{ spaceId
   const [moveTargetUuid, setMoveTargetUuid] = useState<string | null>(null)
   const [actionLoading, setActionLoading] = useState(false)
 
-  // ─── Load groups ───────────────────────────────────────────────────────────
-  const loadGroups = useCallback(async () => {
-    const res = await fetch(`/api/admin/spaces/${spaceId}/component-groups`)
-    if (res.ok) {
-      const data = await res.json()
-      setGroups(data.component_groups ?? [])
-    }
-  }, [spaceId])
-
-  // ─── Load counts ───────────────────────────────────────────────────────────
-  const loadCounts = useCallback(async () => {
-    const res = await fetch(`/api/admin/spaces/${spaceId}/component-counts`)
-    if (res.ok) {
-      const data = await res.json()
-      setCounts(data)
-    }
-  }, [spaceId])
-
-  // ─── Load blocks ───────────────────────────────────────────────────────────
-  const loadBlocks = useCallback(async () => {
+  // ─── Load all components + groups (Storyblok MAPI: single call) ────────────
+  const loadData = useCallback(async () => {
     setIsLoading(true)
     try {
-      const qs = new URLSearchParams()
-      qs.set('page', String(page))
-      qs.set('per_page', String(perPage))
-      if (search.trim()) qs.set('search', search.trim())
-      if (selectedGroupUuid !== null) qs.set('group_uuid', selectedGroupUuid)
-
-      const { field, dir } = parseSortOption(sort)
-      qs.set('sort_field', field)
-      qs.set('sort_dir', dir)
-
-      const res = await fetch(`/api/admin/spaces/${spaceId}/components?${qs}`)
+      const res = await fetch(`/api/admin/spaces/${spaceId}/components`)
       if (res.ok) {
         const data = await res.json()
-        setBlocks(data.components ?? [])
-        setTotal(data.total ?? 0)
+        setAllBlocks(data.components ?? [])
+        setGroups(data.component_groups ?? [])
       }
     } finally {
       setIsLoading(false)
     }
-  }, [spaceId, page, perPage, search, sort, selectedGroupUuid])
+  }, [spaceId])
 
-  useEffect(() => { loadGroups(); loadCounts() }, [loadGroups, loadCounts])
-  useEffect(() => { loadBlocks() }, [loadBlocks])
+  // ─── Client-side counts (derived from allBlocks) ───────────────────────────
+  const counts = useMemo(() => {
+    const byGroup: Record<string, number> = {}
+    let total = 0
+    for (const b of allBlocks) {
+      total++
+      if (b.component_group_uuid) {
+        byGroup[b.component_group_uuid] = (byGroup[b.component_group_uuid] ?? 0) + 1
+      }
+    }
+    return { total, by_group: byGroup }
+  }, [allBlocks])
+
+  // ─── Client-side filter / sort / paginate ─────────────────────────────────
+  const filtered = useMemo(() => {
+    let result = allBlocks
+
+    if (selectedGroupUuid !== null) {
+      result = result.filter((b) => b.component_group_uuid === selectedGroupUuid)
+    }
+
+    const q = search.trim().toLowerCase()
+    if (q) {
+      result = result.filter(
+        (b) =>
+          b.name.toLowerCase().includes(q) ||
+          (b.display_name ?? '').toLowerCase().includes(q),
+      )
+    }
+
+    if (sort === 'updated_at') {
+      result = [...result].sort(
+        (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+      )
+    } else {
+      result = [...result].sort((a, b) => a.name.localeCompare(b.name))
+    }
+
+    return result
+  }, [allBlocks, selectedGroupUuid, search, sort])
+
+  const total = filtered.length
+  const pageBlocks = useMemo(() => {
+    const start = (page - 1) * perPage
+    return filtered.slice(start, start + perPage)
+  }, [filtered, page, perPage])
+
+  // ─── Load tags ─────────────────────────────────────────────────────────────
+  const loadTags = useCallback(async () => {
+    setTagsLoading(true)
+    try {
+      const res = await fetch(`/api/admin/spaces/${spaceId}/internal_tags?by_object_type=component`)
+      if (res.ok) {
+        const data = await res.json()
+        setTags(data.internal_tags ?? [])
+      }
+    } finally {
+      setTagsLoading(false)
+    }
+  }, [spaceId])
+
+  useEffect(() => { loadData() }, [loadData])
+  useEffect(() => { if (isTagsView) loadTags() }, [isTagsView, loadTags])
 
   useEffect(() => { setPage(1) }, [search, sort, selectedGroupUuid])
 
-  // Clear selection when blocks change
-  useEffect(() => { setSelectedIds(new Set()) }, [blocks])
+  // Clear selection when filtered results change
+  useEffect(() => { setSelectedIds(new Set()) }, [pageBlocks])
 
   // ─── Block CRUD ────────────────────────────────────────────────────────────
 
@@ -138,7 +162,7 @@ export default function BlockLibraryPage({ params }: { params: Promise<{ spaceId
       throw new Error(err.message ?? 'Failed to create block')
     }
     setCreateBlockOpen(false)
-    await Promise.all([loadBlocks(), loadCounts()])
+    await loadData()
   }
 
   // ─── Group CRUD ────────────────────────────────────────────────────────────
@@ -154,7 +178,7 @@ export default function BlockLibraryPage({ params }: { params: Promise<{ spaceId
       throw new Error(err.message ?? 'Failed to create group')
     }
     setCreateGroupOpen(false)
-    await loadGroups()
+    await loadData()
   }
 
   async function handleRenameGroup() {
@@ -166,7 +190,7 @@ export default function BlockLibraryPage({ params }: { params: Promise<{ spaceId
     })
     if (res.ok) {
       setRenameGroup(null)
-      await loadGroups()
+      await loadData()
     }
   }
 
@@ -178,7 +202,7 @@ export default function BlockLibraryPage({ params }: { params: Promise<{ spaceId
     if (res.ok) {
       if (selectedGroupUuid === deleteGroupTarget.uuid) setSelectedGroupUuid(null)
       setDeleteGroupTarget(null)
-      await loadGroups()
+      await loadData()
     }
   }
 
@@ -193,14 +217,14 @@ export default function BlockLibraryPage({ params }: { params: Promise<{ spaceId
         ),
       )
       setSelectedIds(new Set())
-      await Promise.all([loadBlocks(), loadCounts()])
+      await loadData()
     } finally {
       setActionLoading(false)
     }
   }
 
   async function handleCopy() {
-    const selected = blocks.filter((b) => selectedIds.has(b.id))
+    const selected = pageBlocks.filter((b) => selectedIds.has(b.id))
     const text = JSON.stringify(selected.map((b) => ({ name: b.name, display_name: b.display_name })), null, 2)
     await navigator.clipboard.writeText(text)
   }
@@ -220,7 +244,7 @@ export default function BlockLibraryPage({ params }: { params: Promise<{ spaceId
       )
       setSelectedIds(new Set())
       setMoveGroupOpen(false)
-      await Promise.all([loadBlocks(), loadCounts()])
+      await loadData()
     } finally {
       setActionLoading(false)
     }
@@ -236,10 +260,40 @@ export default function BlockLibraryPage({ params }: { params: Promise<{ spaceId
       )
       setSelectedIds(new Set())
       setDeleteBlocksOpen(false)
-      await Promise.all([loadBlocks(), loadCounts()])
+      await loadData()
     } finally {
       setActionLoading(false)
     }
+  }
+
+  // ─── Tag CRUD ──────────────────────────────────────────────────────────────
+
+  async function handleCreateTag(name: string) {
+    const res = await fetch(`/api/admin/spaces/${spaceId}/internal_tags`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, object_type: 'component' }),
+    })
+    if (!res.ok) throw new Error('Failed to create tag')
+    await loadTags()
+  }
+
+  async function handleRenameTag(tag: ComponentInternalTag, newName: string) {
+    const res = await fetch(`/api/admin/spaces/${spaceId}/internal_tags/${tag.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newName }),
+    })
+    if (!res.ok) throw new Error('Failed to rename tag')
+    await loadTags()
+  }
+
+  async function handleDeleteTag(tag: ComponentInternalTag) {
+    const res = await fetch(`/api/admin/spaces/${spaceId}/internal_tags/${tag.id}`, {
+      method: 'DELETE',
+    })
+    if (!res.ok) throw new Error('Failed to delete tag')
+    await loadTags()
   }
 
   const hasSelection = selectedIds.size > 0
@@ -249,48 +303,38 @@ export default function BlockLibraryPage({ params }: { params: Promise<{ spaceId
       {/* Header */}
       <div className="flex items-center justify-between px-8 pt-6 pb-4 border-b border-gray-200 dark:border-gray-700">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Block Library</h1>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setCreateGroupOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-          >
-            <FolderPlus className="w-4 h-4" />
-            Create Group
-          </button>
-          <button
-            onClick={() => setCreateBlockOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            New Block
-          </button>
-        </div>
+        {!isTagsView && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCreateGroupOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+            >
+              <FolderPlus className="w-4 h-4" />
+              Create Group
+            </button>
+            <button
+              onClick={() => setCreateBlockOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-2 text-sm bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              New Block
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Body: sidebar + content */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* Left sidebar */}
         <div className="w-60 shrink-0 border-r border-gray-200 dark:border-gray-700 flex flex-col overflow-y-auto py-4 px-3 gap-1">
-          <p className="px-2 text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Groups</p>
-
-          {/* Group search */}
-          <div className="relative mb-1">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
-            <input
-              type="text"
-              value={groupSearch}
-              onChange={(e) => setGroupSearch(e.target.value)}
-              placeholder="Search groups..."
-              className="w-full pl-7 pr-3 py-1.5 text-xs border border-gray-200 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-teal-500"
-            />
-          </div>
-
           <GroupTree
             groups={groups}
             selectedUuid={selectedGroupUuid}
-            onSelect={setSelectedGroupUuid}
-            search={groupSearch}
+            onSelect={(uuid) => { setIsTagsView(false); setSelectedGroupUuid(uuid) }}
             counts={counts}
+            tagsCount={tags.length || undefined}
+            isTagsView={isTagsView}
+            onSelectTags={() => setIsTagsView(true)}
             onCreateGroup={() => setCreateGroupOpen(true)}
             onRenameGroup={(g) => { setRenameGroup(g); setRenameName(g.name) }}
             onDeleteGroup={setDeleteGroupTarget}
@@ -299,49 +343,61 @@ export default function BlockLibraryPage({ params }: { params: Promise<{ spaceId
 
         {/* Content area */}
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-          {/* Toolbar */}
-          <div className="px-6 pt-4 pb-3 flex items-center gap-3">
-            {/* Search */}
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search blocks..."
-                className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
+          {isTagsView ? (
+            <TagsView
+              tags={tags}
+              isLoading={tagsLoading}
+              onCreateTag={handleCreateTag}
+              onRenameTag={handleRenameTag}
+              onDeleteTag={handleDeleteTag}
+            />
+          ) : (
+            <>
+              {/* Toolbar */}
+              <div className="px-6 pt-4 pb-3 flex items-center gap-3">
+                {/* Search */}
+                <div className="flex-1 relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search blocks..."
+                    className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
+                  />
+                </div>
+
+                {/* Sort */}
+                <SelectDropdown
+                  value={sort}
+                  onChange={(v) => v && setSort(v)}
+                  options={SORT_OPTIONS}
+                  className="w-44"
+                />
+              </div>
+
+              {/* Block listing */}
+              <div className="flex-1 overflow-y-auto px-6 pb-4">
+                <BlockList
+                  blocks={pageBlocks}
+                  groups={groups}
+                  isLoading={isLoading}
+                  selectedIds={selectedIds}
+                  onSelectionChange={setSelectedIds}
+                  onEdit={setEditBlock}
+                />
+              </div>
+
+              {/* Pagination */}
+              <Pagination
+                total={total}
+                page={page}
+                perPage={perPage}
+                onPageChange={setPage}
+                onPerPageChange={(n) => { setPerPage(n); setPage(1) }}
               />
-            </div>
-
-            {/* Sort */}
-            <SelectDropdown
-              value={sort}
-              onChange={(v) => v && setSort(v)}
-              options={SORT_OPTIONS}
-              className="w-44"
-            />
-          </div>
-
-          {/* Block listing */}
-          <div className="flex-1 overflow-y-auto px-6 pb-4">
-            <BlockList
-              blocks={blocks}
-              groups={groups}
-              isLoading={isLoading}
-              selectedIds={selectedIds}
-              onSelectionChange={setSelectedIds}
-              onEdit={setEditBlock}
-            />
-          </div>
-
-          {/* Pagination */}
-          <Pagination
-            total={total}
-            page={page}
-            perPage={perPage}
-            onPageChange={setPage}
-            onPerPageChange={(n) => { setPerPage(n); setPage(1) }}
-          />
+            </>
+          )}
         </div>
       </div>
 
@@ -405,7 +461,7 @@ export default function BlockLibraryPage({ params }: { params: Promise<{ spaceId
           groups={groups}
           onClose={() => setEditBlock(null)}
           onSaved={(updatedBlock) => {
-            setBlocks((prev) => prev.map((b) => (b.id === updatedBlock.id ? updatedBlock : b)))
+            setAllBlocks((prev) => prev.map((b) => (b.id === updatedBlock.id ? updatedBlock : b)))
             setEditBlock(updatedBlock)
           }}
         />

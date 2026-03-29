@@ -16,10 +16,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ sp
   const { spaceId, workflowId, stageId } = await params
   const token = await getSessionToken()
   const body = await req.json()
-  const res = await fetch(`${API_URL}/v1/admin/spaces/${spaceId}/workflows/${workflowId}/stages/${stageId}`, {
-    method: 'PATCH',
+  const res = await fetch(`${API_URL}/v1/spaces/${spaceId}/workflow_stages/${stageId}`, {
+    method: 'PUT',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ workflow_stage: body }),
   })
   const data = await res.json()
   return NextResponse.json(data, { status: res.status })
@@ -28,7 +28,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ sp
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ spaceId: string; workflowId: string; stageId: string }> }) {
   const { spaceId, workflowId, stageId } = await params
   const token = await getSessionToken()
-  const res = await fetch(`${API_URL}/v1/admin/spaces/${spaceId}/workflows/${workflowId}/stages/${stageId}`, {
+  const res = await fetch(`${API_URL}/v1/spaces/${spaceId}/workflow_stages/${stageId}`, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${token}` },
   })

@@ -1,12 +1,17 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { asc, desc, eq, and, gte, lte } from 'drizzle-orm';
+import { asc, desc, eq, and, gte, lte, isNull } from 'drizzle-orm';
 import { DB } from '../db/db.module';
 import type { DbType } from '../db/db.module';
 import { webhookEndpoints, webhookLogs } from '../db/schema';
+import { JobsClient } from '@sbx/jobs';
+import { JOBS_CLIENT } from '../jobs/jobs.module';
 
 @Injectable()
 export class WebhooksService {
-  constructor(@Inject(DB) private db: DbType) {}
+  constructor(
+    @Inject(DB) private db: DbType,
+    @Inject(JOBS_CLIENT) private jobs: JobsClient,
+  ) {}
 
   // ─── CDN (read-only) ──────────────────────────────────────────────────────
 
@@ -191,7 +196,6 @@ export class WebhooksService {
 
     const log = result.log;
 
-    // Find the webhook endpoint
     const [endpoint] = await this.db
       .select()
       .from(webhookEndpoints)
@@ -200,88 +204,45 @@ export class WebhooksService {
 
     if (!endpoint) return null;
 
-    // Fire the webhook
-    let status = 'failed';
-    let responseBody: string | null = null;
-    let responseStatus: number | null = null;
+    await this.jobs.webhooks.dispatch({
+      spaceId,
+      webhookEndpointId: endpoint.id,
+      endpoint: endpoint.endpoint,
+      secret: endpoint.secret ?? null,
+      action: log.action,
+      payload: (log.requestBody ?? {}) as Record<string, unknown>,
+    });
 
-    try {
-      const res = await fetch(endpoint.endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(endpoint.secret ? { 'Webhook-Secret': endpoint.secret } : {}),
-        },
-        body: JSON.stringify(log.requestBody ?? {}),
-        signal: AbortSignal.timeout(15000),
-      });
-      responseStatus = res.status;
-      responseBody = await res.text().catch(() => null);
-      status = res.ok ? 'success' : 'failed';
-    } catch {
-      status = 'failed';
-    }
-
-    // Insert new log entry
-    const [newLog] = await this.db
-      .insert(webhookLogs)
-      .values({
-        webhookEndpointId: endpoint.id,
-        spaceId,
-        action: log.action,
-        status,
-        requestBody: log.requestBody as any,
-        responseBody,
-        responseStatus,
-        executedAt: new Date(),
-      })
-      .returning();
-
-    return { log: newLog };
+    return { queued: true };
   }
 
   // ─── Dispatch (called internally when events happen) ─────────────────────
+  // Enqueues one BullMQ job per active webhook endpoint matching the action.
+  // Actual HTTP delivery + logging happens in apps/workers.
 
   async dispatch(spaceId: number, action: string, payload: Record<string, any>) {
-    const webhooks = await this.db
+    const endpoints = await this.db
       .select()
       .from(webhookEndpoints)
-      .where(and(eq(webhookEndpoints.spaceId, spaceId), eq(webhookEndpoints.activated, true)));
+      .where(
+        and(
+          eq(webhookEndpoints.spaceId, spaceId),
+          eq(webhookEndpoints.activated, true),
+          isNull(webhookEndpoints.deletedAt),
+        ),
+      );
 
-    for (const webhook of webhooks) {
-      const actions = webhook.actions as string[];
+    for (const endpoint of endpoints) {
+      const actions = endpoint.actions as string[];
       if (!actions.includes(action)) continue;
 
-      let status = 'failed';
-      let responseBody: string | null = null;
-      let responseStatus: number | null = null;
-
-      try {
-        const res = await fetch(webhook.endpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(webhook.secret ? { 'Webhook-Secret': webhook.secret } : {}),
-          },
-          body: JSON.stringify(payload),
-          signal: AbortSignal.timeout(15000),
-        });
-        responseStatus = res.status;
-        responseBody = await res.text().catch(() => null);
-        status = res.ok ? 'success' : 'failed';
-      } catch {
-        status = 'failed';
-      }
-
-      await this.db.insert(webhookLogs).values({
-        webhookEndpointId: webhook.id,
+      await this.jobs.webhooks.dispatch({
         spaceId,
+        webhookEndpointId: endpoint.id,
+        endpoint: endpoint.endpoint,
+        secret: endpoint.secret ?? null,
         action,
-        status,
-        requestBody: payload as any,
-        responseBody,
-        responseStatus,
-        executedAt: new Date(),
+        payload,
       });
     }
   }

@@ -20,9 +20,25 @@ export async function GET(
   const token = await getSessionToken()
   const search = req.nextUrl.searchParams.toString()
   const res = await fetch(
-    `${API_URL}/v1/admin/spaces/${spaceId}/stories${search ? `?${search}` : ''}`,
+    `${API_URL}/v1/spaces/${spaceId}/stories${search ? `?${search}` : ''}`,
     { headers: { Authorization: `Bearer ${token}` } },
   )
+  const data = await res.json()
+  return NextResponse.json(data, { status: res.status })
+}
+
+export async function POST(
+  req: NextRequest,
+  { params }: { params: Promise<{ spaceId: string }> },
+) {
+  const { spaceId } = await params
+  const token = await getSessionToken()
+  const body = await req.json()
+  const res = await fetch(`${API_URL}/v1/spaces/${spaceId}/stories`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
   const data = await res.json()
   return NextResponse.json(data, { status: res.status })
 }

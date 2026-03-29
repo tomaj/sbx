@@ -6,14 +6,13 @@ import { useRouter } from 'next/navigation'
 import {
   BookOpen, Images, LayoutPanelLeft, Database, Users,
   ChevronRight, ChevronDown, ChevronLeft,
-  Pencil, Plus, Trash2, Upload, Download, CloudUpload, Eye, EyeOff,
-  Settings, Workflow, KeyRound,
+  Pencil, Plus, Trash2, Upload, Download, CloudUpload,
+  Settings, Workflow, KeyRound, MessageSquare, CheckSquare,
 } from 'lucide-react'
 import { UserAvatar } from '@/components/ui/user-avatar'
 import { authClient } from '@/lib/auth-client'
 import {
   formatActivityKey,
-  activityKeyColor,
   resolveItemName,
 } from '@/components/activities/activity-utils'
 
@@ -46,6 +45,31 @@ interface ActivityRow {
     friendly_name: string
     avatar: string | null
   } | null
+}
+
+interface MentionComment {
+  id: number
+  uuid: string
+  discussion_id: number
+  user_id: number | null
+  user_name: string | null
+  user_avatar: string | null
+  message: string | null
+  field_key: string | null
+  story_id: number | null
+  story_name: string | null
+  story_full_slug: string | null
+  created_at: string
+}
+
+interface ApprovalRow {
+  id: number
+  story_id: number
+  approver_id: number
+  status: string
+  story_name: string | null
+  story_full_slug: string | null
+  created_at: string
 }
 
 type ActivityTab = 'team' | 'my_edits' | 'assigned' | 'mentions'
@@ -208,6 +232,10 @@ export default function SpaceDashboardPage({ params }: { params: Promise<{ space
   const [activitiesLoading, setActivitiesLoading] = useState(false)
   const [tab, setTab] = useState<ActivityTab>('team')
   const [currentUserId, setCurrentUserId] = useState<number | null>(null)
+  const [currentUserName, setCurrentUserName] = useState<string | null>(null)
+  const [mentionComments, setMentionComments] = useState<MentionComment[] | null>(null)
+  const [mentionTotal, setMentionTotal] = useState(0)
+  const [approvalRows, setApprovalRows] = useState<ApprovalRow[] | null>(null)
 
   // Load space info
   useEffect(() => {
@@ -221,36 +249,43 @@ export default function SpaceDashboardPage({ params }: { params: Promise<{ space
     Promise.all([
       fetch(`/api/admin/spaces/${spaceId}/stories?per_page=1`).then((r) => r.json()),
       fetch(`/api/admin/spaces/${spaceId}/assets/counts`).then((r) => r.json()),
-      fetch(`/api/admin/spaces/${spaceId}/component-counts`).then((r) => r.json()),
+      fetch(`/api/admin/spaces/${spaceId}/components`).then((r) => r.json()),
       fetch(`/api/admin/spaces/${spaceId}/datasources?per_page=1`).then((r) => r.json()),
       fetch(`/api/admin/spaces/${spaceId}/collaborators`).then((r) => r.json()),
     ]).then(([storiesData, assetsData, blocksData, dsData, colData]) => {
       setStats({
         stories: storiesData.total ?? 0,
         assets: assetsData.total ?? 0,
-        blocks: blocksData.total ?? 0,
+        blocks: (blocksData.components ?? []).length,
         datasources: dsData.total ?? 0,
         users: (colData.collaborators ?? []).length,
       })
     })
   }, [spaceId])
 
-  // Find current user's integer ID for "My last edits"
+  // Find current user's integer ID and name
   useEffect(() => {
     if (!session?.user?.email) return
     fetch(`/api/admin/users?per_page=100&filter=all`)
       .then((r) => r.json())
       .then((d) => {
-        const found = (d.users ?? []).find((u: { id: number; email: string }) => u.email === session.user.email)
-        if (found) setCurrentUserId(found.id)
+        const found = (d.users ?? []).find((u: { id: number; email: string; firstname?: string; lastname?: string }) => u.email === session.user.email)
+        if (found) {
+          setCurrentUserId(found.id)
+          const name = [found.firstname, found.lastname].filter(Boolean).join(' ')
+          if (name) setCurrentUserName(name)
+        }
       })
   }, [session?.user?.email])
 
-  // Load activities
+  // Load activities (team + my_edits tabs)
   const fetchActivities = useCallback(async () => {
+    if (tab !== 'team' && tab !== 'my_edits') return
+    // For my_edits wait until we know the current user id
+    if (tab === 'my_edits' && !currentUserId) { setActivitiesLoading(false); return }
     setActivitiesLoading(true)
     const p = new URLSearchParams({ spaceId, per_page: String(PER_PAGE), page: String(activitiesPage) })
-    if (tab === 'my_edits' && currentUserId) p.set('user_ids', String(currentUserId))
+    if (tab === 'my_edits') p.set('user_ids', String(currentUserId))
     const res = await fetch(`/api/admin/activities?${p}`)
     if (res.ok) {
       const d = await res.json()
@@ -260,14 +295,50 @@ export default function SpaceDashboardPage({ params }: { params: Promise<{ space
     setActivitiesLoading(false)
   }, [spaceId, tab, activitiesPage, currentUserId])
 
+  // Load mentions (My Mentions tab)
+  const fetchMentions = useCallback(async () => {
+    if (tab !== 'mentions') return
+    if (!currentUserName) { setActivitiesLoading(false); return }
+    setActivitiesLoading(true)
+    const p = new URLSearchParams({ user_name: currentUserName, page: String(activitiesPage), per_page: String(PER_PAGE) })
+    const res = await fetch(`/api/admin/spaces/${spaceId}/discussions/mentions?${p}`)
+    if (res.ok) {
+      const d = await res.json()
+      setMentionComments(d.comments ?? [])
+      setMentionTotal(d.total ?? 0)
+    }
+    setActivitiesLoading(false)
+  }, [spaceId, tab, activitiesPage, currentUserName])
+
+  // Load approvals (Assigned to me tab)
+  const fetchApprovals = useCallback(async () => {
+    if (tab !== 'assigned') return
+    if (!currentUserId) { setActivitiesLoading(false); return }
+    setActivitiesLoading(true)
+    const p = new URLSearchParams({ approver: String(currentUserId), with_story: 'true' })
+    const res = await fetch(`/api/admin/spaces/${spaceId}/approvals?${p}`)
+    if (res.ok) {
+      const d = await res.json()
+      setApprovalRows(d.approvals ?? [])
+    }
+    setActivitiesLoading(false)
+  }, [spaceId, tab, currentUserId])
+
   useEffect(() => { fetchActivities() }, [fetchActivities])
+  useEffect(() => { fetchMentions() }, [fetchMentions])
+  useEffect(() => { fetchApprovals() }, [fetchApprovals])
 
   function handleTabChange(t: ActivityTab) {
     setTab(t)
     setActivitiesPage(1)
+    setActivities(null)
+    setMentionComments(null)
+    setApprovalRows(null)
+    setActivitiesLoading(true)
   }
 
-  const totalPages = Math.max(1, Math.ceil(activitiesTotal / PER_PAGE))
+  const totalItems = tab === 'mentions' ? mentionTotal : activitiesTotal
+  const totalPages = Math.max(1, Math.ceil(totalItems / PER_PAGE))
 
   // Get last activity for "last updated" header info
   const lastActivity = activities?.[0]
@@ -356,7 +427,7 @@ export default function SpaceDashboardPage({ params }: { params: Promise<{ space
 
         {/* Activity rows */}
         <div className="divide-y divide-gray-100 dark:divide-gray-700">
-          {activitiesLoading || activities === null ? (
+          {activitiesLoading ? (
             Array.from({ length: PER_PAGE }).map((_, i) => (
               <div key={i} className="flex items-center gap-4 px-6 py-4">
                 <div className="size-5 rounded bg-gray-200 dark:bg-gray-700 animate-pulse shrink-0" />
@@ -368,49 +439,114 @@ export default function SpaceDashboardPage({ params }: { params: Promise<{ space
                 <div className="h-3 w-24 rounded bg-gray-200 dark:bg-gray-700 animate-pulse" />
               </div>
             ))
-          ) : activities.length === 0 ? (
-            <p className="px-6 py-10 text-sm text-gray-400 text-center">No activity yet.</p>
-          ) : (
-            activities.map((row) => {
-              const userName = row.user?.friendly_name ?? 'Unknown'
-              const itemName = resolveItemName(
-                row.trackable as { name?: string } | null,
-                row.activity.trackable_type,
-              )
-              return (
+          ) : tab === 'assigned' ? (
+            approvalRows === null || approvalRows.length === 0 ? (
+              <p className="px-6 py-10 text-sm text-gray-400 text-center">No pending approvals.</p>
+            ) : (
+              approvalRows.map((row) => (
                 <div key={row.id} className="flex items-center gap-4 px-6 py-3.5">
-                  {/* Activity type icon */}
                   <div className="size-8 flex items-center justify-center shrink-0">
-                    <ActivityIcon activityKey={row.activity.key} />
+                    <CheckSquare className="size-4 text-amber-400" />
                   </div>
-                  {/* User avatar */}
-                  <UserAvatar name={userName} src={row.user?.avatar} size="sm" />
-                  {/* Info */}
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
-                      {userName}{' '}
-                      <span className="font-normal text-gray-600 dark:text-gray-400">
-                        {formatActivityKey(row.activity.key).toLowerCase()}
-                      </span>
+                      Approval requested
                     </p>
-                    {row.activity.trackable_id && (
-                      <p className="text-xs text-gray-400 truncate mt-0.5">
-                        {itemName && `${itemName} · `}#{row.activity.trackable_id}
-                      </p>
+                    {row.story_name ? (
+                      <Link
+                        href={`/spaces/${spaceId}/content/${row.story_id}`}
+                        className="text-xs text-teal-600 dark:text-teal-400 hover:underline truncate mt-0.5 block"
+                      >
+                        {row.story_name}
+                      </Link>
+                    ) : (
+                      <p className="text-xs text-gray-400 truncate mt-0.5">Story #{row.story_id}</p>
                     )}
                   </div>
-                  {/* Time */}
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 font-medium capitalize">
+                      {row.status}
+                    </span>
+                    <span className="text-xs text-gray-400 whitespace-nowrap">
+                      {timeAgo(row.created_at)}
+                    </span>
+                  </div>
+                </div>
+              ))
+            )
+          ) : tab === 'mentions' ? (
+            mentionComments === null || mentionComments.length === 0 ? (
+              <p className="px-6 py-10 text-sm text-gray-400 text-center">No mentions yet.</p>
+            ) : (
+              mentionComments.map((comment) => (
+                <div key={comment.id} className="flex items-start gap-4 px-6 py-3.5">
+                  <div className="size-8 flex items-center justify-center shrink-0 mt-0.5">
+                    <MessageSquare className="size-4 text-teal-400" />
+                  </div>
+                  <UserAvatar name={comment.user_name} src={comment.user_avatar} size="sm" className="shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
+                      {comment.user_name ?? 'Unknown'}
+                    </p>
+                    <p className="text-xs text-gray-600 dark:text-gray-400 truncate mt-0.5 italic">
+                      {comment.message}
+                    </p>
+                    {comment.story_name && (
+                      <Link
+                        href={`/spaces/${spaceId}/content/${comment.story_id}`}
+                        className="text-xs text-teal-600 dark:text-teal-400 hover:underline mt-0.5 block truncate"
+                      >
+                        {comment.story_name}{comment.field_key ? ` · ${comment.field_key}` : ''}
+                      </Link>
+                    )}
+                  </div>
                   <span className="text-xs text-gray-400 whitespace-nowrap shrink-0">
-                    {timeAgo(row.activity.created_at)}
+                    {timeAgo(comment.created_at)}
                   </span>
                 </div>
-              )
-            })
+              ))
+            )
+          ) : (
+            activities === null || activities.length === 0 ? (
+              <p className="px-6 py-10 text-sm text-gray-400 text-center">No activity yet.</p>
+            ) : (
+              activities.map((row) => {
+                const userName = row.user?.friendly_name ?? 'Unknown'
+                const itemName = resolveItemName(
+                  row.trackable as { name?: string } | null,
+                  row.activity.trackable_type,
+                )
+                return (
+                  <div key={row.id} className="flex items-center gap-4 px-6 py-3.5">
+                    <div className="size-8 flex items-center justify-center shrink-0">
+                      <ActivityIcon activityKey={row.activity.key} />
+                    </div>
+                    <UserAvatar name={userName} src={row.user?.avatar} size="sm" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
+                        {userName}{' '}
+                        <span className="font-normal text-gray-600 dark:text-gray-400">
+                          {formatActivityKey(row.activity.key).toLowerCase()}
+                        </span>
+                      </p>
+                      {row.activity.trackable_id && (
+                        <p className="text-xs text-gray-400 truncate mt-0.5">
+                          {itemName && `${itemName} · `}#{row.activity.trackable_id}
+                        </p>
+                      )}
+                    </div>
+                    <span className="text-xs text-gray-400 whitespace-nowrap shrink-0">
+                      {timeAgo(row.activity.created_at)}
+                    </span>
+                  </div>
+                )
+              })
+            )
           )}
         </div>
 
-        {/* Pagination */}
-        {totalPages > 1 && (
+        {/* Pagination (not shown for assigned tab — loads all at once) */}
+        {totalPages > 1 && tab !== 'assigned' && (
           <div className="border-t border-gray-100 dark:border-gray-700">
             <SimplePagination
               page={activitiesPage}

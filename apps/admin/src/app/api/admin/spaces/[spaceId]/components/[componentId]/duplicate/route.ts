@@ -19,7 +19,7 @@ export async function POST(
   const { spaceId, componentId } = await params
   const token = await getSessionToken()
   const res = await fetch(
-    `${API_URL}/v1/admin/spaces/${spaceId}/components/${componentId}/duplicate`,
+    `${API_URL}/v1/spaces/${spaceId}/components/${componentId}/duplicate`,
     { method: 'POST', headers: { Authorization: `Bearer ${token}` } },
   )
   const data = await res.json()

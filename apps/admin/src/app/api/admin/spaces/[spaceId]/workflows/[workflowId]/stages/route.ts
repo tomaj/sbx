@@ -16,10 +16,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ spa
   const { spaceId, workflowId } = await params
   const token = await getSessionToken()
   const body = await req.json()
-  const res = await fetch(`${API_URL}/v1/admin/spaces/${spaceId}/workflows/${workflowId}/stages`, {
+  const res = await fetch(`${API_URL}/v1/spaces/${spaceId}/workflow_stages`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ workflow_stage: { ...body, workflow_id: parseInt(workflowId) } }),
   })
   const data = await res.json()
   return NextResponse.json(data, { status: res.status })

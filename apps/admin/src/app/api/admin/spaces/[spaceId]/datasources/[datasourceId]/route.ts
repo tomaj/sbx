@@ -19,11 +19,11 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const token = await getSessionToken()
   const body = await req.json()
   const res = await fetch(
-    `${API_URL}/v1/admin/spaces/${spaceId}/datasources/${datasourceId}`,
+    `${API_URL}/v1/spaces/${spaceId}/datasources/${datasourceId}`,
     {
-      method: 'PATCH',
+      method: 'PUT',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      body: JSON.stringify({ datasource: body }),
     },
   )
   const data = await res.json()
@@ -34,7 +34,7 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   const { spaceId, datasourceId } = await params
   const token = await getSessionToken()
   const res = await fetch(
-    `${API_URL}/v1/admin/spaces/${spaceId}/datasources/${datasourceId}`,
+    `${API_URL}/v1/spaces/${spaceId}/datasources/${datasourceId}`,
     { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } },
   )
   const data = await res.json()

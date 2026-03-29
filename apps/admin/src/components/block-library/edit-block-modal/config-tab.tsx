@@ -1,10 +1,9 @@
 'use client'
 
-import { useState, useRef } from 'react'
-import { X } from 'lucide-react'
 import type { ComponentGroup } from '../group-tree'
 import type { WorkingField } from './types'
 import { SelectDropdown } from '@/components/ui/select-dropdown'
+import { TagsMultiselect } from '@/components/ui/tags-multiselect'
 
 type BlockType = 'nestable' | 'content_type' | 'universal'
 
@@ -16,6 +15,7 @@ const PRESET_COLORS = [
 ]
 
 interface ConfigTabProps {
+  spaceId: string
   displayName: string
   description: string
   blockType: BlockType
@@ -24,7 +24,7 @@ interface ConfigTabProps {
   schemaFields: WorkingField[]
   previewField: string | null
   previewTmpl: string
-  internalTags: string[]
+  internalTags: { id: number; name: string }[]
   color: string | null
   onDisplayNameChange: (v: string) => void
   onDescriptionChange: (v: string) => void
@@ -32,11 +32,12 @@ interface ConfigTabProps {
   onGroupUuidChange: (v: string | null) => void
   onPreviewFieldChange: (v: string | null) => void
   onPreviewTmplChange: (v: string) => void
-  onInternalTagsChange: (v: string[]) => void
+  onInternalTagsChange: (v: { id: number; name: string }[]) => void
   onColorChange: (v: string | null) => void
 }
 
 export function ConfigTab({
+  spaceId,
   displayName,
   description,
   blockType,
@@ -56,8 +57,6 @@ export function ConfigTab({
   onInternalTagsChange,
   onColorChange,
 }: ConfigTabProps) {
-  const [tagInput, setTagInput] = useState('')
-  const tagInputRef = useRef<HTMLInputElement>(null)
 
   const previewFieldOptions = [
     { value: '', label: 'Automatic' },
@@ -65,26 +64,6 @@ export function ConfigTab({
       .filter((f) => PREVIEW_FIELD_TYPES.has(f.def.type))
       .map((f) => ({ value: f.key, label: f.def.display_name || f.key })),
   ]
-
-  function addTag(name: string) {
-    const trimmed = name.trim()
-    if (!trimmed || internalTags.includes(trimmed)) return
-    onInternalTagsChange([...internalTags, trimmed])
-  }
-
-  function removeTag(name: string) {
-    onInternalTagsChange(internalTags.filter((t) => t !== name))
-  }
-
-  function handleTagKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Enter' || e.key === ',') {
-      e.preventDefault()
-      addTag(tagInput)
-      setTagInput('')
-    } else if (e.key === 'Backspace' && tagInput === '' && internalTags.length > 0) {
-      removeTag(internalTags[internalTags.length - 1])
-    }
-  }
 
   return (
     <div className="flex-1 overflow-y-auto px-8 py-6 space-y-5">
@@ -171,36 +150,7 @@ export function ConfigTab({
         <label className="block text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">
           Tags
         </label>
-        <div
-          className="min-h-[38px] w-full px-2 py-1.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 flex flex-wrap gap-1.5 items-center cursor-text focus-within:ring-2 focus-within:ring-teal-500 focus-within:border-teal-500"
-          onClick={() => tagInputRef.current?.focus()}
-        >
-          {internalTags.map((tag) => (
-            <span
-              key={tag}
-              className="flex items-center gap-1 px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded text-xs"
-            >
-              {tag}
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); removeTag(tag) }}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-              >
-                <X className="w-3 h-3" />
-              </button>
-            </span>
-          ))}
-          <input
-            ref={tagInputRef}
-            type="text"
-            value={tagInput}
-            onChange={(e) => setTagInput(e.target.value)}
-            onKeyDown={handleTagKeyDown}
-            onBlur={() => { if (tagInput.trim()) { addTag(tagInput); setTagInput('') } }}
-            placeholder={internalTags.length === 0 ? 'Choose existing or add new' : ''}
-            className="flex-1 min-w-[120px] bg-transparent text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 outline-none"
-          />
-        </div>
+        <TagsMultiselect spaceId={spaceId} value={internalTags} onChange={onInternalTagsChange} />
         <p className="mt-1 text-xs text-gray-400">Tags allow you to categorize components and filter blocks.</p>
       </div>
 

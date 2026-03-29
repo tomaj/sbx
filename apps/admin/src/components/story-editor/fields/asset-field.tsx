@@ -8,6 +8,7 @@ import { FieldLabel } from '../FieldLabel'
 import { AssetPickerModal } from '@/components/assets/asset-picker-modal'
 import { AssetThumb } from '@/components/assets/asset-thumb'
 import type { Asset } from '@/components/assets/asset-grid'
+import { normalizeAssetFilename } from '@/lib/utils'
 
 interface AssetValue {
   id?: number
@@ -36,7 +37,7 @@ interface MultiProps {
 function assetToValue(asset: Asset): AssetValue {
   return {
     id: asset.id,
-    filename: asset.filename,
+    filename: normalizeAssetFilename(asset.filename),
     content_type: asset.content_type,
     alt: asset.alt ?? undefined,
     title: asset.title ?? undefined,

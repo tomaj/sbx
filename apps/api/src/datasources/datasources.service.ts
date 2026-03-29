@@ -6,11 +6,16 @@ import {
 import { and, asc, desc, count, eq, ilike, max, or } from 'drizzle-orm';
 import { DB } from '../db/db.module';
 import type { DbType } from '../db/db.module';
-import { datasourceEntries, datasources } from '../db/schema';
+import { datasourceEntries, datasources, spaces } from '../db/schema';
+import { WebhooksService } from '../webhooks/webhooks.service';
+import { WEBHOOK_ACTIONS } from '../webhooks/webhook-actions';
 
 @Injectable()
 export class DatasourcesService {
-  constructor(@Inject(DB) private db: DbType) {}
+  constructor(
+    @Inject(DB) private db: DbType,
+    private readonly webhooks: WebhooksService,
+  ) {}
 
   async findAll(spaceId: number) {
     const rows = await this.db
@@ -28,6 +33,103 @@ export class DatasourcesService {
         created_at: ds.createdAt,
         updated_at: ds.updatedAt,
       })),
+    };
+  }
+
+  private async getSpaceVersion(spaceId: number): Promise<number> {
+    const [space] = await this.db
+      .select({ version: spaces.version })
+      .from(spaces)
+      .where(eq(spaces.id, spaceId))
+      .limit(1);
+    return space?.version ?? 0;
+  }
+
+  async findAllCdn(spaceId: number) {
+    const [rows, cv] = await Promise.all([
+      this.db
+        .select()
+        .from(datasources)
+        .where(eq(datasources.spaceId, spaceId))
+        .orderBy(asc(datasources.id)),
+      this.getSpaceVersion(spaceId),
+    ]);
+
+    return {
+      datasources: rows.map((ds) => ({
+        id: Number(ds.id),
+        name: ds.name,
+        slug: ds.slug,
+        dimensions: ds.dimensions as any[] ?? [],
+      })),
+      cv,
+    };
+  }
+
+  async findOneCdn(spaceId: number, id: number) {
+    const [rows, cv] = await Promise.all([
+      this.db
+        .select()
+        .from(datasources)
+        .where(and(eq(datasources.id, BigInt(id)), eq(datasources.spaceId, spaceId)))
+        .limit(1),
+      this.getSpaceVersion(spaceId),
+    ]);
+    if (!rows.length) return null;
+    const ds = rows[0];
+    return {
+      datasource: {
+        id: Number(ds.id),
+        name: ds.name,
+        slug: ds.slug,
+        dimensions: ds.dimensions as any[] ?? [],
+      },
+      cv,
+    };
+  }
+
+  async findEntriesCdn(
+    spaceId: number,
+    opts: {
+      datasourceSlug?: string;
+      dimension?: string;
+      perPage: number;
+      page: number;
+    },
+  ) {
+    const [rows, cv] = await Promise.all([
+      this.db
+        .select({
+          id: datasourceEntries.id,
+          name: datasourceEntries.name,
+          value: datasourceEntries.value,
+          dimensionValue: datasourceEntries.dimensionValue,
+          createdAt: datasourceEntries.createdAt,
+          updatedAt: datasourceEntries.updatedAt,
+        })
+        .from(datasourceEntries)
+        .innerJoin(datasources, eq(datasourceEntries.datasourceId, datasources.id))
+        .where(
+          opts.datasourceSlug
+            ? and(eq(datasources.spaceId, spaceId), eq(datasources.slug, opts.datasourceSlug))
+            : eq(datasources.spaceId, spaceId),
+        )
+        .orderBy(asc(datasourceEntries.position), asc(datasourceEntries.name))
+        .limit(Math.min(opts.perPage, 1000))
+        .offset((opts.page - 1) * opts.perPage),
+      this.getSpaceVersion(spaceId),
+    ]);
+
+    return {
+      datasource_entries: rows.map((e) => ({
+        id: Number(e.id),
+        name: e.name,
+        value: e.value,
+        dimension_value: opts.dimension
+          ? ((e.dimensionValue as any)?.[opts.dimension] ?? null)
+          : null,
+      })),
+      cv,
     };
   }
 
@@ -171,6 +273,14 @@ export class DatasourcesService {
         position,
       })
       .returning();
+
+    void this.dispatchDatasourceEntryEvent(datasourceId, WEBHOOK_ACTIONS.DATASOURCE_ENTRY_CREATED, {
+      action: 'datasource_entry_created',
+      entry_id: Number(row.id),
+      name: row.name,
+      value: row.value,
+    });
+
     return {
       id: Number(row.id),
       name: row.name,
@@ -195,6 +305,14 @@ export class DatasourcesService {
       )
       .returning();
     if (!row) throw new NotFoundException('Entry not found');
+
+    void this.dispatchDatasourceEntryEvent(datasourceId, WEBHOOK_ACTIONS.DATASOURCE_ENTRY_UPDATED, {
+      action: 'datasource_entry_updated',
+      entry_id: Number(row.id),
+      name: row.name,
+      value: row.value,
+    });
+
     return { id: Number(row.id), name: row.name, value: row.value };
   }
 
@@ -207,7 +325,33 @@ export class DatasourcesService {
           eq(datasourceEntries.datasourceId, datasourceId),
         ),
       );
+
+    void this.dispatchDatasourceEntryEvent(datasourceId, WEBHOOK_ACTIONS.DATASOURCE_ENTRY_DELETED, {
+      action: 'datasource_entry_deleted',
+      entry_id: Number(entryId),
+    });
+
     return { success: true };
+  }
+
+  private async dispatchDatasourceEntryEvent(
+    datasourceId: bigint,
+    action: string,
+    extra: Record<string, unknown>,
+  ) {
+    const [ds] = await this.db
+      .select({ spaceId: datasources.spaceId, slug: datasources.slug })
+      .from(datasources)
+      .where(eq(datasources.id, datasourceId))
+      .limit(1);
+    if (!ds) return;
+
+    await this.webhooks.dispatch(ds.spaceId, action, {
+      space_id: ds.spaceId,
+      datasource_id: Number(datasourceId),
+      datasource_slug: ds.slug,
+      ...extra,
+    });
   }
 
   async reorderEntries(datasourceId: bigint, sortedIds: number[]) {
@@ -225,6 +369,94 @@ export class DatasourcesService {
       }
     });
     return { success: true };
+  }
+
+  async findOne(spaceId: number, id: number) {
+    const rows = await this.db
+      .select()
+      .from(datasources)
+      .where(and(eq(datasources.id, BigInt(id)), eq(datasources.spaceId, spaceId)))
+      .limit(1);
+    if (!rows.length) return null;
+    const ds = rows[0];
+    return {
+      datasource: {
+        id: Number(ds.id),
+        name: ds.name,
+        slug: ds.slug,
+        dimensions: [],
+        created_at: ds.createdAt,
+        updated_at: ds.updatedAt,
+      },
+    };
+  }
+
+  async findEntry(entryId: number, datasourceId: number) {
+    const rows = await this.db
+      .select()
+      .from(datasourceEntries)
+      .where(
+        and(
+          eq(datasourceEntries.id, BigInt(entryId)),
+          eq(datasourceEntries.datasourceId, BigInt(datasourceId)),
+        ),
+      )
+      .limit(1);
+    if (!rows.length) return null;
+    const e = rows[0];
+    return {
+      datasource_entry: {
+        id: Number(e.id),
+        name: e.name,
+        value: e.value,
+        datasource_id: Number(e.datasourceId),
+        dimension_value: e.dimensionValue,
+        created_at: e.createdAt,
+        updated_at: e.updatedAt,
+      },
+    };
+  }
+
+  async findAllEntries(
+    spaceId: number,
+    datasourceId?: number,
+    page = 1,
+    perPage = 25,
+  ) {
+    const conditions: any[] = [eq(datasources.spaceId, spaceId)];
+    if (datasourceId) {
+      conditions.push(eq(datasourceEntries.datasourceId, BigInt(datasourceId)));
+    }
+    const where = and(...conditions);
+
+    const rows = await this.db
+      .select({
+        id: datasourceEntries.id,
+        name: datasourceEntries.name,
+        value: datasourceEntries.value,
+        datasourceId: datasourceEntries.datasourceId,
+        dimensionValue: datasourceEntries.dimensionValue,
+        createdAt: datasourceEntries.createdAt,
+        updatedAt: datasourceEntries.updatedAt,
+      })
+      .from(datasourceEntries)
+      .innerJoin(datasources, eq(datasourceEntries.datasourceId, datasources.id))
+      .where(where)
+      .orderBy(asc(datasourceEntries.position), asc(datasourceEntries.name))
+      .limit(perPage)
+      .offset((page - 1) * perPage);
+
+    return {
+      datasource_entries: rows.map((e) => ({
+        id: Number(e.id),
+        name: e.name,
+        value: e.value,
+        datasource_id: Number(e.datasourceId),
+        dimension_value: e.dimensionValue,
+        created_at: e.createdAt,
+        updated_at: e.updatedAt,
+      })),
+    };
   }
 
   async findEntries(

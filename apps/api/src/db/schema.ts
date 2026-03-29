@@ -10,6 +10,7 @@ import {
   timestamp,
   unique,
   index,
+  uniqueIndex,
   json,
 } from 'drizzle-orm/pg-core';
 
@@ -41,6 +42,21 @@ export const spaces = pgTable('spaces', {
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
 
+export const internalTags = pgTable(
+  'internal_tags',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    spaceId: integer('space_id').notNull().references(() => spaces.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    // object_type: 'component' | 'asset'
+    objectType: text('object_type').notNull().default('component'),
+  },
+  (t) => [
+    index('idx_internal_tags_space_id').on(t.spaceId),
+    index('idx_internal_tags_space_type').on(t.spaceId, t.objectType),
+  ],
+);
+
 export const users = pgTable('users', {
   id: bigserial('id', { mode: 'number' }).primaryKey(),
   uuid: text('uuid').notNull().unique(),
@@ -50,6 +66,7 @@ export const users = pgTable('users', {
   avatar: text('avatar'),
   passwordHash: text('password_hash'),
   disabled: boolean('disabled').notNull().default(false),
+  favouriteSpaces: json('favourite_spaces').notNull().default([]),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
@@ -106,6 +123,7 @@ export const datasources = pgTable(
       .references(() => spaces.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
     slug: text('slug').notNull(),
+    dimensions: json('dimensions').notNull().default([]),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },
@@ -384,6 +402,8 @@ export const stories = pgTable(
     position: integer('position').notNull().default(0),
     tagList: json('tag_list').notNull().default([]),
     content: json('content').notNull().default({}),
+    defaultFullSlug: text('default_full_slug'),
+    translatedSlugs: json('translated_slugs'),
     sortByDate: timestamp('sort_by_date'),
     publishAt: timestamp('publish_at'),
     expireAt: timestamp('expire_at'),
@@ -393,6 +413,10 @@ export const stories = pgTable(
     createdAt: timestamp('created_at').notNull(),
     updatedAt: timestamp('updated_at').notNull(),
     lastAuthorId: bigint('last_author_id', { mode: 'number' }),
+    releaseIds: json('release_ids').notNull().default([]),
+    publishedData: json('published_data'),
+    favouriteForUserIds: json('favourite_for_user_ids').notNull().default([]),
+    disableFEEditor: boolean('disable_fe_editor').notNull().default(false),
   },
   (t) => [
     // Primary lookup: CDN slug lookup (most critical)
@@ -453,6 +477,10 @@ export const assets = pgTable(
     isExternalUrl: boolean('is_external_url').notNull().default(false),
     metaData: json('meta_data').notNull().default({}),
     shortFilename: text('short_filename').notNull().default(''),
+    // internal_tags_list: [{id: number, name: string}]
+    internalTagsList: json('internal_tags_list').notNull().default([]),
+    // internal_tag_ids: ["id1", "id2"]
+    internalTagIds: json('internal_tag_ids').notNull().default([]),
     deletedAt: timestamp('deleted_at'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
@@ -525,6 +553,27 @@ export const releases = pgTable(
   (t) => [index('idx_releases_space_id').on(t.spaceId)],
 );
 
+export const storyReleases = pgTable(
+  'story_releases',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    storyId: bigint('story_id', { mode: 'number' })
+      .notNull()
+      .references(() => stories.id, { onDelete: 'cascade' }),
+    releaseId: bigint('release_id', { mode: 'number' })
+      .notNull()
+      .references(() => releases.id, { onDelete: 'cascade' }),
+    content: json('content').notNull().default({}),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('idx_story_releases_unique').on(t.storyId, t.releaseId),
+    index('idx_story_releases_release_id').on(t.releaseId),
+    index('idx_story_releases_story_id').on(t.storyId),
+  ],
+);
+
 export const tasks = pgTable(
   'tasks',
   {
@@ -576,3 +625,64 @@ export const fieldTypes = pgTable('field_types', {
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
+
+export const workflowStageChanges = pgTable(
+  'workflow_stage_changes',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    spaceId: integer('space_id').notNull().references(() => spaces.id, { onDelete: 'cascade' }),
+    storyId: bigint('story_id', { mode: 'number' }).notNull(),
+    workflowStageId: integer('workflow_stage_id').notNull(),
+    userId: bigint('user_id', { mode: 'number' }),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (t) => [index('idx_workflow_stage_changes_space_id').on(t.spaceId)],
+);
+
+export const discussions = pgTable(
+  'discussions',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    spaceId: integer('space_id').notNull().references(() => spaces.id, { onDelete: 'cascade' }),
+    storyId: bigint('story_id', { mode: 'number' }),
+    fieldKey: text('field_key'),
+    resolvedAt: timestamp('resolved_at'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (t) => [index('idx_discussions_space_id').on(t.spaceId)],
+);
+
+export const comments = pgTable(
+  'comments',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    discussionId: bigint('discussion_id', { mode: 'number' }).notNull().references(() => discussions.id, { onDelete: 'cascade' }),
+    spaceId: integer('space_id').notNull().references(() => spaces.id, { onDelete: 'cascade' }),
+    userId: bigint('user_id', { mode: 'number' }),
+    message: text('message'),
+    messageJson: json('message_json').notNull().default([]),
+    uuid: text('uuid').notNull().unique(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    index('idx_comments_discussion_id').on(t.discussionId),
+    index('idx_comments_space_id').on(t.spaceId),
+  ],
+);
+
+
+export const approvals = pgTable(
+  'approvals',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    spaceId: integer('space_id').notNull().references(() => spaces.id, { onDelete: 'cascade' }),
+    storyId: bigint('story_id', { mode: 'number' }).notNull(),
+    approverId: bigint('approver_id', { mode: 'number' }).notNull(),
+    status: text('status').notNull().default('pending'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (t) => [index('idx_approvals_space_id').on(t.spaceId)],
+);

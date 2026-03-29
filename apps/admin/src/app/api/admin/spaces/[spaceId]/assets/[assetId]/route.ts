@@ -18,7 +18,7 @@ export async function GET(
 ) {
   const { spaceId, assetId } = await params
   const token = await getSessionToken()
-  const res = await fetch(`${API_URL}/v1/admin/spaces/${spaceId}/assets/${assetId}`, {
+  const res = await fetch(`${API_URL}/v1/spaces/${spaceId}/assets/${assetId}`, {
     headers: { Authorization: `Bearer ${token}` },
   })
   const data = await res.json()

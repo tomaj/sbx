@@ -1,0 +1,17 @@
+{
+  "name": "migrate-avatars",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "import": "tsx import.ts"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "*",
+    "pg": "*"
+  },
+  "devDependencies": {
+    "tsx": "*",
+    "@types/pg": "*"
+  }
+}

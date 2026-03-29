@@ -20,7 +20,7 @@ export async function GET(
   const token = await getSessionToken()
   const search = req.nextUrl.searchParams.toString()
   const res = await fetch(
-    `${API_URL}/v1/admin/spaces/${spaceId}/stories/ancestors${search ? `?${search}` : ''}`,
+    `${API_URL}/v1/spaces/${spaceId}/stories/ancestors${search ? `?${search}` : ''}`,
     { headers: { Authorization: `Bearer ${token}` } },
   )
   const data = await res.json()

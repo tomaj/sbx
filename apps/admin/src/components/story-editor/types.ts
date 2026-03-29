@@ -8,6 +8,7 @@ export interface ComponentMeta {
   icon: string | null
   description: string | null
   component_group_uuid: string | null
+  edit_mode: string | null
 }
 
 export interface ComponentGroup {
@@ -34,6 +35,7 @@ export interface StoryDetail {
   published_at: string | null
   first_published_at: string | null
   last_author_id: number | null
+  disable_fe_editor: boolean
   // content fields
   content: Record<string, any>
   tag_list: string[]

@@ -4,10 +4,15 @@ import { randomBytes } from 'crypto';
 import { DB } from '../db/db.module';
 import type { DbType } from '../db/db.module';
 import { spaceMembers, spaces, users } from '../db/schema';
+import { WebhooksService } from '../webhooks/webhooks.service';
+import { WEBHOOK_ACTIONS } from '../webhooks/webhook-actions';
 
 @Injectable()
 export class UsersService {
-  constructor(@Inject(DB) private db: DbType) {}
+  constructor(
+    @Inject(DB) private db: DbType,
+    private readonly webhooks: WebhooksService,
+  ) {}
 
   async getAllUsers(opts: {
     page: number;
@@ -121,10 +126,42 @@ export class UsersService {
     return { success: true };
   }
 
-  async updateUser(id: number, dto: { firstname?: string; lastname?: string; disabled?: boolean }) {
+  async getMe(email: string) {
+    const [user] = await this.db
+      .select()
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1);
+    if (!user) return null;
+    return {
+      id: user.id,
+      email: user.email,
+      firstname: user.firstname,
+      lastname: user.lastname,
+      avatar: user.avatar,
+      favourite_spaces: (user.favouriteSpaces as number[]) ?? [],
+    };
+  }
+
+  async updateAvatar(email: string, avatarPath: string) {
     const [updated] = await this.db
       .update(users)
-      .set({ ...dto, updatedAt: new Date() })
+      .set({ avatar: avatarPath, updatedAt: new Date() })
+      .where(eq(users.email, email))
+      .returning();
+    return updated ?? null;
+  }
+
+  async updateUser(id: number, dto: { firstname?: string; lastname?: string; disabled?: boolean; favouriteSpaces?: number[] }) {
+    const patch: Record<string, any> = { updatedAt: new Date() };
+    if (dto.firstname !== undefined) patch.firstname = dto.firstname;
+    if (dto.lastname !== undefined) patch.lastname = dto.lastname;
+    if (dto.disabled !== undefined) patch.disabled = dto.disabled;
+    if (dto.favouriteSpaces !== undefined) patch.favouriteSpaces = dto.favouriteSpaces;
+
+    const [updated] = await this.db
+      .update(users)
+      .set(patch)
       .where(eq(users.id, id))
       .returning();
 
@@ -133,6 +170,7 @@ export class UsersService {
       firstname: updated.firstname,
       lastname: updated.lastname,
       email: updated.email,
+      favourite_spaces: (updated.favouriteSpaces as number[]) ?? [],
     };
   }
 
@@ -216,6 +254,14 @@ export class UsersService {
       })
       .returning();
 
+    void this.webhooks.dispatch(spaceId, WEBHOOK_ACTIONS.USER_ADDED_TO_SPACE, {
+      action: 'user_added',
+      space_id: spaceId,
+      user_id: userId,
+      role,
+      text: `User ${userId} was added to space ${spaceId}.`,
+    });
+
     return { id: created.id };
   }
 
@@ -238,9 +284,24 @@ export class UsersService {
   }
 
   async removeSpaceMember(spaceId: number, memberId: number) {
+    const [member] = await this.db
+      .select({ userId: spaceMembers.userId })
+      .from(spaceMembers)
+      .where(and(eq(spaceMembers.id, memberId), eq(spaceMembers.spaceId, spaceId)))
+      .limit(1);
+
     await this.db
       .delete(spaceMembers)
       .where(and(eq(spaceMembers.id, memberId), eq(spaceMembers.spaceId, spaceId)));
+
+    if (member) {
+      void this.webhooks.dispatch(spaceId, WEBHOOK_ACTIONS.USER_REMOVED_FROM_SPACE, {
+        action: 'user_removed',
+        space_id: spaceId,
+        user_id: member.userId,
+        text: `User ${member.userId} was removed from space ${spaceId}.`,
+      });
+    }
 
     return { success: true };
   }
@@ -281,6 +342,93 @@ export class UsersService {
         email: u.email,
         avatar: u.avatar,
       })),
+    };
+  }
+
+  async findUserByEmail(email: string) {
+    const [row] = await this.db
+      .select({ id: users.id, email: users.email })
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1);
+    return row ?? null;
+  }
+
+  async getCollaboratorByUserId(spaceId: number, userId: number) {
+    const [row] = await this.db
+      .select()
+      .from(spaceMembers)
+      .innerJoin(users, eq(spaceMembers.userId, users.id))
+      .where(and(eq(spaceMembers.userId, userId), eq(spaceMembers.spaceId, spaceId)))
+      .limit(1);
+
+    if (!row) return null;
+
+    return {
+      collaborator: {
+        id: row.space_members.id,
+        user_id: row.users.id,
+        space_id: row.space_members.spaceId,
+        role: row.space_members.role,
+        space_role_id: row.space_members.spaceRoleId
+          ? Number(row.space_members.spaceRoleId)
+          : null,
+        space_role_ids: [],
+        permissions: row.space_members.permissions ?? [],
+        allowed_path: row.space_members.allowedPath,
+        field_permissions: '',
+        invitation: null,
+        user: {
+          id: row.users.id,
+          friendly_name: `${row.users.firstname} ${row.users.lastname}`.trim(),
+          firstname: row.users.firstname,
+          lastname: row.users.lastname,
+          avatar: row.users.avatar ?? null,
+          userid: row.users.email,
+          real_email: row.users.email,
+          alt_email: null,
+          disabled: row.users.disabled,
+        },
+      },
+    };
+  }
+
+  async getCollaboratorById(spaceId: number, memberId: number) {
+    const [row] = await this.db
+      .select()
+      .from(spaceMembers)
+      .innerJoin(users, eq(spaceMembers.userId, users.id))
+      .where(and(eq(spaceMembers.id, memberId), eq(spaceMembers.spaceId, spaceId)))
+      .limit(1);
+
+    if (!row) return null;
+
+    return {
+      collaborator: {
+        id: row.space_members.id,
+        user_id: row.users.id,
+        space_id: row.space_members.spaceId,
+        role: row.space_members.role,
+        space_role_id: row.space_members.spaceRoleId
+          ? Number(row.space_members.spaceRoleId)
+          : null,
+        space_role_ids: [],
+        permissions: row.space_members.permissions ?? [],
+        allowed_path: row.space_members.allowedPath,
+        field_permissions: '',
+        invitation: null,
+        user: {
+          id: row.users.id,
+          friendly_name: `${row.users.firstname} ${row.users.lastname}`.trim(),
+          firstname: row.users.firstname,
+          lastname: row.users.lastname,
+          avatar: row.users.avatar ?? null,
+          userid: row.users.email,
+          real_email: row.users.email,
+          alt_email: null,
+          disabled: row.users.disabled,
+        },
+      },
     };
   }
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import {
   Link2,
   ExternalLink,
@@ -12,6 +12,7 @@ import {
   ImageIcon,
 } from 'lucide-react'
 import { AssetThumb } from './asset-thumb'
+import { TagsMultiselect } from '@/components/ui/tags-multiselect'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
 import { DateField } from '@/components/ui/date-field'
 import type { Asset } from './asset-grid'
@@ -45,8 +46,20 @@ interface AssetDetailModalProps {
   onSaved: (asset: Asset) => void
 }
 
-export function AssetDetailModal({ asset, spaceId, onClose, onDeleted, onSaved }: AssetDetailModalProps) {
+export function AssetDetailModal({ asset: initialAsset, spaceId, onClose, onDeleted, onSaved }: AssetDetailModalProps) {
   const [tab, setTab] = useState<'overview' | 'references'>('overview')
+  const [asset, setAsset] = useState<Asset>(initialAsset)
+
+  // Fetch fresh asset data on open (like Storyblok does) — ref guards against StrictMode double-invoke
+  const fetchedRef = useRef(false)
+  useEffect(() => {
+    if (fetchedRef.current) return
+    fetchedRef.current = true
+    fetch(`/api/admin/spaces/${spaceId}/assets/${initialAsset.id}`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => { if (data?.asset) setAsset(data.asset) })
+      .catch(() => {})
+  }, [spaceId, initialAsset.id])
 
   // Form state
   const [title, setTitle] = useState(asset.title ?? '')
@@ -57,6 +70,26 @@ export function AssetDetailModal({ asset, spaceId, onClose, onDeleted, onSaved }
     (asset as any).expire_at ? new Date((asset as any).expire_at).toISOString().slice(0, 10) : '',
   )
   const [locked, setLocked] = useState((asset as any).locked ?? false)
+  const [internalTags, setInternalTags] = useState<{ id: number; name: string }[]>(
+    (asset as any).internal_tags_list ?? [],
+  )
+
+  // Sync form state when fresh asset data arrives
+  useEffect(() => {
+    setTitle(asset.title ?? '')
+    setAlt(asset.alt ?? '')
+    setCopyright((asset as any).copyright ?? '')
+    setSource((asset as any).meta_data?.source ?? '')
+    setExpireAt((asset as any).expire_at ? new Date((asset as any).expire_at).toISOString().slice(0, 10) : '')
+    setLocked((asset as any).locked ?? false)
+    setInternalTags((asset as any).internal_tags_list ?? [])
+  }, [asset])
+
+  // References state
+  const [referenceStories, setReferenceStories] = useState<any[]>([])
+  const [referencesTotal, setReferencesTotal] = useState(0)
+  const [referencesLoading, setReferencesLoading] = useState(false)
+  const [referencesLoaded, setReferencesLoaded] = useState(false)
 
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState<{ title?: string; alt?: string }>({})
@@ -73,8 +106,26 @@ export function AssetDetailModal({ asset, spaceId, onClose, onDeleted, onSaved }
 
   const isImage = asset.content_type.startsWith('image/')
 
-  // Folder breadcrumb: just show folder_id for now
-  const folderLabel = asset.folder_id ? `Folder ${asset.folder_id}` : null
+  // Folder breadcrumb: just show asset_folder_id for now
+  const folderLabel = asset.asset_folder_id ? `Folder ${asset.asset_folder_id}` : null
+
+  // Fetch story references when tab switches to 'references'
+  useEffect(() => {
+    if (tab !== 'references' || referencesLoaded) return
+    setReferencesLoading(true)
+    const qs = new URLSearchParams()
+    qs.set('reference_search[]', asset.filename)
+    qs.set('per_page', '25')
+    fetch(`/api/admin/spaces/${spaceId}/stories?${qs}`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (data?.stories) setReferenceStories(data.stories)
+        if (data?.total !== undefined) setReferencesTotal(data.total)
+        setReferencesLoaded(true)
+      })
+      .catch(() => setReferencesLoaded(true))
+      .finally(() => setReferencesLoading(false))
+  }, [tab, referencesLoaded, spaceId, asset.filename])
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -106,6 +157,7 @@ export function AssetDetailModal({ asset, spaceId, onClose, onDeleted, onSaved }
           expire_at: expireAt || null,
           locked,
           meta_data,
+          internal_tag_ids: internalTags.map((t) => t.id),
         }),
       })
       if (res.ok) {
@@ -217,12 +269,12 @@ export function AssetDetailModal({ asset, spaceId, onClose, onDeleted, onSaved }
 
             {/* Footer: dimensions / size / format */}
             <div className="px-6 py-3 border-t border-gray-200 dark:border-gray-700 flex items-center gap-8 text-sm">
-              {(width && height) ? (
-                <div>
-                  <span className="text-gray-400 text-xs block">Width &amp; Height</span>
-                  <span className="text-gray-700 dark:text-gray-300">{width} x {height}</span>
-                </div>
-              ) : null}
+              <div>
+                <span className="text-gray-400 text-xs block">Width &amp; Height</span>
+                <span className="text-gray-700 dark:text-gray-300">
+                  {(width && height) ? `${width} x ${height}` : '—'}
+                </span>
+              </div>
               <div>
                 <span className="text-gray-400 text-xs block">Size</span>
                 <span className="text-gray-700 dark:text-gray-300">{formatBytes(asset.content_length)}</span>
@@ -336,13 +388,15 @@ export function AssetDetailModal({ asset, spaceId, onClose, onDeleted, onSaved }
                     <p className="text-sm text-gray-600 dark:text-gray-400 select-all">{asset.id}</p>
                   </div>
 
-                  {/* Tags — TODO */}
+                  {/* Tags */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tags</label>
-                    <div className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-400 bg-gray-50 dark:bg-gray-800/50 cursor-not-allowed flex items-center justify-between">
-                      <span>Choose existing or add new</span>
-                      <span className="text-xs bg-gray-200 dark:bg-gray-700 text-gray-500 px-1.5 py-0.5 rounded">TODO</span>
-                    </div>
+                    <TagsMultiselect
+                      spaceId={spaceId}
+                      objectType="asset"
+                      value={internalTags}
+                      onChange={setInternalTags}
+                    />
                   </div>
 
                   {/* Private asset */}
@@ -392,8 +446,56 @@ export function AssetDetailModal({ asset, spaceId, onClose, onDeleted, onSaved }
                   </div>
                 </div>
               ) : (
-                <div className="px-5 py-6">
-                  <p className="text-sm text-gray-400 italic">References — TODO</p>
+                <div className="px-5 py-4">
+                  {referencesLoading ? (
+                    <div className="space-y-3 mt-2">
+                      {[...Array(3)].map((_, i) => (
+                        <div key={i} className="animate-pulse flex items-center gap-3 py-3 border-b border-gray-100 dark:border-gray-800">
+                          <div className="w-5 h-5 rounded-full bg-gray-200 dark:bg-gray-700 shrink-0" />
+                          <div className="flex-1 space-y-1.5">
+                            <div className="h-3.5 bg-gray-200 dark:bg-gray-700 rounded w-2/3" />
+                            <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                        Used in: {referencesTotal} {referencesTotal === 1 ? 'story' : 'stories'}
+                      </p>
+                      {referenceStories.length === 0 ? (
+                        <p className="text-sm text-gray-400 italic">No stories reference this asset.</p>
+                      ) : (
+                        <div className="divide-y divide-gray-100 dark:divide-gray-800">
+                          {referenceStories.map((story) => (
+                            <div key={story.id} className="flex items-center gap-3 py-3">
+                              <div className="w-5 h-5 rounded-full border-2 border-teal-500 flex items-center justify-center shrink-0">
+                                <div className="w-2 h-2 rounded-full bg-teal-500" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{story.name}</p>
+                                <p className="text-xs text-gray-400 truncate">/{story.full_slug}</p>
+                              </div>
+                              <div className="shrink-0 text-right">
+                                <p className="text-xs text-gray-400">
+                                  {story.updated_at ? new Date(story.updated_at).toLocaleDateString() : ''}
+                                </p>
+                              </div>
+                              <a
+                                href={`/spaces/${spaceId}/content/${story.id}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors shrink-0"
+                              >
+                                <ExternalLink className="w-4 h-4" />
+                              </a>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
               )}
             </div>

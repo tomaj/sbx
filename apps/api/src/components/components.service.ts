@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { SQL, and, asc, count, desc, eq, ilike, isNull } from 'drizzle-orm';
+import { SQL, and, asc, count, desc, eq, ilike, inArray, isNull } from 'drizzle-orm';
 import { DB } from '../db/db.module';
 import type { DbType } from '../db/db.module';
 import { componentGroups, components } from '../db/schema';
@@ -10,15 +10,56 @@ export class ComponentsService {
 
   // ─── CDN / read-only ────────────────────────────────────────────────────────
 
-  async findAllComponents(spaceId: number) {
-    const rows = await this.db
-      .select()
-      .from(components)
-      .where(eq(components.spaceId, spaceId))
-      .orderBy(asc(components.id));
+  async findAllComponents(
+    spaceId: number,
+    opts: {
+      search?: string;
+      in_group?: string;
+      is_root?: boolean;
+      by_ids?: string;
+      sort_by?: string;
+    } = {},
+  ) {
+    const conditions: (SQL | undefined)[] = [eq(components.spaceId, spaceId)];
+
+    if (opts.search?.trim()) {
+      conditions.push(ilike(components.name, `%${opts.search.trim()}%`));
+    }
+    if (opts.in_group !== undefined) {
+      conditions.push(
+        opts.in_group === '' ? isNull(components.componentGroupUuid) : eq(components.componentGroupUuid, opts.in_group),
+      );
+    }
+    if (opts.is_root !== undefined) {
+      conditions.push(eq(components.isRoot, opts.is_root));
+    }
+    if (opts.by_ids) {
+      const ids = opts.by_ids
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .map((s) => BigInt(s));
+      if (ids.length > 0) conditions.push(inArray(components.id, ids));
+    }
+
+    let order: ReturnType<typeof asc>;
+    if (opts.sort_by === 'updated_at') order = desc(components.updatedAt) as any;
+    else if (opts.sort_by === 'is_nestable') order = desc(components.isNestable) as any;
+    else if (opts.sort_by === 'is_root') order = desc(components.isRoot) as any;
+    else order = asc(components.name);
+
+    const [rows, groupRows] = await Promise.all([
+      this.db
+        .select()
+        .from(components)
+        .where(and(...conditions))
+        .orderBy(order),
+      this.db.select().from(componentGroups).where(eq(componentGroups.spaceId, spaceId)).orderBy(asc(componentGroups.name)),
+    ]);
 
     return {
       components: rows.map((c) => this.formatComponent(c)),
+      component_groups: groupRows.map((g) => this.formatGroup(g)),
     };
   }
 
@@ -45,23 +86,15 @@ export class ComponentsService {
     };
   }
 
-  // ─── Admin: counts ──────────────────────────────────────────────────────────
+  async findOneComponentGroup(spaceId: number, id: number) {
+    const [row] = await this.db
+      .select()
+      .from(componentGroups)
+      .where(and(eq(componentGroups.id, BigInt(id)), eq(componentGroups.spaceId, spaceId)))
+      .limit(1);
 
-  async getComponentCounts(spaceId: number) {
-    const rows = await this.db
-      .select({ groupUuid: components.componentGroupUuid, total: count() })
-      .from(components)
-      .where(eq(components.spaceId, spaceId))
-      .groupBy(components.componentGroupUuid);
-
-    const byGroup: Record<string, number> = {};
-    let total = 0;
-    for (const row of rows) {
-      const n = Number(row.total);
-      total += n;
-      if (row.groupUuid) byGroup[row.groupUuid] = n;
-    }
-    return { total, by_group: byGroup };
+    if (!row) return null;
+    return { component_group: this.formatGroup(row) };
   }
 
   // ─── Admin: list with pagination ────────────────────────────────────────────
@@ -308,6 +341,7 @@ export class ComponentsService {
     return {
       id: Number(c.id),
       name: c.name,
+      real_name: c.name,
       display_name: c.displayName ?? null,
       description: c.description ?? '',
       created_at: c.createdAt,
@@ -319,12 +353,14 @@ export class ComponentsService {
       is_root: c.isRoot,
       is_nestable: c.isNestable,
       all_presets: c.allPresets,
+      preset_id: null,
       component_group_uuid: c.componentGroupUuid ?? null,
       color: c.color ?? null,
       icon: c.icon ?? null,
       internal_tags_list: c.internalTagsList,
       internal_tag_ids: c.internalTagIds,
       content_type_asset_preview: c.contentTypeAssetPreview ?? null,
+      metadata: {},
     };
   }
 }

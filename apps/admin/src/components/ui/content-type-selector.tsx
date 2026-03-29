@@ -5,7 +5,9 @@ import { ChevronDown, X, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface ContentTypeSelectorProps {
-  spaceId: string
+  spaceId?: string
+  /** Pre-loaded options — if provided, skips the API fetch */
+  options?: { value: string; label: string }[]
   value: string[]
   onChange: (value: string[]) => void
   placeholder?: string
@@ -13,26 +15,33 @@ interface ContentTypeSelectorProps {
 
 export function ContentTypeSelector({
   spaceId,
+  options: preloadedOptions,
   value,
   onChange,
   placeholder = 'All content types',
 }: ContentTypeSelectorProps) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
-  const [components, setComponents] = useState<string[]>([])
+  const [fetchedComponents, setFetchedComponents] = useState<string[]>([])
   const containerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
+  // Only fetch from API when no pre-loaded options are provided
   useEffect(() => {
+    if (preloadedOptions !== undefined || !spaceId) return
     fetch(`/api/admin/spaces/${spaceId}/components?per_page=500`)
       .then((r) => r.json())
       .then((d) => {
         const names: string[] = (d.components ?? []).map((c: any) => c.name as string)
         names.sort()
-        setComponents(names)
+        setFetchedComponents(names)
       })
       .catch(() => {})
-  }, [spaceId])
+  }, [spaceId, preloadedOptions])
+
+  const components = preloadedOptions
+    ? preloadedOptions.map((o) => o.value)
+    : fetchedComponents
 
   useEffect(() => {
     if (!open) return
@@ -77,12 +86,14 @@ export function ContentTypeSelector({
             : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500',
         )}
       >
-        {value.map((v) => (
+        {value.map((v) => {
+          const label = preloadedOptions?.find((o) => o.value === v)?.label ?? v
+          return (
           <span
             key={v}
             className="inline-flex items-center gap-1 bg-gray-100 dark:bg-gray-700 rounded px-2 py-0.5 text-xs text-gray-800 dark:text-gray-200 shrink-0"
           >
-            {v}
+            {label}
             <button
               type="button"
               onClick={(e) => remove(v, e)}
@@ -91,7 +102,8 @@ export function ContentTypeSelector({
               <X className="w-3 h-3" />
             </button>
           </span>
-        ))}
+          )
+        })}
         <input
           ref={inputRef}
           type="text"
@@ -119,6 +131,7 @@ export function ContentTypeSelector({
           ) : (
             filtered.map((name) => {
               const checked = value.includes(name)
+              const label = preloadedOptions?.find((o) => o.value === name)?.label ?? name
               return (
                 <button
                   key={name}
@@ -144,7 +157,7 @@ export function ContentTypeSelector({
                         : 'text-gray-800 dark:text-gray-200',
                     )}
                   >
-                    {name}
+                    {label}
                   </span>
                 </button>
               )

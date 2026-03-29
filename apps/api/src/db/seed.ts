@@ -188,8 +188,8 @@ async function seedDatasources() {
     for (const ds of dsList) {
       await db
         .insert(datasources)
-        .values({ id: BigInt(ds.id), uuid: randomUUID(), spaceId, name: ds.name, slug: ds.slug })
-        .onConflictDoUpdate({ target: datasources.id, set: { name: ds.name, slug: ds.slug } });
+        .values({ id: BigInt(ds.id), uuid: randomUUID(), spaceId, name: ds.name, slug: ds.slug, dimensions: ds.dimensions ?? [] })
+        .onConflictDoUpdate({ target: datasources.id, set: { name: ds.name, slug: ds.slug, dimensions: ds.dimensions ?? [] } });
     }
     console.log(`  ✓ Space ${spaceId}: ${dsList.length} datasources`);
   }
@@ -484,6 +484,8 @@ async function seedStories() {
         position: s.position ?? 0,
         tagList: s.tag_list ?? [],
         content: s.content ?? {},
+        defaultFullSlug: s.default_full_slug ?? null,
+        translatedSlugs: s.translated_slugs ?? null,
         sortByDate: s.sort_by_date ? new Date(s.sort_by_date) : null,
         publishAt: s.publish_at ? new Date(s.publish_at) : null,
         expireAt: s.expire_at ? new Date(s.expire_at) : null,
@@ -507,6 +509,8 @@ async function seedStories() {
           tagList: sql`excluded.tag_list`,
           content: sql`excluded.content`,
           position: sql`excluded.position`,
+          defaultFullSlug: sql`excluded.default_full_slug`,
+          translatedSlugs: sql`excluded.translated_slugs`,
         },
       });
       process.stdout.write(`\r  Space ${spaceId}: ${Math.min(i + BATCH, items.length)}/${items.length} stories...`);

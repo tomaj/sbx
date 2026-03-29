@@ -16,7 +16,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ spa
   const { spaceId, taskId } = await params
   const token = await getSessionToken()
   const body = await req.json().catch(() => ({}))
-  const res = await fetch(`${API_URL}/v1/admin/spaces/${spaceId}/tasks/${taskId}/execute`, {
+  const res = await fetch(`${API_URL}/v1/spaces/${spaceId}/tasks/${taskId}/execute`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(body),

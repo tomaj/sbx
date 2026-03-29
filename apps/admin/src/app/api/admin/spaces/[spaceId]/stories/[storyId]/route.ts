@@ -13,12 +13,16 @@ async function getSessionToken() {
 }
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ spaceId: string; storyId: string }> },
 ) {
   const { spaceId, storyId } = await params
   const token = await getSessionToken()
-  const res = await fetch(`${API_URL}/v1/admin/spaces/${spaceId}/stories/${storyId}`, {
+  const releaseId = req.nextUrl.searchParams.get('release_id')
+  const url = releaseId
+    ? `${API_URL}/v1/spaces/${spaceId}/stories/${storyId}?release_id=${releaseId}`
+    : `${API_URL}/v1/spaces/${spaceId}/stories/${storyId}`
+  const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
   })
   const data = await res.json()
@@ -32,10 +36,10 @@ export async function PATCH(
   const { spaceId, storyId } = await params
   const token = await getSessionToken()
   const body = await req.json()
-  const res = await fetch(`${API_URL}/v1/admin/spaces/${spaceId}/stories/${storyId}`, {
-    method: 'PATCH',
+  const res = await fetch(`${API_URL}/v1/spaces/${spaceId}/stories/${storyId}`, {
+    method: 'PUT',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ story: body }),
   })
   const data = await res.json()
   return NextResponse.json(data, { status: res.status })

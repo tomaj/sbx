@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { eq, max } from 'drizzle-orm';
+import { randomUUID } from 'crypto';
 import { DB } from '../db/db.module';
 import type { DbType } from '../db/db.module';
 import { spaces, spaceMembers, users, stories } from '../db/schema';
@@ -125,6 +126,32 @@ export class SpacesService {
         assetLibrarySettings: (updated.assetLibrarySettings as Record<string, unknown>) ?? {},
         createdAt: updated.createdAt,
         updatedAt: updated.updatedAt,
+      },
+    };
+  }
+
+  async createSpace(data: { name: string; domain?: string | null }) {
+    const [maxRow] = await this.db.select({ maxId: max(spaces.id) }).from(spaces);
+    const nextId = (maxRow?.maxId ?? 0) + 1;
+
+    const [created] = await this.db
+      .insert(spaces)
+      .values({
+        id: nextId,
+        uuid: randomUUID(),
+        name: data.name,
+        domain: data.domain ?? null,
+      })
+      .returning();
+
+    return {
+      space: {
+        id: created.id,
+        uuid: created.uuid,
+        name: created.name,
+        domain: created.domain ?? '',
+        createdAt: created.createdAt,
+        updatedAt: created.updatedAt,
       },
     };
   }

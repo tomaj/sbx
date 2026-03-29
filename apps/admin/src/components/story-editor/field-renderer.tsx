@@ -1,5 +1,6 @@
 'use client'
 
+import { MessageSquare } from 'lucide-react'
 import type { AnyFieldDef } from '@/components/block-library/edit-block-modal/types'
 import type { ComponentMeta, ComponentGroup } from './types'
 import { TextField } from './fields/text-field'
@@ -27,10 +28,16 @@ interface Props {
   allComponents: ComponentMeta[]
   allGroups: ComponentGroup[]
   spaceId: string
+  onOpenDiscussion?: (fieldKey: string, rect: DOMRect) => void
+  discussionCount?: number
+  isActiveDiscussion?: boolean
 }
 
-export function FieldRenderer({ fieldKey, def, value, onChange, allComponents, allGroups, spaceId }: Props) {
-  switch (def.type) {
+export function FieldRenderer({ fieldKey, def, value, onChange, allComponents, allGroups, spaceId, onOpenDiscussion, discussionCount, isActiveDiscussion }: Props) {
+  const isStructural = def.type === 'section' || def.type === 'tab'
+
+  function renderField() {
+    switch (def.type) {
     case 'text':
       return <TextField fieldKey={fieldKey} def={def} value={value} onChange={onChange} />
 
@@ -107,5 +114,33 @@ export function FieldRenderer({ fieldKey, def, value, onChange, allComponents, a
           Unknown field type: {(def as any).type} ({fieldKey})
         </div>
       )
+    }
   }
+
+  if (isStructural) return renderField()
+
+  return (
+    <div className={`group relative rounded-lg transition-colors ${isActiveDiscussion ? 'bg-gray-100 dark:bg-gray-800/80' : ''}`}>
+      {onOpenDiscussion && (
+        <button
+          type="button"
+          onClick={(e) => onOpenDiscussion(fieldKey, (e.currentTarget as HTMLElement).getBoundingClientRect())}
+          title="Start a discussion"
+          className={`absolute top-0 right-0 z-10 flex items-center gap-1 p-0.5 rounded transition-all ${
+            isActiveDiscussion
+              ? 'opacity-100 text-teal-600 dark:text-teal-400'
+              : 'text-gray-400 opacity-0 group-hover:opacity-100 hover:text-teal-600 dark:hover:text-teal-400'
+          }`}
+        >
+          {discussionCount != null && discussionCount > 0 && (
+            <span className="text-[10px] font-bold text-red-500">
+              {discussionCount}
+            </span>
+          )}
+          <MessageSquare className="w-3.5 h-3.5" />
+        </button>
+      )}
+      {renderField()}
+    </div>
+  )
 }

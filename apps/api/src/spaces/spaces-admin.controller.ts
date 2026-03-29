@@ -18,54 +18,9 @@ export class SpacesAdminController {
     return this.spacesService.getAllSpaces();
   }
 
-  @Get('spaces/:id')
-  getSpace(@Param('id') id: string) {
-    return this.spacesService.getSpaceById(parseInt(id));
-  }
-
-  @Patch('spaces/:id')
-  updateSpace(
-    @Param('id') id: string,
-    @Body() body: {
-      name?: string;
-      defaultRoot?: string | null;
-      domain?: string | null;
-      previewUrls?: { name: string; location: string }[];
-      encodeUrl?: boolean;
-      mobileWidth?: number;
-      visualEditorDisabled?: boolean;
-      assetLibrarySettings?: Record<string, unknown>;
-    },
-  ) {
-    return this.spacesService.updateSpace(parseInt(id), body);
-  }
-
-  // Space collaborators (members)
-  @Get('spaces/:id/collaborators')
-  getSpaceMembers(@Param('id') id: string) {
-    return this.usersService.getSpaceMembers(parseInt(id));
-  }
-
-  @Post('spaces/:id/collaborators')
-  addSpaceMember(
-    @Param('id') id: string,
-    @Body() body: { userId: number; role: string; spaceRoleId?: number | null; spaceRoleIds?: number[] },
-  ) {
-    return this.usersService.addSpaceMember(parseInt(id), body.userId, body.role, body.spaceRoleId, body.spaceRoleIds);
-  }
-
-  @Patch('spaces/:id/collaborators/:memberId')
-  updateSpaceMember(
-    @Param('id') id: string,
-    @Param('memberId') memberId: string,
-    @Body() body: { role?: string; spaceRoleId?: number | null; spaceRoleIds?: number[] },
-  ) {
-    return this.usersService.updateSpaceMember(parseInt(id), parseInt(memberId), body);
-  }
-
-  @Delete('spaces/:id/collaborators/:memberId')
-  removeSpaceMember(@Param('id') id: string, @Param('memberId') memberId: string) {
-    return this.usersService.removeSpaceMember(parseInt(id), parseInt(memberId));
+  @Post('spaces')
+  createSpace(@Body() body: { name: string; domain?: string | null }) {
+    return this.spacesService.createSpace({ name: body.name, domain: body.domain });
   }
 
   @Get('spaces/:id/roles')

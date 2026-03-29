@@ -13,9 +13,12 @@ interface Props {
   allGroups: ComponentGroup[]
   onChange: (key: string, value: any) => void
   loading?: boolean
+  onOpenDiscussion?: (fieldKey: string, rect: DOMRect) => void
+  discussionCounts?: Record<string, number>
+  activeDiscussionField?: string | null
 }
 
-export function EditTab({ spaceId, schema, content, allComponents, allGroups, onChange, loading }: Props) {
+export function EditTab({ spaceId, schema, content, allComponents, allGroups, onChange, loading, onOpenDiscussion, discussionCounts, activeDiscussionField }: Props) {
   const [activeTab, setActiveTab] = useState(0)
 
   const componentName = content?.component as string | undefined
@@ -106,6 +109,9 @@ export function EditTab({ spaceId, schema, content, allComponents, allGroups, on
             allComponents={allComponents}
             allGroups={allGroups}
             spaceId={spaceId}
+            onOpenDiscussion={onOpenDiscussion}
+            discussionCount={discussionCounts?.[field.key]}
+            isActiveDiscussion={activeDiscussionField === field.key}
           />
         ))}
       </div>

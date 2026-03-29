@@ -1,9 +1,21 @@
-import { Controller, Get, NotFoundException, Param, Req, UseGuards } from '@nestjs/common';
-import { TokenGuard } from '../auth/token.guard';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  NotFoundException,
+  Param,
+  Post,
+  Put,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
+import { SessionOrTokenGuard } from '../auth/session-or-token.guard';
 import { ReleasesService } from './releases.service';
 
 @Controller('v1/spaces/:spaceId/releases')
-@UseGuards(TokenGuard)
+@UseGuards(SessionOrTokenGuard)
 export class ReleasesController {
   constructor(private readonly releasesService: ReleasesService) {}
 
@@ -17,5 +29,41 @@ export class ReleasesController {
     const result = await this.releasesService.findOne(req.space.id, parseInt(id));
     if (!result) throw new NotFoundException();
     return result;
+  }
+
+  @Post()
+  @HttpCode(201)
+  async createRelease(
+    @Req() req: any,
+    @Body() body: { release: { name: string; release_at?: string | null; timezone?: string } },
+  ) {
+    return this.releasesService.create(req.space.id, body.release);
+  }
+
+  @Get(':id/conflict_check')
+  async conflictCheck(@Req() req: any, @Param('id') id: string) {
+    const release = await this.releasesService.findOne(req.space.id, parseInt(id));
+    if (!release) throw new NotFoundException();
+    return this.releasesService.conflictCheck(req.space.id, parseInt(id));
+  }
+
+  @Put(':id')
+  async updateRelease(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body() body: { release: { name?: string; release_at?: string | null; timezone?: string }; do_release?: boolean },
+  ) {
+    const result = await this.releasesService.update(req.space.id, parseInt(id), {
+      ...body.release,
+      do_release: body.do_release,
+    });
+    if (!result) throw new NotFoundException();
+    return result;
+  }
+
+  @Delete(':id')
+  @HttpCode(200)
+  async deleteRelease(@Req() req: any, @Param('id') id: string) {
+    return this.releasesService.remove(req.space.id, parseInt(id));
   }
 }

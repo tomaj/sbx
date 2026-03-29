@@ -174,6 +174,68 @@ export class WorkflowsService {
     return { deleted: true };
   }
 
+  async listStages(spaceId: number) {
+    const stages = await this.db
+      .select()
+      .from(workflowStages)
+      .where(eq(workflowStages.spaceId, spaceId))
+      .orderBy(asc(workflowStages.position));
+    return { workflow_stages: stages.map(this.formatStage) };
+  }
+
+  async getStage(spaceId: number, id: number) {
+    const [stage] = await this.db
+      .select()
+      .from(workflowStages)
+      .where(and(eq(workflowStages.id, id), eq(workflowStages.spaceId, spaceId)))
+      .limit(1);
+    if (!stage) return null;
+    return { workflow_stage: this.formatStage(stage) };
+  }
+
+  async createStage(
+    spaceId: number,
+    data: {
+      name: string;
+      workflow_id: number;
+      color?: string;
+      position?: number;
+      allow_publish?: boolean;
+      allow_all_users?: boolean;
+    },
+  ) {
+    return this.adminCreateStage(spaceId, data.workflow_id, {
+      name: data.name,
+      color: data.color,
+      allowPublish: data.allow_publish,
+      allowAllUsers: data.allow_all_users,
+    });
+  }
+
+  async updateStage(
+    spaceId: number,
+    id: number,
+    data: {
+      name?: string;
+      color?: string;
+      position?: number;
+      allow_publish?: boolean;
+      allow_all_users?: boolean;
+    },
+  ) {
+    return this.adminUpdateStage(spaceId, id, {
+      name: data.name,
+      color: data.color,
+      position: data.position,
+      allowPublish: data.allow_publish,
+      allowAllUsers: data.allow_all_users,
+    });
+  }
+
+  async deleteStage(spaceId: number, id: number) {
+    return this.adminDeleteStage(spaceId, id);
+  }
+
   // ─── Format ────────────────────────────────────────────────────────────────
 
   private formatWorkflow(w: typeof workflows.$inferSelect) {

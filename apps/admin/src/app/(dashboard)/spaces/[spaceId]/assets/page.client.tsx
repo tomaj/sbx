@@ -9,6 +9,7 @@ import {
   Search,
   LayoutGrid,
   List,
+  Tag,
 } from 'lucide-react'
 import { Pagination } from '@/components/ui/pagination'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
@@ -19,6 +20,7 @@ import { AssetGrid, type Asset } from '@/components/assets/asset-grid'
 import { AssetList } from '@/components/assets/asset-list'
 import { AssetDetailModal } from '@/components/assets/asset-detail-modal'
 import { UploadAssetsModal } from '@/components/assets/upload-assets-modal'
+import { TagsView, type ComponentInternalTag } from '@/components/block-library/tags-view'
 
 const SORT_OPTIONS: SortOption[] = [
   { value: 'created_at_desc', label: 'Default' },
@@ -81,6 +83,11 @@ export default function AssetsPage({ params }: { params: Promise<{ spaceId: stri
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(24)
 
+  // ─── Tags view ─────────────────────────────────────────────────────────────
+  const [isTagsView, setIsTagsView] = useState(false)
+  const [assetTags, setAssetTags] = useState<ComponentInternalTag[]>([])
+  const [tagsLoading, setTagsLoading] = useState(false)
+
   // ─── Folder sidebar search ─────────────────────────────────────────────────
   const [folderSearch, setFolderSearch] = useState('')
 
@@ -92,6 +99,20 @@ export default function AssetsPage({ params }: { params: Promise<{ spaceId: stri
   const [deleteFolderTarget, setDeleteFolderTarget] = useState<AssetFolder | null>(null)
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null)
   const [uploadOpen, setUploadOpen] = useState(false)
+
+  // ─── Load asset tags ──────────────────────────────────────────────────────
+  const loadAssetTags = useCallback(async () => {
+    setTagsLoading(true)
+    try {
+      const res = await fetch(`/api/admin/spaces/${spaceId}/internal_tags?by_object_type=asset`)
+      if (res.ok) {
+        const data = await res.json()
+        setAssetTags(data.internal_tags ?? [])
+      }
+    } finally {
+      setTagsLoading(false)
+    }
+  }, [spaceId])
 
   // ─── Load folders ──────────────────────────────────────────────────────────
   const loadFolders = useCallback(async () => {
@@ -150,11 +171,14 @@ export default function AssetsPage({ params }: { params: Promise<{ spaceId: stri
   useEffect(() => {
     loadFolders()
     loadCounts()
-  }, [loadFolders, loadCounts])
+    loadAssetTags()
+  }, [loadFolders, loadCounts, loadAssetTags])
 
   useEffect(() => {
     loadAssets()
   }, [loadAssets])
+
+  useEffect(() => { if (isTagsView) loadAssetTags() }, [isTagsView, loadAssetTags])
 
   // Reset page when filters change
   useEffect(() => {
@@ -216,27 +240,59 @@ export default function AssetsPage({ params }: { params: Promise<{ spaceId: stri
     await loadCounts()
   }
 
+  // ─── Asset tag CRUD ──────────────────────────────────────────────────────
+
+  async function handleCreateAssetTag(name: string) {
+    const res = await fetch(`/api/admin/spaces/${spaceId}/internal_tags`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, object_type: 'asset' }),
+    })
+    if (!res.ok) throw new Error('Failed to create tag')
+    await loadAssetTags()
+  }
+
+  async function handleRenameAssetTag(tag: ComponentInternalTag, newName: string) {
+    const res = await fetch(`/api/admin/spaces/${spaceId}/internal_tags/${tag.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newName }),
+    })
+    if (!res.ok) throw new Error('Failed to rename tag')
+    await loadAssetTags()
+  }
+
+  async function handleDeleteAssetTag(tag: ComponentInternalTag) {
+    const res = await fetch(`/api/admin/spaces/${spaceId}/internal_tags/${tag.id}`, {
+      method: 'DELETE',
+    })
+    if (!res.ok) throw new Error('Failed to delete tag')
+    await loadAssetTags()
+  }
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="flex items-center justify-between px-8 pt-6 pb-4 border-b border-gray-200 dark:border-gray-700">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Assets</h1>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => { setCreateFolderParentId(null); setCreateFolderOpen(true) }}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-          >
-            <FolderPlus className="w-4 h-4" />
-            Create Folder
-          </button>
-          <button
-            onClick={() => setUploadOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
-          >
-            <Upload className="w-4 h-4" />
-            Upload files
-          </button>
-        </div>
+        {!isTagsView && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => { setCreateFolderParentId(null); setCreateFolderOpen(true) }}
+              className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+            >
+              <FolderPlus className="w-4 h-4" />
+              Create Folder
+            </button>
+            <button
+              onClick={() => setUploadOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-2 text-sm bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
+            >
+              <Upload className="w-4 h-4" />
+              Upload files
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Body: sidebar + content */}
@@ -245,9 +301,9 @@ export default function AssetsPage({ params }: { params: Promise<{ spaceId: stri
         <div className="w-60 shrink-0 border-r border-gray-200 dark:border-gray-700 flex flex-col overflow-y-auto py-4 px-3 gap-1">
           {/* All Assets */}
           <button
-            onClick={() => { setShowDeleted(false); setSelectedFolder(undefined) }}
+            onClick={() => { setIsTagsView(false); setShowDeleted(false); setSelectedFolder(undefined) }}
             className={`flex items-center justify-between px-2 py-1.5 rounded-md text-sm transition-colors ${
-              !showDeleted && selectedFolder === undefined
+              !isTagsView && !showDeleted && selectedFolder === undefined
                 ? 'text-teal-700 dark:text-teal-300 font-medium'
                 : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
             }`}
@@ -259,11 +315,29 @@ export default function AssetsPage({ params }: { params: Promise<{ spaceId: stri
             <span className="text-xs text-gray-400">{totalCount}</span>
           </button>
 
+          {/* Tags */}
+          <button
+            onClick={() => setIsTagsView(true)}
+            className={`flex items-center justify-between px-2 py-1.5 rounded-md text-sm transition-colors ${
+              isTagsView
+                ? 'text-teal-700 dark:text-teal-300 font-medium'
+                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+            }`}
+          >
+            <span className="flex items-center gap-2">
+              <Tag className="w-4 h-4 text-gray-400" />
+              Tags
+            </span>
+            {assetTags.length > 0 && (
+              <span className="text-xs text-gray-400">{assetTags.length}</span>
+            )}
+          </button>
+
           {/* Deleted assets */}
           <button
-            onClick={() => { setShowDeleted(true); setSelectedFolder(undefined) }}
+            onClick={() => { setIsTagsView(false); setShowDeleted(true); setSelectedFolder(undefined) }}
             className={`flex items-center justify-between px-2 py-1.5 rounded-md text-sm transition-colors ${
-              showDeleted
+              !isTagsView && showDeleted
                 ? 'text-teal-700 dark:text-teal-300 font-medium'
                 : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
             }`}
@@ -310,78 +384,90 @@ export default function AssetsPage({ params }: { params: Promise<{ spaceId: stri
 
         {/* Content area */}
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-          {/* Toolbar */}
-          <div className="px-6 pt-4 pb-3 flex flex-col gap-3">
-            <div className="flex items-start gap-3">
-              <div className="flex-1">
-                <SearchFilterBar
-                  searchPlaceholder="Search assets..."
-                  search={search}
-                  onSearchChange={setSearch}
-                  sortOptions={SORT_OPTIONS}
-                  sort={sort}
-                  onSortChange={setSort}
-                  filterFields={FILTER_FIELDS}
-                  activeFilters={activeFilters}
-                  onFiltersChange={setActiveFilters}
-                />
+          {isTagsView ? (
+            <TagsView
+              tags={assetTags}
+              isLoading={tagsLoading}
+              onCreateTag={handleCreateAssetTag}
+              onRenameTag={handleRenameAssetTag}
+              onDeleteTag={handleDeleteAssetTag}
+            />
+          ) : (
+            <>
+              {/* Toolbar */}
+              <div className="px-6 pt-4 pb-3 flex flex-col gap-3">
+                <div className="flex items-start gap-3">
+                  <div className="flex-1">
+                    <SearchFilterBar
+                      searchPlaceholder="Search assets..."
+                      search={search}
+                      onSearchChange={setSearch}
+                      sortOptions={SORT_OPTIONS}
+                      sort={sort}
+                      onSortChange={setSort}
+                      filterFields={FILTER_FIELDS}
+                      activeFilters={activeFilters}
+                      onFiltersChange={setActiveFilters}
+                    />
+                  </div>
+
+                  {/* View toggle */}
+                  <div className="flex items-center border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden shrink-0">
+                    <button
+                      onClick={() => setViewMode('grid')}
+                      className={`p-2 transition-colors ${
+                        viewMode === 'grid'
+                          ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
+                          : 'text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+                      }`}
+                    >
+                      <LayoutGrid className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => setViewMode('list')}
+                      className={`p-2 transition-colors ${
+                        viewMode === 'list'
+                          ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
+                          : 'text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+                      }`}
+                    >
+                      <List className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
               </div>
 
-              {/* View toggle */}
-              <div className="flex items-center border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden shrink-0">
-                <button
-                  onClick={() => setViewMode('grid')}
-                  className={`p-2 transition-colors ${
-                    viewMode === 'grid'
-                      ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
-                      : 'text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
-                  }`}
-                >
-                  <LayoutGrid className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => setViewMode('list')}
-                  className={`p-2 transition-colors ${
-                    viewMode === 'list'
-                      ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
-                      : 'text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
-                  }`}
-                >
-                  <List className="w-4 h-4" />
-                </button>
+              {/* Asset listing */}
+              <div className="flex-1 overflow-y-auto px-6 pb-4">
+                {viewMode === 'grid' ? (
+                  <AssetGrid
+                    assets={assets}
+                    spaceId={spaceId}
+                    isLoading={isLoading}
+                    onAssetClick={setSelectedAsset}
+                  />
+                ) : (
+                  <AssetList
+                    assets={assets}
+                    spaceId={spaceId}
+                    isLoading={isLoading}
+                    showRestore={showDeleted}
+                    onRestore={handleRestoreAsset}
+                    onAssetClick={setSelectedAsset}
+                  />
+                )}
               </div>
-            </div>
-          </div>
 
-          {/* Asset listing */}
-          <div className="flex-1 overflow-y-auto px-6 pb-4">
-            {viewMode === 'grid' ? (
-              <AssetGrid
-                assets={assets}
-                spaceId={spaceId}
-                isLoading={isLoading}
-                onAssetClick={setSelectedAsset}
+              {/* Pagination */}
+              <Pagination
+                total={total}
+                page={page}
+                perPage={perPage}
+                onPageChange={setPage}
+                onPerPageChange={n => { setPerPage(n); setPage(1) }}
               />
-            ) : (
-              <AssetList
-                assets={assets}
-                spaceId={spaceId}
-                isLoading={isLoading}
-                showRestore={showDeleted}
-                onRestore={handleRestoreAsset}
-                onAssetClick={setSelectedAsset}
-              />
-            )}
-          </div>
-
-          {/* Pagination */}
-          <Pagination
-            total={total}
-            page={page}
-            perPage={perPage}
-            onPageChange={setPage}
-            onPerPageChange={n => { setPerPage(n); setPage(1) }}
-          />
+            </>
+          )}
         </div>
       </div>
 

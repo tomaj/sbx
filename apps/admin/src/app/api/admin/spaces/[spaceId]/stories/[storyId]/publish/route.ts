@@ -18,7 +18,7 @@ export async function POST(
 ) {
   const { spaceId, storyId } = await params
   const token = await getSessionToken()
-  const res = await fetch(`${API_URL}/v1/admin/spaces/${spaceId}/stories/${storyId}/publish`, {
+  const res = await fetch(`${API_URL}/v1/spaces/${spaceId}/stories/${storyId}/publish`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
   })

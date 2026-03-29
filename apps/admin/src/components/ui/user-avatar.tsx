@@ -1,7 +1,8 @@
 'use client'
 
+import type React from 'react'
 import { useState } from 'react'
-import { cn } from '@/lib/utils'
+import { cn, avatarUrl } from '@/lib/utils'
 
 const COLORS = [
   'bg-green-400 text-white',
@@ -39,6 +40,7 @@ const sizes = {
   sm: 'size-7 text-xs',
   md: 'size-9 text-sm',
   lg: 'size-12 text-base',
+  xl: 'size-16 text-xl',
 }
 
 interface UserAvatarProps {
@@ -46,18 +48,21 @@ interface UserAvatarProps {
   src?: string | null
   size?: keyof typeof sizes
   className?: string
+  style?: React.CSSProperties
 }
 
-export function UserAvatar({ name: nameProp, src, size = 'md', className }: UserAvatarProps) {
+export function UserAvatar({ name: nameProp, src, size = 'md', className, style }: UserAvatarProps) {
   const name = nameProp || '?'
   const [imgError, setImgError] = useState(false)
+  const resolvedSrc = avatarUrl(src)
 
-  if (src && !imgError) {
+  if (resolvedSrc && !imgError) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
-        src={src}
+        src={resolvedSrc}
         alt={name}
+        style={style}
         className={cn(sizes[size], 'rounded-full object-cover shrink-0', className)}
         onError={() => setImgError(true)}
       />
@@ -66,6 +71,7 @@ export function UserAvatar({ name: nameProp, src, size = 'md', className }: User
 
   return (
     <div
+      style={style}
       className={cn(
         sizes[size],
         getColor(name),

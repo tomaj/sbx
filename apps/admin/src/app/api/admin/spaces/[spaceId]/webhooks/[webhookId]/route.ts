@@ -12,6 +12,19 @@ async function getSessionToken() {
   )
 }
 
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ spaceId: string; webhookId: string }> },
+) {
+  const { spaceId, webhookId } = await params
+  const token = await getSessionToken()
+  const res = await fetch(`${API_URL}/v1/spaces/${spaceId}/webhook_endpoints/${webhookId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  const data = await res.json()
+  return NextResponse.json({ webhook: data.webhook_endpoint }, { status: res.status })
+}
+
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ spaceId: string; webhookId: string }> },
@@ -19,16 +32,16 @@ export async function PATCH(
   const { spaceId, webhookId } = await params
   const token = await getSessionToken()
   const body = await req.json()
-  const res = await fetch(`${API_URL}/v1/admin/spaces/${spaceId}/webhooks/${webhookId}`, {
-    method: 'PATCH',
+  const res = await fetch(`${API_URL}/v1/spaces/${spaceId}/webhook_endpoints/${webhookId}`, {
+    method: 'PUT',
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ webhook_endpoint: body }),
   })
   const data = await res.json()
-  return NextResponse.json(data, { status: res.status })
+  return NextResponse.json({ webhook: data.webhook_endpoint }, { status: res.status })
 }
 
 export async function DELETE(
@@ -37,7 +50,7 @@ export async function DELETE(
 ) {
   const { spaceId, webhookId } = await params
   const token = await getSessionToken()
-  const res = await fetch(`${API_URL}/v1/admin/spaces/${spaceId}/webhooks/${webhookId}`, {
+  const res = await fetch(`${API_URL}/v1/spaces/${spaceId}/webhook_endpoints/${webhookId}`, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${token}` },
   })

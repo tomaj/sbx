@@ -47,6 +47,14 @@ export class PersonalTokensService {
     };
   }
 
+  async updateToken(userId: string, id: number, name: string) {
+    await this.db
+      .update(personalAccessTokens)
+      .set({ name })
+      .where(and(eq(personalAccessTokens.id, id), eq(personalAccessTokens.userId, userId)));
+    return { success: true };
+  }
+
   async deleteToken(userId: string, id: number) {
     await this.db
       .delete(personalAccessTokens)

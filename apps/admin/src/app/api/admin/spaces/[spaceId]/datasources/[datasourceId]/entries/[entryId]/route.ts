@@ -15,15 +15,15 @@ async function getSessionToken() {
 type Params = { params: Promise<{ spaceId: string; datasourceId: string; entryId: string }> }
 
 export async function PATCH(req: NextRequest, { params }: Params) {
-  const { spaceId, datasourceId, entryId } = await params
+  const { spaceId, entryId } = await params
   const token = await getSessionToken()
   const body = await req.json()
   const res = await fetch(
-    `${API_URL}/v1/admin/spaces/${spaceId}/datasources/${datasourceId}/entries/${entryId}`,
+    `${API_URL}/v1/spaces/${spaceId}/datasource_entries/${entryId}`,
     {
-      method: 'PATCH',
+      method: 'PUT',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      body: JSON.stringify({ datasource_entry: body }),
     },
   )
   const data = await res.json()
@@ -31,10 +31,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 }
 
 export async function DELETE(_req: NextRequest, { params }: Params) {
-  const { spaceId, datasourceId, entryId } = await params
+  const { spaceId, entryId } = await params
   const token = await getSessionToken()
   const res = await fetch(
-    `${API_URL}/v1/admin/spaces/${spaceId}/datasources/${datasourceId}/entries/${entryId}`,
+    `${API_URL}/v1/spaces/${spaceId}/datasource_entries/${entryId}`,
     { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } },
   )
   const data = await res.json()

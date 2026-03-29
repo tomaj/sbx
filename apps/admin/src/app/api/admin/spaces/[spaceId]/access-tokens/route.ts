@@ -18,11 +18,10 @@ export async function GET(
 ) {
   const { spaceId } = await params
   const token = await getSessionToken()
-  const res = await fetch(`${API_URL}/v1/admin/spaces/${spaceId}/access-tokens`, {
+  const res = await fetch(`${API_URL}/v1/spaces/${spaceId}/api_keys`, {
     headers: { Authorization: `Bearer ${token}` },
   })
-  const data = await res.json()
-  return NextResponse.json(data, { status: res.status })
+  return NextResponse.json(await res.json(), { status: res.status })
 }
 
 export async function POST(
@@ -32,11 +31,17 @@ export async function POST(
   const { spaceId } = await params
   const token = await getSessionToken()
   const body = await req.json()
-  const res = await fetch(`${API_URL}/v1/admin/spaces/${spaceId}/access-tokens`, {
+  const res = await fetch(`${API_URL}/v1/spaces/${spaceId}/api_keys`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify({
+      api_key: {
+        name: body.name,
+        token_type: body.access,
+        branch_id: body.branchId,
+        min_cache: body.minCache,
+      },
+    }),
   })
-  const data = await res.json()
-  return NextResponse.json(data, { status: res.status })
+  return NextResponse.json(await res.json(), { status: res.status })
 }

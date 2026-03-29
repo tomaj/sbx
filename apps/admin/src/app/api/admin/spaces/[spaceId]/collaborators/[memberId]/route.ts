@@ -19,10 +19,16 @@ export async function PATCH(
   const { spaceId, memberId } = await params
   const token = await getSessionToken()
   const body = await req.json()
-  const res = await fetch(`${API_URL}/v1/admin/spaces/${spaceId}/collaborators/${memberId}`, {
-    method: 'PATCH',
+  const res = await fetch(`${API_URL}/v1/spaces/${spaceId}/collaborators/${memberId}`, {
+    method: 'PUT',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify({
+      collaborator: {
+        role: body.role,
+        space_role_id: body.spaceRoleId,
+        space_role_ids: body.spaceRoleIds,
+      },
+    }),
   })
   const data = await res.json()
   return NextResponse.json(data, { status: res.status })
@@ -34,7 +40,7 @@ export async function DELETE(
 ) {
   const { spaceId, memberId } = await params
   const token = await getSessionToken()
-  const res = await fetch(`${API_URL}/v1/admin/spaces/${spaceId}/collaborators/${memberId}`, {
+  const res = await fetch(`${API_URL}/v1/spaces/${spaceId}/collaborators/${memberId}`, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${token}` },
   })

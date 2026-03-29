@@ -18,7 +18,7 @@ export async function GET(
 ) {
   const { spaceId } = await params
   const token = await getSessionToken()
-  const res = await fetch(`${API_URL}/v1/admin/spaces/${spaceId}/component-groups`, {
+  const res = await fetch(`${API_URL}/v1/spaces/${spaceId}/component_groups`, {
     headers: { Authorization: `Bearer ${token}` },
   })
   const data = await res.json()
@@ -32,10 +32,10 @@ export async function POST(
   const { spaceId } = await params
   const token = await getSessionToken()
   const body = await req.json()
-  const res = await fetch(`${API_URL}/v1/admin/spaces/${spaceId}/component-groups`, {
+  const res = await fetch(`${API_URL}/v1/spaces/${spaceId}/component_groups`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ component_group: body }),
   })
   const data = await res.json()
   return NextResponse.json(data, { status: res.status })

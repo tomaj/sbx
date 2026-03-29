@@ -12,27 +12,27 @@ async function getSessionToken() {
   )
 }
 
-export async function POST(req: NextRequest, { params }: { params: Promise<{ spaceId: string }> }) {
-  const { spaceId } = await params
-  const token = await getSessionToken()
-  const body = await req.json()
-  const res = await fetch(`${API_URL}/v1/admin/spaces/${spaceId}/branches`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
-  const data = await res.json()
-  return NextResponse.json(data, { status: res.status })
-}
-
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ spaceId: string }> },
 ) {
   const { spaceId } = await params
   const token = await getSessionToken()
-  const res = await fetch(`${API_URL}/v1/admin/spaces/${spaceId}/branches`, {
+  const res = await fetch(`${API_URL}/v1/spaces/${spaceId}/branches`, {
     headers: { Authorization: `Bearer ${token}` },
+  })
+  const data = await res.json()
+  return NextResponse.json(data, { status: res.status })
+}
+
+export async function POST(req: NextRequest, { params }: { params: Promise<{ spaceId: string }> }) {
+  const { spaceId } = await params
+  const token = await getSessionToken()
+  const body = await req.json()
+  const res = await fetch(`${API_URL}/v1/spaces/${spaceId}/branches`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ branch: body }),
   })
   const data = await res.json()
   return NextResponse.json(data, { status: res.status })

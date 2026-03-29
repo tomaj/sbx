@@ -118,6 +118,7 @@ export class AssetsAdminController {
       locked?: boolean;
       folder_id?: number | null;
       meta_data?: Record<string, any>;
+      internal_tag_ids?: number[];
     },
   ) {
     return this.assetsService.updateAsset(parseInt(assetId), parseInt(spaceId), body);
@@ -148,4 +149,5 @@ export class AssetsAdminController {
   ) {
     return this.assetsService.restoreAsset(parseInt(assetId), parseInt(spaceId));
   }
+
 }

@@ -6,14 +6,18 @@ import {
 import { and, asc, desc, count, eq, ilike, isNull, isNotNull, or } from 'drizzle-orm';
 import { DB } from '../db/db.module';
 import type { DbType } from '../db/db.module';
-import { assets, assetFolders } from '../db/schema';
+import { assets, assetFolders, internalTags } from '../db/schema';
+import { inArray } from 'drizzle-orm';
 import { StorageService } from '../storage/storage.service';
+import { WebhooksService } from '../webhooks/webhooks.service';
+import { WEBHOOK_ACTIONS } from '../webhooks/webhook-actions';
 
 @Injectable()
 export class AssetsService {
   constructor(
     @Inject(DB) private db: DbType,
     private readonly storage: StorageService,
+    private readonly webhooks: WebhooksService,
   ) {}
 
   // ─── Folders ────────────────────────────────────────────────────────────────
@@ -25,39 +29,46 @@ export class AssetsService {
       .where(eq(assetFolders.spaceId, spaceId))
       .orderBy(asc(assetFolders.name));
 
+    const idToUuid = new Map(rows.map((f) => [f.id, f.uuid]));
+
     return {
-      asset_folders: rows.map((f) => ({
-        id: f.id,
-        name: f.name,
-        parent_id: f.parentId,
-        uuid: f.uuid,
-        created_at: f.createdAt,
-        updated_at: f.updatedAt,
-      })),
+      asset_folders: rows.map((f) => this.formatFolder(f, idToUuid)),
     };
+  }
+
+  async findFolder(id: number, spaceId: number) {
+    const [row] = await this.db
+      .select()
+      .from(assetFolders)
+      .where(and(eq(assetFolders.id, id), eq(assetFolders.spaceId, spaceId)));
+    if (!row) throw new NotFoundException('Folder not found');
+
+    let parentUuid: string | null = null;
+    if (row.parentId) {
+      const [parent] = await this.db.select({ uuid: assetFolders.uuid }).from(assetFolders).where(eq(assetFolders.id, row.parentId)).limit(1);
+      parentUuid = parent?.uuid ?? null;
+    }
+    return this.formatFolder(row, new Map([[row.id, row.uuid], ...(row.parentId ? [[row.parentId, parentUuid ?? '']] as [bigint, string][] : [])]));
   }
 
   async createFolder(spaceId: number, data: { name: string; parent_id?: number | null }) {
     const id = Date.now() * 1000 + Math.floor(Math.random() * 1000);
     const uuid = crypto.randomUUID();
+
+    let parentUuid: string | null = null;
+    if (data.parent_id) {
+      const [parent] = await this.db.select({ uuid: assetFolders.uuid }).from(assetFolders).where(eq(assetFolders.id, BigInt(data.parent_id))).limit(1);
+      parentUuid = parent?.uuid ?? null;
+    }
+
     const [row] = await this.db
       .insert(assetFolders)
-      .values({
-        id,
-        spaceId,
-        name: data.name,
-        parentId: data.parent_id ?? null,
-        uuid,
-      })
+      .values({ id, spaceId, name: data.name, parentId: data.parent_id ?? null, uuid })
       .returning();
-    return {
-      id: row.id,
-      name: row.name,
-      parent_id: row.parentId,
-      uuid: row.uuid,
-      created_at: row.createdAt,
-      updated_at: row.updatedAt,
-    };
+
+    const idToUuid = new Map<bigint, string>([[row.id, row.uuid]]);
+    if (row.parentId && parentUuid) idToUuid.set(row.parentId, parentUuid);
+    return this.formatFolder(row, idToUuid);
   }
 
   async updateFolder(id: number, spaceId: number, data: { name?: string; parent_id?: number | null }) {
@@ -71,14 +82,15 @@ export class AssetsService {
       .where(and(eq(assetFolders.id, id), eq(assetFolders.spaceId, spaceId)))
       .returning();
     if (!row) throw new NotFoundException('Folder not found');
-    return {
-      id: row.id,
-      name: row.name,
-      parent_id: row.parentId,
-      uuid: row.uuid,
-      created_at: row.createdAt,
-      updated_at: row.updatedAt,
-    };
+
+    let parentUuid: string | null = null;
+    if (row.parentId) {
+      const [parent] = await this.db.select({ uuid: assetFolders.uuid }).from(assetFolders).where(eq(assetFolders.id, row.parentId)).limit(1);
+      parentUuid = parent?.uuid ?? null;
+    }
+    const idToUuid = new Map<bigint, string>([[row.id, row.uuid]]);
+    if (row.parentId && parentUuid) idToUuid.set(row.parentId, parentUuid);
+    return this.formatFolder(row, idToUuid);
   }
 
   async deleteFolder(id: number, spaceId: number) {
@@ -160,7 +172,7 @@ export class AssetsService {
     ]);
 
     return {
-      assets: rows.map(this.formatAsset),
+      assets: rows.map((a) => this.formatAsset(a)),
       total: Number(totals[0]?.total ?? 0),
       page,
       per_page: perPage,
@@ -188,6 +200,7 @@ export class AssetsService {
       locked?: boolean;
       folder_id?: number | null;
       meta_data?: Record<string, any>;
+      internal_tag_ids?: number[];
     },
   ) {
     const updates: any = { updatedAt: new Date() };
@@ -201,6 +214,24 @@ export class AssetsService {
     if (data.locked !== undefined) updates.locked = data.locked;
     if (data.folder_id !== undefined) updates.folderId = data.folder_id;
     if (data.meta_data !== undefined) updates.metaData = data.meta_data;
+    if (data.internal_tag_ids !== undefined) {
+      const ids = data.internal_tag_ids;
+      if (ids.length === 0) {
+        updates.internalTagIds = [];
+        updates.internalTagsList = [];
+      } else {
+        const tagRows = await this.db
+          .select({ id: internalTags.id, name: internalTags.name })
+          .from(internalTags)
+          .where(inArray(internalTags.id, ids));
+        const tagMap = new Map(tagRows.map((t) => [t.id, t.name]));
+        const list = ids
+          .filter((id) => tagMap.has(id))
+          .map((id) => ({ id, name: tagMap.get(id)! }));
+        updates.internalTagIds = list.map((t) => String(t.id));
+        updates.internalTagsList = list;
+      }
+    }
 
     const [row] = await this.db
       .update(assets)
@@ -208,6 +239,15 @@ export class AssetsService {
       .where(and(eq(assets.id, id), eq(assets.spaceId, spaceId)))
       .returning();
     if (!row) throw new NotFoundException('Asset not found');
+
+    void this.webhooks.dispatch(spaceId, WEBHOOK_ACTIONS.ASSET_UPDATED, {
+      action: 'asset_updated',
+      space_id: spaceId,
+      asset_id: id,
+      filename: row.filename,
+      text: `Asset "${row.shortFilename}" was updated.`,
+    });
+
     return this.formatAsset(row);
   }
 
@@ -238,6 +278,14 @@ export class AssetsService {
             metaData: {},
           })
           .returning();
+
+        void this.webhooks.dispatch(spaceId, WEBHOOK_ACTIONS.ASSET_CREATED, {
+          action: 'asset_created',
+          space_id: spaceId,
+          asset_id: row.id,
+          filename: row.filename,
+          text: `Asset "${safeName}" was uploaded.`,
+        });
 
         return this.formatAsset(row);
       }),
@@ -278,6 +326,15 @@ export class AssetsService {
       .where(and(eq(assets.id, id), eq(assets.spaceId, spaceId), isNull(assets.deletedAt)))
       .returning();
     if (!row) throw new NotFoundException('Asset not found');
+
+    void this.webhooks.dispatch(spaceId, WEBHOOK_ACTIONS.ASSET_DELETED, {
+      action: 'asset_deleted',
+      space_id: spaceId,
+      asset_id: id,
+      filename: row.filename,
+      text: `Asset "${row.shortFilename}" was deleted.`,
+    });
+
     return { deleted: true };
   }
 
@@ -306,25 +363,62 @@ export class AssetsService {
     };
   }
 
+  private normalizeFilename(filename: string): string {
+    // Migrated assets may have S3/Storyblok URLs like:
+    //   https://s3.amazonaws.com/a.storyblok.com/f/285923/path/img.jpg
+    //   https://a.storyblok.com/f/285923/path/img.jpg
+    // Normalize them to our CDN path format: /f/{spaceId}/path/img.jpg
+    const match = filename.match(/\/f\/(\d+)\/(.+)$/);
+    if (!match) return filename;
+    return `/f/${match[1]}/${match[2]}`;
+  }
+
+  private formatFolder(f: typeof assetFolders.$inferSelect, idToUuid: Map<bigint, string>) {
+    return {
+      id: f.id,
+      name: f.name,
+      parent_id: f.parentId,
+      parent_uuid: f.parentId ? (idToUuid.get(f.parentId) ?? null) : null,
+      uuid: f.uuid,
+    };
+  }
+
   private formatAsset(a: typeof assets.$inferSelect) {
+    const filename = this.normalizeFilename(a.filename);
+    const metaData = a.metaData as Record<string, unknown> ?? {};
+    // Parse dimensions from filename if not stored in meta_data
+    // Storyblok encodes dimensions as /f/{spaceId}/{width}x{height}/{hash}/name
+    if (!metaData.width && !metaData.height) {
+      const dimMatch = filename.match(/\/f\/\d+\/(\d+)x(\d+)\//);
+      if (dimMatch) {
+        metaData.width = parseInt(dimMatch[1], 10);
+        metaData.height = parseInt(dimMatch[2], 10);
+      }
+    }
     return {
       id: a.id,
-      filename: a.filename,
+      space_id: a.spaceId,
+      filename,
       short_filename: a.shortFilename,
       content_type: a.contentType,
       content_length: a.contentLength,
       alt: a.alt,
       title: a.title,
       copyright: a.copyright,
+      source: null,
       focus: a.focus,
-      folder_id: a.folderId,
+      asset_folder_id: a.folderId,
       locked: a.locked,
       expire_at: a.expireAt,
-      is_external_url: a.isExternalUrl,
-      meta_data: a.metaData,
+      publish_at: null,
+      is_private: false,
+      ext_id: null,
+      meta_data: metaData,
       deleted_at: a.deletedAt,
       created_at: a.createdAt,
       updated_at: a.updatedAt,
+      internal_tags_list: a.internalTagsList,
+      internal_tag_ids: a.internalTagIds,
     };
   }
 }

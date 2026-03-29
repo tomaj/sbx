@@ -2,9 +2,11 @@
 
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
-import Image from 'next/image'
+import { useRouter } from 'next/navigation'
 import { Plus, Search, MoreHorizontal, ChevronDown, ChevronUp } from 'lucide-react'
 import { TimeAgo } from '@/components/ui/time-ago'
+import { UserAvatar } from '@/components/ui/user-avatar'
+import { CreateSpacePanel } from '@/components/spaces/create-space-panel'
 
 interface Member {
   firstname: string
@@ -18,26 +20,6 @@ interface Space {
   updatedAt: string
   lastActivityAt: string | null
   members: Member[]
-}
-
-function OwnerAvatar({ member }: { member: Member }) {
-  const initials = [member.firstname[0], member.lastname[0]]
-    .filter(Boolean)
-    .join('')
-    .toUpperCase() || '?'
-
-  if (member.avatar) {
-    return (
-      <div className="size-9 rounded-full overflow-hidden bg-gray-200 shrink-0">
-        <Image src={member.avatar} alt={initials} width={36} height={36} className="object-cover" unoptimized />
-      </div>
-    )
-  }
-  return (
-    <div className="size-9 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center shrink-0">
-      <span className="text-xs font-medium text-gray-600 dark:text-gray-300">{initials}</span>
-    </div>
-  )
 }
 
 function OrgSpaceCard({ space }: { space: Space }) {
@@ -64,7 +46,12 @@ function OrgSpaceCard({ space }: { space: Space }) {
       {/* Middle: avatar left, space ID right */}
       <div className="flex items-end justify-between">
         <div className="flex flex-col gap-1">
-          {owner && <OwnerAvatar member={owner} />}
+          {owner && (
+            <UserAvatar
+              name={`${owner.firstname} ${owner.lastname}`}
+              src={owner.avatar}
+            />
+          )}
           <span className="text-xs text-gray-400 mt-1">
             <TimeAgo date={space.lastActivityAt ?? space.updatedAt} />
           </span>
@@ -128,6 +115,8 @@ export function OrgSpacesClient({ spaces }: { spaces: Space[] }) {
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState('updated')
   const [sortOpen, setSortOpen] = useState(false)
+  const [createOpen, setCreateOpen] = useState(false)
+  const router = useRouter()
 
   const filtered = useMemo(() => {
     let list = spaces
@@ -153,9 +142,12 @@ export function OrgSpacesClient({ spaces }: { spaces: Space[] }) {
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Organization Spaces</h1>
-        <button className="flex items-center gap-2 bg-teal-700 hover:bg-teal-800 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+        <button
+          onClick={() => setCreateOpen(true)}
+          className="flex items-center gap-2 bg-teal-700 hover:bg-teal-800 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+        >
           <Plus className="size-4" />
-          Add new
+          Add space
         </button>
       </div>
 
@@ -210,6 +202,12 @@ export function OrgSpacesClient({ spaces }: { spaces: Space[] }) {
         count={0}
         spaces={[]}
         emptyText="No results found. There are no spaces in your organization yet."
+      />
+
+      <CreateSpacePanel
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onCreated={() => { setCreateOpen(false); router.refresh() }}
       />
     </div>
   )

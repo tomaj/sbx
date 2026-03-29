@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Folder, FolderOpen, ChevronRight, ChevronDown, LayoutTemplate, MoreHorizontal, Plus, Pencil, Trash2 } from 'lucide-react'
+import { Folder, FolderOpen, ChevronRight, ChevronDown, LayoutTemplate, MoreHorizontal, Plus, Pencil, Trash2, Tag, Search } from 'lucide-react'
 
 export interface ComponentGroup {
   id: number
@@ -147,8 +147,10 @@ interface GroupTreeProps {
   groups: ComponentGroup[]
   selectedUuid: string | null
   onSelect: (uuid: string | null) => void
-  search: string
   counts?: { total: number; by_group: Record<string, number> }
+  tagsCount?: number
+  isTagsView: boolean
+  onSelectTags: () => void
   onCreateGroup: (parentUuid?: string) => void
   onRenameGroup: (group: ComponentGroup) => void
   onDeleteGroup: (group: ComponentGroup) => void
@@ -158,12 +160,15 @@ export function GroupTree({
   groups,
   selectedUuid,
   onSelect,
-  search,
   counts,
+  tagsCount,
+  isTagsView,
+  onSelectTags,
   onCreateGroup,
   onRenameGroup,
   onDeleteGroup,
 }: GroupTreeProps) {
+  const [search, setSearch] = useState('')
   const filtered = search.trim()
     ? groups.filter((g) => g.name.toLowerCase().includes(search.toLowerCase()))
     : groups
@@ -175,7 +180,7 @@ export function GroupTree({
       {/* All blocks */}
       <div
         className={`flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer select-none ${
-          selectedUuid === null
+          !isTagsView && selectedUuid === null
             ? 'bg-teal-50 dark:bg-teal-950 text-teal-700 dark:text-teal-300'
             : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
         }`}
@@ -186,6 +191,37 @@ export function GroupTree({
         {counts && (
           <span className="text-xs text-gray-400">{counts.total}</span>
         )}
+      </div>
+
+      {/* Tags */}
+      <div
+        className={`flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer select-none ${
+          isTagsView
+            ? 'bg-teal-50 dark:bg-teal-950 text-teal-700 dark:text-teal-300'
+            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+        }`}
+        onClick={onSelectTags}
+      >
+        <Tag className="w-4 h-4 shrink-0 text-gray-400" />
+        <span className="text-sm font-medium flex-1">Tags</span>
+        {tagsCount !== undefined && (
+          <span className="text-xs text-gray-400">{tagsCount}</span>
+        )}
+      </div>
+
+      {/* Block folders section */}
+      <p className="px-2 pt-3 pb-1 text-xs font-semibold text-gray-400 uppercase tracking-wide">Block folders</p>
+
+      {/* Group search */}
+      <div className="relative mb-1">
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search folders..."
+          className="w-full pl-7 pr-3 py-1.5 text-xs border border-gray-200 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-teal-500"
+        />
       </div>
 
       {tree

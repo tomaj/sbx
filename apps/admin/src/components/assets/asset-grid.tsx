@@ -10,7 +10,7 @@ export interface Asset {
   content_length: number
   alt: string | null
   title: string | null
-  folder_id: number | null
+  asset_folder_id: number | null
   deleted_at: string | null
   created_at: string
   updated_at: string

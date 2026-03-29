@@ -17,7 +17,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ spac
   const token = await getSessionToken()
   const search = req.nextUrl.searchParams.toString()
   const res = await fetch(
-    `${API_URL}/v1/admin/spaces/${spaceId}/datasources${search ? `?${search}` : ''}`,
+    `${API_URL}/v1/spaces/${spaceId}/datasources${search ? `?${search}` : ''}`,
     { headers: { Authorization: `Bearer ${token}` } },
   )
   const data = await res.json()
@@ -28,10 +28,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ spa
   const { spaceId } = await params
   const token = await getSessionToken()
   const body = await req.json()
-  const res = await fetch(`${API_URL}/v1/admin/spaces/${spaceId}/datasources`, {
+  const res = await fetch(`${API_URL}/v1/spaces/${spaceId}/datasources`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ datasource: body }),
   })
   const data = await res.json()
   return NextResponse.json(data, { status: res.status })

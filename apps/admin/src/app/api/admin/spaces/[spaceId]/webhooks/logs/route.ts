@@ -19,7 +19,7 @@ export async function GET(
   const { spaceId } = await params
   const token = await getSessionToken()
   const search = req.nextUrl.searchParams.toString()
-  const url = `${API_URL}/v1/admin/spaces/${spaceId}/webhooks/logs${search ? `?${search}` : ''}`
+  const url = `${API_URL}/v1/spaces/${spaceId}/webhook_endpoints/logs${search ? `?${search}` : ''}`
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
   })
