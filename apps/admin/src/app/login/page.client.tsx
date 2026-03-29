@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { authClient } from '@/lib/auth-client'
-import Image from 'next/image'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -51,17 +50,6 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {/* Hero image pinned to bottom */}
-        <div className="px-6 pb-0 mt-auto">
-          <Image
-            src="/cms-hero.png"
-            alt="CMS content blocks illustration"
-            width={820}
-            height={560}
-            className="w-full object-contain object-bottom drop-shadow-2xl"
-            priority
-          />
-        </div>
       </div>
 
       {/* ── Right panel ── */}
