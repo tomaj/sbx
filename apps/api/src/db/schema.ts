@@ -606,6 +606,7 @@ export const componentVersions = pgTable(
     componentId: bigint('component_id', { mode: 'number' }).notNull().references(() => components.id, { onDelete: 'cascade' }),
     spaceId: integer('space_id').notNull().references(() => spaces.id, { onDelete: 'cascade' }),
     userId: bigint('user_id', { mode: 'number' }),
+    authorName: text('author_name'),
     event: text('event').notNull().default('update'),
     schema: json('schema').notNull().default({}),
     name: text('name').notNull(),

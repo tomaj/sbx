@@ -7,6 +7,7 @@ import {
   Pencil, Info, Diamond, MessageSquare, SlidersHorizontal,
   Monitor, FileText, Layers, LayoutList,
   Smartphone, Maximize2, Settings, ExternalLink, Calendar,
+  MoreHorizontal, Image, Database, Tag, AppWindow,
 } from 'lucide-react'
 import { EditTab } from './edit-tab'
 import { InfoTab } from './info-tab'
@@ -97,6 +98,8 @@ export function StoryEditor({
     () => (typeof window !== 'undefined' ? (localStorage.getItem(previewStorageKey) ?? 'domain') : 'domain')
   )
   const [showPreviewMenu, setShowPreviewMenu] = useState(false)
+  const [showMoreMenu, setShowMoreMenu] = useState(false)
+  const moreMenuRef = useRef<HTMLDivElement>(null)
   const [mobileViewWidth, setMobileViewWidth] = useState(mobileWidth)
   const [activeDiscussionField, setActiveDiscussionField] = useState<string | null>(null)
   const [activeDiscussionRect, setActiveDiscussionRect] = useState<DOMRect | null>(null)
@@ -139,6 +142,17 @@ export function StoryEditor({
       return () => { document.title = prev }
     }
   }, [story?.name])
+
+  useEffect(() => {
+    if (!showMoreMenu) return
+    function handler(e: MouseEvent) {
+      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
+        setShowMoreMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [showMoreMenu])
 
   // Load discussion counts per field for badges
   const refreshDiscussionCounts = useCallback(() => {
@@ -601,6 +615,45 @@ export function StoryEditor({
             <LayoutList className="w-4 h-4" />
             <span className="text-[10px] font-medium">Content</span>
           </button>
+
+          {/* More menu */}
+          <div ref={moreMenuRef} className="relative">
+            <button
+              type="button"
+              onClick={() => setShowMoreMenu(p => !p)}
+              title="More"
+              className={`flex flex-col items-center gap-0.5 w-full py-2 px-1 rounded-lg transition-colors ${
+                showMoreMenu
+                  ? 'bg-gray-100 dark:bg-gray-800 text-teal-600 dark:text-teal-400'
+                  : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800/50'
+              }`}
+            >
+              <MoreHorizontal className="w-4 h-4" />
+              <span className="text-[10px] font-medium">More</span>
+            </button>
+
+            {showMoreMenu && (
+              <div className="absolute left-full top-0 ml-2 w-52 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl overflow-hidden z-50">
+                {[
+                  { href: `/spaces/${spaceId}/assets`, icon: Image, label: 'Assets' },
+                  { href: `/spaces/${spaceId}/datasources`, icon: Database, label: 'Datasources' },
+                  { href: `/spaces/${spaceId}/tags`, icon: Tag, label: 'Tags' },
+                  { href: `/spaces/${spaceId}/block-library`, icon: AppWindow, label: 'App Directory' },
+                  { href: `/spaces/${spaceId}/settings`, icon: Settings, label: 'Settings' },
+                ].map(({ href, icon: Icon, label }) => (
+                  <a
+                    key={href}
+                    href={href}
+                    onClick={() => setShowMoreMenu(false)}
+                    className="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors first:rounded-t-xl last:rounded-b-xl"
+                  >
+                    <Icon className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+                    {label}
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Layers panel */}

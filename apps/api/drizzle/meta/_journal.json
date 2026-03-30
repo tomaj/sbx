@@ -99,6 +99,13 @@
       "when": 1743300000000,
       "tag": "0015_component_versions",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1743400000000,
+      "tag": "0016_component_versions_author_name",
+      "breakpoints": true
     }
   ]
 }

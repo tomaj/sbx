@@ -14,19 +14,14 @@ interface Entry {
   name: string
   value: string
   position: number
-}
-
-interface EntriesResponse {
-  entries: Entry[]
-  total: number
-  page: number
-  perPage: number
+  datasource_id: number
 }
 
 interface Datasource {
   id: number
   name: string
   slug: string
+  dimensions: { id: number; name: string; entry_value: string }[]
 }
 
 // ---- Entry row ----
@@ -147,31 +142,33 @@ export default function DatasourceDetailPage({
 
   const [deleteTarget, setDeleteTarget] = useState<Entry | null>(null)
 
-  // Drag state
   const dragIndex = useRef<number | null>(null)
   const [dragSourceIndex, setDragSourceIndex] = useState<number | null>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
 
+  // Fetch datasource via MAPI single GET
   const fetchDatasource = useCallback(async () => {
-    const res = await fetch(`/api/admin/spaces/${spaceId}/datasources?page=1&per_page=200`)
+    const res = await fetch(`/api/admin/spaces/${spaceId}/datasources/${datasourceId}`)
     if (res.ok) {
       const data = await res.json()
-      const ds = data.datasources?.find((d: Datasource) => String(d.id) === datasourceId)
-      if (ds) setDatasource(ds)
+      if (data.datasource) setDatasource(data.datasource)
     }
   }, [spaceId, datasourceId])
 
+  // Fetch entries via MAPI /datasource_entries?datasource_id=...
   const fetchEntries = useCallback(async () => {
     setIsLoading(true)
-    const p = new URLSearchParams({ page: String(page), per_page: String(perPage) })
+    const p = new URLSearchParams({
+      datasource_id: datasourceId,
+      page: String(page),
+      per_page: String(perPage),
+    })
     if (search.trim()) p.set('search', search.trim())
-    const res = await fetch(
-      `/api/admin/spaces/${spaceId}/datasources/${datasourceId}/entries?${p}`,
-    )
+    const res = await fetch(`/api/admin/spaces/${spaceId}/datasource_entries?${p}`)
     if (res.ok) {
-      const data: EntriesResponse = await res.json()
-      setEntries(data.entries)
-      setTotal(data.total)
+      const data = await res.json()
+      setEntries(data.datasource_entries ?? [])
+      setTotal(data.total ?? 0)
     }
     setIsLoading(false)
   }, [spaceId, datasourceId, page, perPage, search])
@@ -182,14 +179,17 @@ export default function DatasourceDetailPage({
   async function handleAdd() {
     if (!newName.trim() || !newValue.trim()) return
     setAdding(true)
-    const res = await fetch(
-      `/api/admin/spaces/${spaceId}/datasources/${datasourceId}/entries`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newName.trim(), value: newValue.trim() }),
-      },
-    )
+    const res = await fetch(`/api/admin/spaces/${spaceId}/datasource_entries`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        datasource_entry: {
+          name: newName.trim(),
+          value: newValue.trim(),
+          datasource_id: parseInt(datasourceId),
+        },
+      }),
+    })
     if (res.ok) {
       setNewName('')
       setNewValue('')
@@ -199,23 +199,19 @@ export default function DatasourceDetailPage({
   }
 
   async function handleSaveEntry(id: number, name: string, value: string) {
-    await fetch(
-      `/api/admin/spaces/${spaceId}/datasources/${datasourceId}/entries/${id}`,
-      {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, value }),
-      },
-    )
+    await fetch(`/api/admin/spaces/${spaceId}/datasource_entries/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ datasource_entry: { name, value } }),
+    })
     fetchEntries()
   }
 
   async function handleDeleteEntry() {
     if (!deleteTarget) return
-    await fetch(
-      `/api/admin/spaces/${spaceId}/datasources/${datasourceId}/entries/${deleteTarget.id}`,
-      { method: 'DELETE' },
-    )
+    await fetch(`/api/admin/spaces/${spaceId}/datasource_entries/${deleteTarget.id}`, {
+      method: 'DELETE',
+    })
     setDeleteTarget(null)
     fetchEntries()
   }
@@ -233,14 +229,11 @@ export default function DatasourceDetailPage({
     setEditSaving(true)
     setEditError(null)
     try {
-      const res = await fetch(
-        `/api/admin/spaces/${spaceId}/datasources/${datasource.id}`,
-        {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: editName.trim(), slug: editSlug.trim() }),
-        },
-      )
+      const res = await fetch(`/api/admin/spaces/${spaceId}/datasources/${datasource.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ datasource: { name: editName.trim(), slug: editSlug.trim() } }),
+      })
       const data = await res.json()
       if (res.ok) {
         setSidebarOpen(false)
@@ -255,7 +248,6 @@ export default function DatasourceDetailPage({
     }
   }
 
-  // Drag and drop handlers
   function handleDragStart(index: number) {
     dragIndex.current = index
     setDragSourceIndex(index)

@@ -174,6 +174,17 @@ Golden dáta: `golden/{space_id}/`
 - **Nikdy `s3.amazonaws.com` ani `a.storyblok.com`** — všetky asset URL musia vždy ukazovať na náš CDN (`NEXT_PUBLIC_CDN_URL`, default `http://localhost:3002`). Migrované assety z Storybloku môžu mať v DB staré S3/Storyblok URL — vždy ich normalizuj pomocou `normalizeAssetFilename()` z `@/lib/utils` pred uložením do story obsahu.
 - **Formát asset URL**: `${CDN_URL}/f/{spaceId}/{path}` — bez akýchkoľvek externých domén.
 
+## MAPI — pravidlá implementácie
+
+**MAPI musí byť 1:1 zhodné s produkčným Storyblok API** (https://www.storyblok.com/docs/api/management).
+
+- Dokumentácia jednotlivých MAPI zdrojov je v `docs/mapi/` — vždy sa nimi riaď
+- **Admin UI (`apps/admin`) používa výlučne MAPI** — žiadne custom admin-only endpointy v NestJS (`/v1/admin/...`)
+- Admin Next.js route handlery (`apps/admin/src/app/api/admin/...`) sú len thin proxy na MAPI — žiadna transformácia, žiadna business logika
+- Ak MAPI niečo nevracia (napr. `total` pre pagination), admin UI sa prispôsobí tomu čo MAPI vracia
+- Parametre a response formát MAPI musia zodpovedať Storyblok — vrátane názvov polí, formátov hodnôt (napr. `sort_by=name:asc` nie `sort_field=name&sort_dir=asc`)
+- Storyblok admin (`app.storyblok.com`) používa niektoré nedokumentované params (`page`, `per_page`, `sort_by`) — tieto tiež implementujeme
+
 ## UI konvencie (apps/admin)
 
 - **Skeleton loading vždy** — pri načítaní dát používame skeleton placeholders (`animate-pulse` bloky v tvare obsahu), nie text "Loading...", nadpis "Loading" ani spinner/preloader.

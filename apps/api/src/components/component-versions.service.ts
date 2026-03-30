@@ -13,10 +13,12 @@ export class ComponentVersionsService {
     componentId: number;
     spaceId: number;
     userId?: number | null;
+    authorName?: string | null;
     event: 'create' | 'update';
     schema: Record<string, any>;
     name: string;
     displayName?: string | null;
+    createdAt?: Date;
   }) {
     void this.db
       .insert(componentVersions)
@@ -24,11 +26,13 @@ export class ComponentVersionsService {
         componentId: params.componentId,
         spaceId: params.spaceId,
         userId: params.userId ?? null,
+        authorName: params.authorName ?? null,
         event: params.event,
         schema: params.schema ?? {},
         name: params.name,
         displayName: params.displayName ?? null,
         isDraft: true,
+        ...(params.createdAt ? { createdAt: params.createdAt } : {}),
       })
       .catch(() => { /* non-critical */ });
   }
@@ -82,7 +86,7 @@ export class ComponentVersionsService {
         event: r.event,
         created_at: r.createdAt,
         author_id: r.userId ? String(r.userId) : null,
-        author: user?.name ?? null,
+        author: user?.name ?? r.authorName ?? null,
         author_avatar: user?.avatar_url ?? null,
         item_id: r.componentId,
         is_draft: r.isDraft,

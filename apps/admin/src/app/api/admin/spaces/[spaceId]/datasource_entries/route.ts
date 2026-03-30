@@ -12,13 +12,22 @@ async function getSessionToken() {
   )
 }
 
-type Params = { params: Promise<{ spaceId: string; datasourceId: string }> }
+type Params = { params: Promise<{ spaceId: string }> }
 
-// Legacy route kept for backwards compatibility with reorder endpoint
-// New code should use /api/admin/spaces/[spaceId]/datasource_entries instead
+export async function GET(req: NextRequest, { params }: Params) {
+  const { spaceId } = await params
+  const token = await getSessionToken()
+  const search = req.nextUrl.searchParams.toString()
+  const res = await fetch(
+    `${API_URL}/v1/spaces/${spaceId}/datasource_entries${search ? `?${search}` : ''}`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  )
+  const data = await res.json()
+  return NextResponse.json(data, { status: res.status })
+}
 
 export async function POST(req: NextRequest, { params }: Params) {
-  const { spaceId, datasourceId } = await params
+  const { spaceId } = await params
   const token = await getSessionToken()
   const body = await req.json()
   const res = await fetch(
@@ -26,9 +35,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        datasource_entry: { name: body.name, value: body.value, datasource_id: parseInt(datasourceId) },
-      }),
+      body: JSON.stringify(body),
     },
   )
   const data = await res.json()

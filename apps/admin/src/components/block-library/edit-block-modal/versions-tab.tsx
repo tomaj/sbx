@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { Eye, RotateCcw } from 'lucide-react'
+import { UserAvatar } from '@/components/ui/user-avatar'
 
 export interface ComponentVersionDetail {
   id: number
@@ -39,26 +40,6 @@ function formatDateTime(iso: string): string {
     hour: '2-digit',
     minute: '2-digit',
   })
-}
-
-function AuthorAvatar({ name, avatarUrl }: { name: string | null; avatarUrl: string | null }) {
-  if (avatarUrl) {
-    return (
-      <img
-        src={avatarUrl}
-        alt={name ?? ''}
-        className="w-10 h-10 rounded-full object-cover flex-shrink-0"
-      />
-    )
-  }
-  const initials = name
-    ? name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
-    : '?'
-  return (
-    <div className="w-10 h-10 rounded-full bg-teal-700/60 flex items-center justify-center flex-shrink-0 text-sm font-semibold text-white">
-      {initials}
-    </div>
-  )
 }
 
 export function VersionsTab({ spaceId, blockId, onPreview, onRestored }: VersionsTabProps) {
@@ -142,7 +123,7 @@ export function VersionsTab({ spaceId, blockId, onPreview, onRestored }: Version
               key={version.id}
               className="flex items-center gap-3 p-4 rounded-lg border border-gray-200 dark:border-gray-700 group hover:border-gray-300 dark:hover:border-gray-500 transition-colors"
             >
-              <AuthorAvatar name={version.author} avatarUrl={version.author_avatar} />
+              <UserAvatar name={version.author} src={version.author_avatar} size="md" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
                   {formatDateTime(version.created_at)}

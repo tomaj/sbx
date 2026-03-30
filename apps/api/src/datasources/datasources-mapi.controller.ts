@@ -8,6 +8,7 @@ import {
   Param,
   Post,
   Put,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { SessionOrTokenGuard } from '../auth/session-or-token.guard';
@@ -19,8 +20,26 @@ export class DatasourcesMapiController {
   constructor(private readonly datasourcesService: DatasourcesService) {}
 
   @Get()
-  list(@Param('spaceId') spaceId: string) {
-    return this.datasourcesService.findAll(parseInt(spaceId));
+  list(
+    @Param('spaceId') spaceId: string,
+    @Query('page') page = '1',
+    @Query('per_page') perPage = '25',
+    @Query('sort_by') sortBy?: string,         // format: "name:asc" or "created_at:desc"
+    @Query('search') search?: string,
+    @Query('by_ids') byIds?: string,
+  ) {
+    // Parse sort_by="name:asc" format
+    const [sortField, sortDir] = (sortBy ?? 'name:asc').split(':');
+    const byIdsArr = byIds ? byIds.split(',').map(Number).filter(Boolean) : undefined;
+
+    return this.datasourcesService.listDatasourcesAdmin(parseInt(spaceId), {
+      page: Math.max(1, parseInt(page) || 1),
+      perPage: Math.min(200, parseInt(perPage) || 25),
+      sortField,
+      sortDir: sortDir === 'desc' ? 'desc' : 'asc',
+      search,
+      byIds: byIdsArr,
+    });
   }
 
   @Get(':id')
@@ -37,7 +56,14 @@ export class DatasourcesMapiController {
   @HttpCode(201)
   async create(
     @Param('spaceId') spaceId: string,
-    @Body() body: { datasource: { name: string; slug: string } },
+    @Body()
+    body: {
+      datasource: {
+        name: string;
+        slug: string;
+        dimensions_attributes?: { name: string; entry_value: string }[];
+      };
+    },
   ) {
     const ds = await this.datasourcesService.createDatasource(
       parseInt(spaceId),
@@ -50,7 +76,14 @@ export class DatasourcesMapiController {
   async update(
     @Param('spaceId') spaceId: string,
     @Param('id') id: string,
-    @Body() body: { datasource: { name?: string; slug?: string } },
+    @Body()
+    body: {
+      datasource: {
+        name?: string;
+        slug?: string;
+        dimensions_attributes?: { name: string; entry_value: string }[];
+      };
+    },
   ) {
     const ds = await this.datasourcesService.updateDatasource(
       BigInt(id),

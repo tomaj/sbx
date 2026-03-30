@@ -172,6 +172,7 @@ export class ComponentsService {
       icon?: string | null;
     },
     userId?: number | null,
+    authorName?: string | null,
   ) {
     const id = BigInt(Date.now() * 1000 + Math.floor(Math.random() * 1000));
     const [row] = await this.db
@@ -196,6 +197,7 @@ export class ComponentsService {
       componentId: Number(row.id),
       spaceId,
       userId,
+      authorName,
       event: 'create',
       schema: (data.schema ?? {}) as Record<string, any>,
       name: row.name,
@@ -224,6 +226,7 @@ export class ComponentsService {
       internal_tags_list?: { id: string | number; name: string }[];
     },
     userId?: number | null,
+    authorName?: string | null,
   ) {
     const set: Record<string, any> = { updatedAt: new Date() };
     if (data.name !== undefined) set.name = data.name;
@@ -254,6 +257,7 @@ export class ComponentsService {
       componentId: id,
       spaceId,
       userId,
+      authorName,
       event: 'update',
       schema: (row.schema ?? {}) as Record<string, any>,
       name: row.name,

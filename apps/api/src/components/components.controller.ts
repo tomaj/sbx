@@ -118,7 +118,9 @@ export class ComponentsController {
       };
     },
   ) {
-    return this.componentsService.createComponent(req.space.id, body.component, req.user?.id ?? null);
+    const u1 = req.user;
+    const authorName1 = u1 ? ([u1.firstname, u1.lastname].filter(Boolean).join(' ') || u1.email || null) : null;
+    return this.componentsService.createComponent(req.space.id, body.component, u1?.id ?? null, authorName1);
   }
 
   @Put('components/:id')
@@ -140,7 +142,9 @@ export class ComponentsController {
       };
     },
   ) {
-    return this.componentsService.updateComponent(req.space.id, parseInt(id), body.component, req.user?.id ?? null);
+    const u2 = req.user;
+    const authorName2 = u2 ? ([u2.firstname, u2.lastname].filter(Boolean).join(' ') || u2.email || null) : null;
+    return this.componentsService.updateComponent(req.space.id, parseInt(id), body.component, u2?.id ?? null, authorName2);
   }
 
   @Delete('components/:id')

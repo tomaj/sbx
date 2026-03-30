@@ -175,8 +175,7 @@ export default function DatasourcesPage({ params }: { params: Promise<{ spaceId:
     const params = new URLSearchParams({
       page: String(page),
       per_page: String(perPage),
-      sort_field: sort.field,
-      sort_dir: sort.direction,
+      sort_by: `${sort.field}:${sort.direction}`,
     })
     if (search.trim()) params.set('search', search.trim())
     const res = await fetch(`/api/admin/spaces/${spaceId}/datasources?${params}`)

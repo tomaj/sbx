@@ -86,89 +86,65 @@ export async function syncStoryVersions(spaceId: number, token: string, full = f
 
   console.log(`    story_versions: fetching for ${storiesToFetch.length} stories...`);
 
-  // Fetch versions for each story
-  const newVersionsByStoryId = new Map<number, any[]>();
-  let fetched = 0;
+  ensureDir(dir);
+  // Clear old chunks upfront for full sync
+  if (lastSyncAt === null) {
+    fs.readdirSync(dir).filter((f) => f.startsWith('chunk_')).forEach((f) =>
+      fs.unlinkSync(path.join(dir, f)));
+  }
 
+  // Write incrementally: accumulate a buffer, flush every FLUSH_EVERY versions
+  const FLUSH_EVERY = 500;
+  let buffer: any[] = [];
+  let chunkIndex = 1;
+  let totalVersions = 0;
+  let lastChunkSize = 0;
+  let newestUpdatedAt = '';
+
+  function flushBuffer(force = false) {
+    if (buffer.length === 0) return;
+    if (!force && buffer.length < FLUSH_EVERY) return;
+
+    // Write as many full chunks as possible
+    while (buffer.length >= CHUNK_SIZE || (force && buffer.length > 0)) {
+      const chunk = buffer.splice(0, CHUNK_SIZE);
+      const fileName = `chunk_${String(chunkIndex).padStart(4, '0')}.json`;
+      fs.writeFileSync(path.join(dir, fileName), JSON.stringify(chunk, null, 2));
+      lastChunkSize = chunk.length;
+      chunkIndex++;
+    }
+  }
+
+  let fetched = 0;
   for (const story of storiesToFetch) {
     try {
       const versions = await fetchStoryVersions(spaceId, story.id, token);
-      newVersionsByStoryId.set(story.id, versions);
+      buffer.push(...versions.sort((a, b) => a.id - b.id));
+      totalVersions += versions.length;
+      flushBuffer();
     } catch (e: any) {
       console.warn(`\n    story_versions: failed for story ${story.id}: ${e.message}`);
     }
+
+    if (story.updated_at > newestUpdatedAt) newestUpdatedAt = story.updated_at;
+
     fetched++;
-    if (fetched % 10 === 0) {
-      process.stdout.write(`\r    story_versions: fetched ${fetched}/${storiesToFetch.length}...`);
+    if (fetched % 20 === 0) {
+      process.stdout.write(`\r    story_versions: fetched ${fetched}/${storiesToFetch.length} (${totalVersions} versions)...`);
     }
     await sleep(REQUEST_DELAY_MS);
   }
+  // Flush remaining
+  flushBuffer(true);
   process.stdout.write('\n');
 
-  const totalNewVersions = [...newVersionsByStoryId.values()].reduce((s, v) => s + v.length, 0);
-
-  if (totalNewVersions === 0) {
-    console.log(`    story_versions: no versions found`);
-    // Still update lastSyncAt
-    const newestStory = storiesToFetch.reduce((a: any, b: any) =>
-      a.updated_at > b.updated_at ? a : b, storiesToFetch[0]);
-    state[RESOURCE] = { ...prevState, lastSyncAt: newestStory.updated_at };
-    writeState(spaceId, state);
-    return;
-  }
-
-  if (lastSyncAt === null) {
-    // Full sync: write fresh chunks
-    const allVersions = [...newVersionsByStoryId.entries()]
-      .sort(([a], [b]) => a - b)
-      .flatMap(([, versions]) => versions.sort((a, b) => a.id - b.id));
-
-    ensureDir(dir);
-    if (fs.existsSync(dir)) {
-      fs.readdirSync(dir).filter((f) => f.startsWith('chunk_')).forEach((f) =>
-        fs.unlinkSync(path.join(dir, f)));
-    }
-    const { chunkNum, lastChunkSize } = writeChunks(dir, allVersions, 1, 0);
-    const newestStory = storiesToFetch.reduce((a: any, b: any) =>
-      a.updated_at > b.updated_at ? a : b, storiesToFetch[0]);
-
-    state[RESOURCE] = {
-      lastSyncAt: newestStory.updated_at,
-      totalItems: allVersions.length,
-      chunkCount: chunkNum,
-      lastChunkSize,
-    };
-    console.log(`    story_versions: full sync ${allVersions.length} versions across ${storiesToFetch.length} stories, chunks: ${chunkNum}`);
-  } else {
-    // Incremental: merge into existing chunks, replacing versions for updated stories
-    const existing = readChunks(dir);
-    // Remove old versions for re-fetched stories
-    const updatedStoryIds = new Set(storiesToFetch.map((s: any) => s.id));
-    const filtered = existing.filter((v: any) => !updatedStoryIds.has(v.story_id));
-
-    // Merge new versions
-    const newVersionsFlat = [...newVersionsByStoryId.entries()]
-      .sort(([a], [b]) => a - b)
-      .flatMap(([, versions]) => versions.sort((a, b) => a.id - b.id));
-
-    const all = [...filtered, ...newVersionsFlat].sort((a: any, b: any) =>
-      a.story_id !== b.story_id ? a.story_id - b.story_id : a.id - b.id);
-
-    ensureDir(dir);
-    fs.readdirSync(dir).filter((f) => f.startsWith('chunk_')).forEach((f) =>
-      fs.unlinkSync(path.join(dir, f)));
-    const { chunkNum, lastChunkSize } = writeChunks(dir, all, 1, 0);
-    const newestStory = storiesToFetch.reduce((a: any, b: any) =>
-      a.updated_at > b.updated_at ? a : b, storiesToFetch[0]);
-
-    state[RESOURCE] = {
-      lastSyncAt: newestStory.updated_at,
-      totalItems: all.length,
-      chunkCount: chunkNum,
-      lastChunkSize,
-    };
-    console.log(`    story_versions: +${totalNewVersions} versions for ${storiesToFetch.length} stories → total ${all.length}, chunks: ${chunkNum}`);
-  }
-
+  const finalChunkCount = chunkIndex - 1;
+  state[RESOURCE] = {
+    lastSyncAt: newestUpdatedAt || storiesToFetch[0]?.updated_at,
+    totalItems: totalVersions,
+    chunkCount: finalChunkCount,
+    lastChunkSize,
+  };
   writeState(spaceId, state);
+  console.log(`    story_versions: ${totalVersions} versions across ${storiesToFetch.length} stories, chunks: ${finalChunkCount}`);
 }

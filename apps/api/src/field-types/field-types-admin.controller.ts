@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Put, Delete, Param, Body, Query, UseGuards, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Param, Body, Query, UseGuards, ParseIntPipe, Res } from '@nestjs/common';
+import type { Response } from 'express';
 import { SessionGuard } from '../auth/session.guard';
 import { FieldTypesService } from './field-types.service';
 
@@ -10,6 +11,14 @@ export class FieldTypesAdminController {
   @Get()
   list(@Query('search') search?: string, @Query('only_mine') onlyMine?: string) {
     return this.service.list({ search, onlyMine: onlyMine === '1' });
+  }
+
+  @Get(':name/get_html')
+  async getHtml(@Param('name') name: string, @Query() query: Record<string, string>, @Res() res: Response) {
+    const { theme, ...rest } = query;
+    const html = await this.service.getHtml(name, theme ?? 'light', rest);
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(html);
   }
 
   @Get(':id')
