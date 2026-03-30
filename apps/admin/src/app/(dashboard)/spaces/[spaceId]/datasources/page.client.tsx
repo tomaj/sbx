@@ -1,6 +1,7 @@
 'use client'
 
 import { use, useState, useEffect, useCallback } from 'react'
+import { usePerPage } from '@/hooks/use-per-page'
 import { useRouter } from 'next/navigation'
 import { Plus, Trash2 } from 'lucide-react'
 import { SearchBar } from '@/components/ui/search-bar'
@@ -161,7 +162,7 @@ export default function DatasourcesPage({ params }: { params: Promise<{ spaceId:
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState<SortState>({ field: 'name', direction: 'asc' })
   const [page, setPage] = useState(1)
-  const [perPage, setPerPage] = useState(25)
+  const [perPage, setPerPage] = usePerPage('perPage:datasources', 25)
 
   const [data, setData] = useState<ApiResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -277,6 +278,7 @@ export default function DatasourcesPage({ params }: { params: Promise<{ spaceId:
             perPage,
             onPageChange: setPage,
             onPerPageChange: (n) => { setPerPage(n); setPage(1) },
+            storageKey: 'perPage:datasources',
           }}
         />
       </div>

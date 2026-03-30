@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
+import { usePerPage } from '@/hooks/use-per-page'
 import { MoreHorizontal, EyeOff, Plus } from 'lucide-react'
 import { Tabs } from '@/components/ui/tabs'
 import { SearchBar } from '@/components/ui/search-bar'
@@ -155,7 +156,7 @@ export default function UserManagementPage() {
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState<SortState>({ field: 'firstname', direction: 'asc' })
   const [page, setPage] = useState(1)
-  const [perPage, setPerPage] = useState(10)
+  const [perPage, setPerPage] = usePerPage('perPage:users', 10)
   const [selectedIds, setSelectedIds] = useState<number[]>([])
 
   const [data, setData] = useState<ApiResponse | null>(null)
@@ -436,6 +437,7 @@ export default function UserManagementPage() {
             perPage,
             onPageChange: setPage,
             onPerPageChange: (n) => { setPerPage(n); setPage(1) },
+            storageKey: 'perPage:users',
           }}
         />
       </div>

@@ -1,6 +1,7 @@
 'use client'
 
 import { use, useState, useEffect, useCallback, useRef } from 'react'
+import { usePerPage } from '@/hooks/use-per-page'
 import Link from 'next/link'
 import { ArrowLeft, GripVertical, Trash2 } from 'lucide-react'
 import { SearchBar } from '@/components/ui/search-bar'
@@ -130,7 +131,7 @@ export default function DatasourceDetailPage({
   const [entries, setEntries] = useState<Entry[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
-  const [perPage, setPerPage] = useState(25)
+  const [perPage, setPerPage] = usePerPage('perPage:datasource-entries', 25)
   const [search, setSearch] = useState('')
   const [isLoading, setIsLoading] = useState(true)
 
@@ -392,6 +393,7 @@ export default function DatasourceDetailPage({
           perPage={perPage}
           onPageChange={setPage}
           onPerPageChange={(n) => { setPerPage(n); setPage(1) }}
+          storageKey="perPage:datasource-entries"
         />
       </div>
 

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
+import { usePerPage } from '@/hooks/use-per-page'
 import { Activity } from 'lucide-react'
 import { DataTable, type Column } from '@/components/ui/data-table'
 import { SelectDropdown } from '@/components/ui/select-dropdown'
@@ -54,7 +55,7 @@ export default function OrgActivitiesPage() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [page, setPage] = useState(1)
-  const [perPage, setPerPage] = useState(25)
+  const [perPage, setPerPage] = usePerPage('perPage:org-activities', 25)
 
   const [spaces, setSpaces] = useState<Space[]>([])
   const [users, setUsers] = useState<User[]>([])
@@ -253,6 +254,7 @@ export default function OrgActivitiesPage() {
             perPage,
             onPageChange: setPage,
             onPerPageChange: (n) => { setPerPage(n); setPage(1) },
+            storageKey: 'perPage:org-activities',
           }}
         />
       )}

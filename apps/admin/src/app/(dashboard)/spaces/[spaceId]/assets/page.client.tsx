@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect, use } from 'react'
+import { usePerPage } from '@/hooks/use-per-page'
 import {
   FolderPlus,
   Upload,
@@ -81,7 +82,7 @@ export default function AssetsPage({ params }: { params: Promise<{ spaceId: stri
 
   // ─── Pagination ────────────────────────────────────────────────────────────
   const [page, setPage] = useState(1)
-  const [perPage, setPerPage] = useState(24)
+  const [perPage, setPerPage] = usePerPage('perPage:assets', 24)
 
   // ─── Tags view ─────────────────────────────────────────────────────────────
   const [isTagsView, setIsTagsView] = useState(false)
@@ -460,11 +461,13 @@ export default function AssetsPage({ params }: { params: Promise<{ spaceId: stri
 
               {/* Pagination */}
               <Pagination
+              storageKey="perPage:assets"
                 total={total}
                 page={page}
                 perPage={perPage}
                 onPageChange={setPage}
                 onPerPageChange={n => { setPerPage(n); setPage(1) }}
+                storageKey="perPage:assets"
               />
             </>
           )}

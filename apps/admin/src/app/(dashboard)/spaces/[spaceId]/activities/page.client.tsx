@@ -1,6 +1,7 @@
 'use client'
 
 import { use, useState, useCallback, useEffect } from 'react'
+import { usePerPage } from '@/hooks/use-per-page'
 import { DataTable, type Column } from '@/components/ui/data-table'
 import { CheckboxDropdown } from '@/components/ui/checkbox-dropdown'
 import { DateField } from '@/components/ui/date-field'
@@ -48,7 +49,7 @@ export default function SpaceActivitiesPage({ params }: { params: Promise<{ spac
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [page, setPage] = useState(1)
-  const [perPage, setPerPage] = useState(25)
+  const [perPage, setPerPage] = usePerPage('perPage:activities', 25)
 
   const [users, setUsers] = useState<User[]>([])
   const [rows, setRows] = useState<ActivityRow[]>([])
@@ -211,6 +212,7 @@ export default function SpaceActivitiesPage({ params }: { params: Promise<{ spac
           perPage,
           onPageChange: setPage,
           onPerPageChange: (n) => { setPerPage(n); setPage(1) },
+          storageKey: 'perPage:activities',
         }}
       />
     </div>

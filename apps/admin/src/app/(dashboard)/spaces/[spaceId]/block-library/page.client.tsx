@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect, useMemo, use } from 'react'
+import { usePerPage } from '@/hooks/use-per-page'
 import { FolderPlus, Plus, Search, Copy, Trash2, Move, Files } from 'lucide-react'
 import { Pagination } from '@/components/ui/pagination'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
@@ -35,7 +36,7 @@ export default function BlockLibraryPage({ params }: { params: Promise<{ spaceId
 
   // ─── Pagination ────────────────────────────────────────────────────────────
   const [page, setPage] = useState(1)
-  const [perPage, setPerPage] = useState(25)
+  const [perPage, setPerPage] = usePerPage('perPage:blocks', 25)
 
   // ─── Block modals ──────────────────────────────────────────────────────────
   const [createBlockOpen, setCreateBlockOpen] = useState(false)
@@ -390,11 +391,13 @@ export default function BlockLibraryPage({ params }: { params: Promise<{ spaceId
 
               {/* Pagination */}
               <Pagination
+              storageKey="perPage:blocks"
                 total={total}
                 page={page}
                 perPage={perPage}
                 onPageChange={setPage}
                 onPerPageChange={(n) => { setPerPage(n); setPage(1) }}
+                storageKey="perPage:blocks"
               />
             </>
           )}

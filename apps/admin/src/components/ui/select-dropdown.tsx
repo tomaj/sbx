@@ -21,6 +21,8 @@ interface SelectDropdownProps {
   compact?: boolean
   /** No border/bg — for use inside chips or tight inline contexts */
   ghost?: boolean
+  /** Open the dropdown upward instead of downward */
+  dropUp?: boolean
 }
 
 export function SelectDropdown({
@@ -32,6 +34,7 @@ export function SelectDropdown({
   className,
   compact = false,
   ghost = false,
+  dropUp = false,
 }: SelectDropdownProps) {
   const [open, setOpen] = useState(false)
   const [filter, setFilter] = useState('')
@@ -99,7 +102,8 @@ export function SelectDropdown({
       {open && (
         <div
           className={cn(
-            'absolute top-full mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl max-h-64 overflow-y-auto',
+            'absolute z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl max-h-64 overflow-y-auto',
+            dropUp ? 'bottom-full mb-1' : 'top-full mt-1',
             ghost ? 'left-0' : 'left-0 right-0',
           )}
           style={ghost ? { minWidth: '130px' } : undefined}

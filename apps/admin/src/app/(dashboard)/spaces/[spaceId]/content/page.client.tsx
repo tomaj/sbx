@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect, useRef, use } from 'react'
+import { usePerPage } from '@/hooks/use-per-page'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Plus, ChevronRight, Settings, Move, Files, Eye, EyeOff, Trash2, Star, ChevronDown, AlertTriangle, GitBranch, Rocket, SlidersHorizontal, Search, SquarePen, CalendarDays } from 'lucide-react'
@@ -339,7 +340,7 @@ export default function ContentPage({ params }: { params: Promise<{ spaceId: str
 
   // ─── Pagination ───────────────────────────────────────────────────────────
   const [page,    setPage]    = useState(1)
-  const [perPage, setPerPage] = useState(25)
+  const [perPage, setPerPage] = usePerPage('perPage:stories', 25)
 
   // ─── Selection ────────────────────────────────────────────────────────────
   const [selectedIds,   setSelectedIds]   = useState<Set<number>>(new Set())
@@ -883,11 +884,13 @@ export default function ContentPage({ params }: { params: Promise<{ spaceId: str
       {/* Pagination — hidden in favorites mode */}
       {!showFavoritesOnly && (
         <Pagination
+              storageKey="perPage:stories"
           total={total}
           page={page}
           perPage={perPage}
           onPageChange={setPage}
           onPerPageChange={(n) => { setPerPage(n); setPage(1) }}
+          storageKey="perPage:stories"
         />
       )}
 

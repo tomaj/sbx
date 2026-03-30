@@ -9,11 +9,13 @@ export interface PaginationState {
   perPage: number
   onPageChange: (page: number) => void
   onPerPageChange: (perPage: number) => void
+  /** localStorage key for persisting perPage per entity (e.g. "perPage:components") */
+  storageKey?: string
 }
 
 const PER_PAGE_OPTIONS = [10, 25, 50, 100]
 
-export function Pagination({ total, page, perPage, onPageChange, onPerPageChange }: PaginationState) {
+export function Pagination({ total, page, perPage, onPageChange, onPerPageChange, storageKey }: PaginationState) {
   const totalPages = Math.max(1, Math.ceil(total / perPage))
   const from = total === 0 ? 0 : (page - 1) * perPage + 1
   const to = Math.min(page * perPage, total)
@@ -24,8 +26,17 @@ export function Pagination({ total, page, perPage, onPageChange, onPerPageChange
         <span className="whitespace-nowrap">Items per page:</span>
         <SelectDropdown
           compact
+          dropUp
           value={String(perPage)}
-          onChange={(v) => { if (v) { onPerPageChange(Number(v)); onPageChange(1) } }}
+          onChange={(v) => {
+            if (v) {
+              onPerPageChange(Number(v))
+              onPageChange(1)
+              if (storageKey) {
+                try { localStorage.setItem(storageKey, v) } catch {}
+              }
+            }
+          }}
           options={PER_PAGE_OPTIONS.map((n) => ({ value: String(n), label: String(n) }))}
         />
       </div>
