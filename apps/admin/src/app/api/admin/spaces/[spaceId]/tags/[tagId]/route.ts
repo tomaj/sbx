@@ -27,9 +27,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ sp
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ spaceId: string; tagId: string }> }) {
   const { spaceId, tagId } = await params
   const token = await getSessionToken()
-  const res = await fetch(`${API_URL}/v1/spaces/${spaceId}/tags/${tagId}`, {
+  const res = await fetch(`${API_URL}/v1/spaces/${spaceId}/tags/${encodeURIComponent(tagId)}`, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${token}` },
   })
+  if (res.status === 204) return new NextResponse(null, { status: 204 })
   return NextResponse.json(await res.json(), { status: res.status })
 }

@@ -27,8 +27,12 @@ export class ComponentsController {
   // ─── Component Groups ────────────────────────────────────────────────────────
 
   @Get('component_groups')
-  async getComponentGroups(@Req() req: any) {
-    return this.componentsService.findAllComponentGroups(req.space.id);
+  async getComponentGroups(
+    @Req() req: any,
+    @Query('search') search?: string,
+    @Query('with_parent') withParent?: string,
+  ) {
+    return this.componentsService.findAllComponentGroups(req.space.id, { search, withParent });
   }
 
   @Get('component_groups/:id')
@@ -41,7 +45,7 @@ export class ComponentsController {
   @Post('component_groups')
   async createComponentGroup(
     @Req() req: any,
-    @Body() body: { component_group: { name: string; parent_uuid?: string | null } },
+    @Body() body: { component_group: { name: string; parent_id?: number | null; parent_uuid?: string | null } },
   ) {
     const group = await this.componentsService.createComponentGroup(req.space.id, body.component_group);
     return { component_group: group };
@@ -51,7 +55,7 @@ export class ComponentsController {
   async updateComponentGroup(
     @Req() req: any,
     @Param('id') id: string,
-    @Body() body: { component_group: { name?: string } },
+    @Body() body: { component_group: { name?: string; parent_id?: number | null } },
   ) {
     const group = await this.componentsService.updateComponentGroup(
       req.space.id,

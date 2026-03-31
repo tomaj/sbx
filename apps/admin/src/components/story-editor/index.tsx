@@ -266,12 +266,12 @@ export function StoryEditor({
     setIsSaving(true)
     setError(null)
     try {
-      const saveBody: Record<string, any> = { content }
-      if (releaseId != null) saveBody.release_id = releaseId
+      const mapiBody: Record<string, any> = { story: { content } }
+      if (releaseId != null) mapiBody.release_id = releaseId
       const res = await fetch(`/api/admin/spaces/${spaceId}/stories/${story.id}`, {
-        method: 'PATCH',
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(saveBody),
+        body: JSON.stringify(mapiBody),
       })
       if (!res.ok) throw new Error('Save failed')
       const data = await res.json()
@@ -339,9 +339,9 @@ export function StoryEditor({
       const utcMs = localMs - offsetHours * 3600 * 1000
       const publishAt = new Date(utcMs).toISOString()
       const res = await fetch(`/api/admin/spaces/${spaceId}/stories/${story.id}`, {
-        method: 'PATCH',
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ publish_at: publishAt }),
+        body: JSON.stringify({ story: { publish_at: publishAt } }),
       })
       if (!res.ok) throw new Error('Schedule failed')
       const data = await res.json()
@@ -360,11 +360,12 @@ export function StoryEditor({
     setIsSaving(true)
     setError(null)
     try {
-      const body = releaseId != null ? { ...data, release_id: releaseId } : data
+      const mapiBody: Record<string, any> = { story: data }
+      if (releaseId != null) mapiBody.release_id = releaseId
       const res = await fetch(`/api/admin/spaces/${spaceId}/stories/${story.id}`, {
-        method: 'PATCH',
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify(mapiBody),
       })
       if (!res.ok) throw new Error('Save failed')
       const result = await res.json()

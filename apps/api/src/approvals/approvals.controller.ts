@@ -40,14 +40,14 @@ export class ApprovalsController {
   @HttpCode(201)
   async createApproval(
     @Req() req: any,
-    @Body() body: { approval: { approver_id: number; story_id: number } },
+    @Body() body: { approval: { approver_id: number; story_id: number }; release_id?: number },
   ) {
-    return this.approvalsService.create(req.space.id, body.approval);
+    return this.approvalsService.create(req.space.id, body.approval, body.release_id);
   }
 
   @Delete(':id')
-  @HttpCode(200)
+  @HttpCode(204)
   async deleteApproval(@Req() req: any, @Param('id') id: string) {
-    return this.approvalsService.remove(req.space.id, parseInt(id));
+    await this.approvalsService.remove(req.space.id, parseInt(id));
   }
 }

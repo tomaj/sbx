@@ -120,9 +120,8 @@ export class WebhooksController {
   }
 
   @Delete(':id')
-  @HttpCode(200)
+  @HttpCode(204)
   async deleteWebhook(@Req() req: any, @Param('id') id: string) {
     await this.webhooksService.adminDelete(req.space.id, parseInt(id));
-    return {};
   }
 }

@@ -79,23 +79,29 @@ export class StoryVersionsService {
       }
     }
 
-    const story_versions = rows.map((r) => ({
-      id: r.id,
-      story_id: r.storyId,
-      release_id: r.releaseId ?? null,
-      user_id: r.userId ?? null,
-      user: r.userId ? (userMap.get(r.userId) ?? null) : null,
-      action: r.action,
-      status: r.status,
-      name: r.name,
-      slug: r.slug,
-      full_slug: r.fullSlug,
-      tag_list: r.tagList,
-      path: r.path ?? null,
-      is_startpage: r.isStartpage,
-      created_at: r.createdAt,
-      ...(showContent ? { content: (r as any).content } : {}),
-    }));
+    const story_versions = rows.map((r) => {
+      const userObj = r.userId ? (userMap.get(r.userId) ?? null) : null;
+      return {
+        id: r.id,
+        created_at: r.createdAt,
+        user_id: r.userId ?? null,
+        user: userObj?.name ?? null,         // Storyblok returns name string, not object
+        story_id: r.storyId,
+        meta_data: {},                        // Storyblok compat
+        parent_id: null,                      // Storyblok compat
+        release_id: r.releaseId ?? null,
+        status: r.status,
+        // Extended fields (beyond Storyblok)
+        action: r.action,
+        name: r.name,
+        slug: r.slug,
+        full_slug: r.fullSlug,
+        tag_list: r.tagList,
+        path: r.path ?? null,
+        is_startpage: r.isStartpage,
+        ...(showContent ? { content: (r as any).content } : {}),
+      };
+    });
 
     return { story_versions, total };
   }

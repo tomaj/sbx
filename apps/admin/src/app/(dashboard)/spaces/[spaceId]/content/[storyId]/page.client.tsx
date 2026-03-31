@@ -66,8 +66,8 @@ export default function StoryDetailPage({ params }: PageProps) {
         const tokens: { access: string; token: string }[] = tokensData.api_keys ?? []
         setSpaceSettings({
           domain: spaceData.space?.domain ?? '',
-          previewUrls: spaceData.space?.previewUrls ?? [],
-          mobileWidth: spaceData.space?.mobileWidth ?? 360,
+          previewUrls: spaceData.space?.preview_urls ?? [],
+          mobileWidth: spaceData.space?.mobile_width ?? 360,
           previewToken: tokens.find((t) => t.access === 'private')?.token ?? '',
           publicToken: tokens.find((t) => t.access === 'public')?.token ?? '',
         })

@@ -12,6 +12,20 @@ async function getSessionToken() {
   )
 }
 
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ spaceId: string; discussionId: string }> },
+) {
+  const { spaceId, discussionId } = await params
+  const token = await getSessionToken()
+  const res = await fetch(
+    `${API_URL}/v1/spaces/${spaceId}/discussions/${discussionId}`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  )
+  const data = await res.json()
+  return NextResponse.json(data, { status: res.status })
+}
+
 export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ spaceId: string; discussionId: string }> },
@@ -19,14 +33,45 @@ export async function PUT(
   const { spaceId, discussionId } = await params
   const token = await getSessionToken()
   const url = new URL(req.url)
-  const action = url.searchParams.get('action') ?? 'resolve'
+  const action = url.searchParams.get('action')
+
+  // Map resolve/unresolve actions to MAPI body format
+  let body: string
+  if (action === 'resolve') {
+    body = JSON.stringify({ discussion: { solved_at: new Date().toISOString() } })
+  } else if (action === 'unresolve') {
+    body = JSON.stringify({ discussion: { solved_at: null } })
+  } else {
+    // Pass through raw body
+    body = await req.text()
+  }
+
   const res = await fetch(
-    `${API_URL}/v1/spaces/${spaceId}/discussions/${discussionId}/${action}`,
+    `${API_URL}/v1/spaces/${spaceId}/discussions/${discussionId}`,
     {
       method: 'PUT',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body,
+    },
+  )
+  const data = await res.json()
+  return NextResponse.json(data, { status: res.status })
+}
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ spaceId: string; discussionId: string }> },
+) {
+  const { spaceId, discussionId } = await params
+  const token = await getSessionToken()
+  const res = await fetch(
+    `${API_URL}/v1/spaces/${spaceId}/discussions/${discussionId}`,
+    {
+      method: 'DELETE',
       headers: { Authorization: `Bearer ${token}` },
     },
   )
+  if (res.status === 204) return new NextResponse(null, { status: 204 })
   const data = await res.json()
   return NextResponse.json(data, { status: res.status })
 }

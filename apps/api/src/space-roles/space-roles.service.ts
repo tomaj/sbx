@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { asc, eq } from 'drizzle-orm';
+import { and, asc, eq, ilike, inArray } from 'drizzle-orm';
 import { DB } from '../db/db.module';
 import type { DbType } from '../db/db.module';
 import { spaceMembers, spaceRoles } from '../db/schema';
@@ -31,11 +31,28 @@ export class SpaceRolesService {
 
   // ─── Admin methods ────────────────────────────────────────────────────────
 
-  async adminList(spaceId: number) {
+  async adminList(spaceId: number, filters?: { search?: string; by_ids?: string }) {
+    const conditions = [eq(spaceRoles.spaceId, spaceId)];
+
+    if (filters?.search) {
+      conditions.push(ilike(spaceRoles.role, `%${filters.search}%`));
+    }
+
+    if (filters?.by_ids) {
+      const ids = filters.by_ids
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .map((s) => BigInt(s));
+      if (ids.length > 0) {
+        conditions.push(inArray(spaceRoles.id, ids));
+      }
+    }
+
     const rows = await this.db
       .select()
       .from(spaceRoles)
-      .where(eq(spaceRoles.spaceId, spaceId))
+      .where(and(...conditions))
       .orderBy(asc(spaceRoles.id));
 
     const members = await this.db
@@ -168,6 +185,18 @@ export class SpaceRolesService {
     if (body.component_ids !== undefined) updates.componentIds = body.component_ids;
     if (body.allowed_component_ids !== undefined)
       updates.allowedComponentIds = body.allowed_component_ids;
+    if (body.managed_component_ids !== undefined)
+      updates.managedComponentIds = body.managed_component_ids;
+    if (body.blocked_manage_component_ids !== undefined)
+      updates.blockedManageComponentIds = body.blocked_manage_component_ids;
+    if (body.managed_component_group_uuids !== undefined)
+      updates.managedComponentGroupUuids = body.managed_component_group_uuids;
+    if (body.blocked_manage_component_group_uuids !== undefined)
+      updates.blockedManageComponentGroupUuids = body.blocked_manage_component_group_uuids;
+    if (body.component_group_uuids !== undefined)
+      updates.componentGroupUuids = body.component_group_uuids;
+    if (body.blocked_component_group_uuids !== undefined)
+      updates.blockedComponentGroupUuids = body.blocked_component_group_uuids;
     if (body.branch_ids !== undefined) updates.branchIds = body.branch_ids;
     if (body.blocked_branch_ids !== undefined) updates.blockedBranchIds = body.blocked_branch_ids;
     if (body.allowed_languages !== undefined) updates.allowedLanguages = body.allowed_languages;
@@ -190,10 +219,10 @@ export class SpaceRolesService {
       .where(eq(spaceRoles.id, BigInt(id)))
       .limit(1);
 
-    if (!existing || existing.spaceId !== spaceId) return false;
+    if (!existing || existing.spaceId !== spaceId) return null;
 
     await this.db.delete(spaceRoles).where(eq(spaceRoles.id, BigInt(id)));
-    return true;
+    return { space_role: this.format(existing) };
   }
 
   // ─── Format ───────────────────────────────────────────────────────────────
@@ -208,7 +237,7 @@ export class SpaceRolesService {
       allowed_paths: r.allowedPaths,
       blocked_paths: r.blockedPaths,
       resolved_allowed_paths: r.allowedPaths,
-      resolved_blocked_paths: null,
+      resolved_blocked_paths: r.blockedPaths,
       field_permissions: r.fieldPermissions,
       allowed_field_permissions: r.allowedFieldPermissions,
       readonly_field_permissions: r.readonlyFieldPermissions,

@@ -39,11 +39,29 @@ export function CommentTab({ spaceId, storyId, onDiscussionChange }: CommentTabP
     setLoading(true)
     try {
       const res = await fetch(
-        `/api/admin/spaces/${spaceId}/discussions?story_id=${storyId}&resolved=${activeTab === 'resolved'}`,
+        `/api/admin/spaces/${spaceId}/discussions?story_id=${storyId}&by_status=${activeTab === 'resolved' ? 'solved' : 'unsolved'}`,
       )
       if (!res.ok) throw new Error('Failed to load')
       const data = await res.json()
-      setDiscussions(data.discussions ?? [])
+      const discs = data.discussions ?? []
+
+      // Fetch comments for each discussion in parallel
+      const withComments = await Promise.all(
+        discs.map(async (d: any) => {
+          try {
+            const cRes = await fetch(
+              `/api/admin/spaces/${spaceId}/discussions/${d.id}/comments`,
+            )
+            if (cRes.ok) {
+              const cData = await cRes.json()
+              return { ...d, comments: cData.comments ?? [] }
+            }
+          } catch {}
+          return { ...d, comments: [] }
+        }),
+      )
+      // Only show discussions that have comments (matching previous behavior)
+      setDiscussions(withComments.filter((d: Discussion) => d.comments.length > 0))
     } catch {
       setDiscussions([])
     } finally {

@@ -254,7 +254,7 @@ export class UsersService {
       })
       .returning();
 
-    void this.webhooks.dispatch(spaceId, WEBHOOK_ACTIONS.USER_ADDED_TO_SPACE, {
+    void this.webhooks.dispatch(spaceId, WEBHOOK_ACTIONS.USER_ADDED, {
       action: 'user_added',
       space_id: spaceId,
       user_id: userId,
@@ -295,7 +295,7 @@ export class UsersService {
       .where(and(eq(spaceMembers.id, memberId), eq(spaceMembers.spaceId, spaceId)));
 
     if (member) {
-      void this.webhooks.dispatch(spaceId, WEBHOOK_ACTIONS.USER_REMOVED_FROM_SPACE, {
+      void this.webhooks.dispatch(spaceId, WEBHOOK_ACTIONS.USER_REMOVED, {
         action: 'user_removed',
         space_id: spaceId,
         user_id: member.userId,
@@ -432,12 +432,17 @@ export class UsersService {
     };
   }
 
-  async getCollaborators(spaceId: number) {
+  async getCollaborators(spaceId: number, opts?: { page?: number; perPage?: number }) {
+    const page = Math.max(1, opts?.page ?? 1);
+    const perPage = Math.min(100, Math.max(1, opts?.perPage ?? 25));
+
     const rows = await this.db
       .select()
       .from(spaceMembers)
       .innerJoin(users, eq(spaceMembers.userId, users.id))
-      .where(eq(spaceMembers.spaceId, spaceId));
+      .where(eq(spaceMembers.spaceId, spaceId))
+      .limit(perPage)
+      .offset((page - 1) * perPage);
 
     // Storyblok MAPI /collaborators response shape
     return {

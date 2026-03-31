@@ -27,8 +27,20 @@ export class WorkflowStageChangesController {
   @HttpCode(201)
   async createWorkflowStageChange(
     @Req() req: any,
-    @Body() body: { workflow_stage_change: { workflow_stage_id: number; story_id: number } },
+    @Body()
+    body: {
+      workflow_stage_change: { workflow_stage_id: number; story_id: number };
+      release_id?: number;
+      notify?: boolean;
+      comment?: { message: string };
+      assign?: { space_role_ids?: number[]; user_ids?: number[] };
+    },
   ) {
-    return this.workflowStageChangesService.create(req.space.id, body.workflow_stage_change);
+    return this.workflowStageChangesService.create(req.space.id, body.workflow_stage_change, {
+      releaseId: body.release_id,
+      notify: body.notify,
+      comment: body.comment,
+      assign: body.assign,
+    });
   }
 }

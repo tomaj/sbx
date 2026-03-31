@@ -17,8 +17,8 @@ interface Member {
 interface Space {
   id: number
   name: string
-  updatedAt: string
-  lastActivityAt: string | null
+  updated_at: string
+  last_activity_at: string | null
   members: Member[]
 }
 
@@ -53,7 +53,7 @@ function OrgSpaceCard({ space }: { space: Space }) {
             />
           )}
           <span className="text-xs text-gray-400 mt-1">
-            <TimeAgo date={space.lastActivityAt ?? space.updatedAt} />
+            <TimeAgo date={space.last_activity_at ?? space.updated_at} />
           </span>
         </div>
         <div className="text-right">
@@ -129,8 +129,8 @@ export function OrgSpacesClient({ spaces }: { spaces: Space[] }) {
     return [...list].sort((a, b) => {
       if (sort === 'name') return a.name.localeCompare(b.name)
       if (sort === 'id') return a.id - b.id
-      const aDate = a.lastActivityAt ?? a.updatedAt
-      const bDate = b.lastActivityAt ?? b.updatedAt
+      const aDate = a.last_activity_at ?? a.updated_at
+      const bDate = b.last_activity_at ?? b.updated_at
       return new Date(bDate).getTime() - new Date(aDate).getTime()
     })
   }, [spaces, search, sort])

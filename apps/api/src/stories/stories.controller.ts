@@ -11,8 +11,33 @@ export class StoriesController {
     private readonly storyVersionsService: StoryVersionsService,
   ) {}
 
+  /**
+   * Parse Storyblok-style sort_by param: "field:direction" (e.g. "name:asc", "created_at:desc").
+   * Also supports legacy sort_field/sort_dir params for backward compatibility.
+   */
+  private parseSortBy(sortBy?: string, sortField?: string, sortDir?: string, sortOrder?: string): { field: string; dir: 'asc' | 'desc' } {
+    if (sortBy) {
+      const lastColon = sortBy.lastIndexOf(':');
+      if (lastColon > 0) {
+        const field = sortBy.slice(0, lastColon);
+        const dir = sortBy.slice(lastColon + 1);
+        if (dir === 'asc' || dir === 'desc') {
+          return { field, dir };
+        }
+      }
+      // sort_by without direction defaults to asc
+      return { field: sortBy, dir: 'asc' };
+    }
+    // Legacy params
+    return {
+      field: sortField ?? 'position',
+      dir: (sortDir ?? sortOrder) === 'desc' ? 'desc' : 'asc',
+    };
+  }
+
   @Get()
   async list(
+    @Req() req: any,
     @Param('spaceId') spaceId: string,
     @Query('page') page = '1',
     @Query('per_page') perPage = '25',
@@ -33,8 +58,11 @@ export class StoriesController {
     @Query('in_release') inRelease?: string,
     @Query('by_ids') byIdsParam?: string,
     @Query('by_uuids') byUuidsParam?: string,
+    @Query('by_uuids_ordered') byUuidsOrderedParam?: string,
     @Query('excluding_ids') excludingIdsParam?: string,
+    @Query('favourite') favourite?: string,
     @Query('favourite_of') favouriteOfParam?: string,
+    @Query('mine') mine?: string,
     @Query('folder_only') folderOnly?: string,
     @Query('story_only') storyOnly?: string,
     @Query('starts_with') startsWith?: string,
@@ -47,6 +75,7 @@ export class StoriesController {
     @Query('scheduled_at_lt') scheduledAtLt?: string,
     @Query('reference_search') referenceSearch?: string | string[],
     @Query('reference_search[]') referenceSearchBracket?: string | string[],
+    @Query('with_summary') withSummary?: string,
   ) {
     let parentId: bigint | null | undefined = undefined;
     const rawParent = parentIdParam !== undefined ? parentIdParam : withParent;
@@ -64,12 +93,20 @@ export class StoriesController {
       : (isPublished ?? published) === 'false' ? false
       : undefined;
 
+    const { field: resolvedSortField, dir: resolvedSortDir } = this.parseSortBy(sortBy, sortField, sortDir, sortOrder);
+
+    // Resolve favourite_of: either from explicit param or from `favourite=true` using current user
+    let favouriteOf: number | undefined = favouriteOfParam ? parseInt(favouriteOfParam) : undefined;
+    if (favourite === 'true' && !favouriteOf && req.adminUser?.sbxUserId) {
+      favouriteOf = req.adminUser.sbxUserId;
+    }
+
     const { stories, total } = await this.storiesService.listStoriesAdmin(parseInt(spaceId), {
       page: Math.max(1, parseInt(page) || 1),
       perPage: Math.min(100, parseInt(perPage) || 25),
       search: textSearch ?? search,
-      sortField: sortField ?? sortBy ?? 'position',
-      sortDir: (sortDir ?? sortOrder) === 'desc' ? 'desc' : 'asc',
+      sortField: resolvedSortField,
+      sortDir: resolvedSortDir,
       parentId,
       contentType,
       tag,
@@ -79,8 +116,10 @@ export class StoriesController {
       inRelease: inRelease ? parseInt(inRelease) : undefined,
       byIds: byIdsParam?.trim() ? byIdsParam.split(',').map((s) => BigInt(s.trim())).filter(Boolean) : undefined,
       byUuids: byUuidsParam?.trim() ? byUuidsParam.split(',').map((s) => s.trim()).filter(Boolean) : undefined,
+      byUuidsOrdered: byUuidsOrderedParam?.trim() ? byUuidsOrderedParam.split(',').map((s) => s.trim()).filter(Boolean) : undefined,
       excludingIds: excludingIdsParam?.trim() ? excludingIdsParam.split(',').map((s) => BigInt(s.trim())).filter(Boolean) : undefined,
-      favouriteOf: favouriteOfParam ? parseInt(favouriteOfParam) : undefined,
+      favouriteOf,
+      mine: mine === 'true' ? req.adminUser?.sbxUserId : undefined,
       folderOnly: folderOnly === 'true' || folderOnly === '1',
       storyOnly: storyOnly === 'true' || storyOnly === '1',
       startsWith,
@@ -92,6 +131,7 @@ export class StoriesController {
       scheduledAtGt: scheduledAtGt ? new Date(scheduledAtGt) : undefined,
       scheduledAtLt: scheduledAtLt ? new Date(scheduledAtLt) : undefined,
       referenceSearch: referenceSearch ?? referenceSearchBracket ?? undefined,
+      withSummary: withSummary === 'true' || withSummary === '1',
     });
 
     return { stories, total };
@@ -116,6 +156,31 @@ export class StoriesController {
     return this.storyVersionsService.compareVersions(parseInt(spaceId), parseInt(id), parseInt(versionV2));
   }
 
+  /**
+   * Storyblok MAPI uses GET for publish/unpublish (not POST/PUT).
+   * Must be declared BEFORE @Get(':id') to avoid NestJS matching "publish" as :id.
+   * We also keep POST as an alias for backward compatibility with admin UI.
+   */
+  @Get(':id/publish')
+  publishStoryGet(
+    @Param('spaceId') spaceId: string,
+    @Param('id') id: string,
+    @Query('lang') lang?: string,
+    @Req() req?: any,
+  ) {
+    return this.storiesService.publishStory(parseInt(spaceId), parseInt(id), req?.adminUser?.sbxUserId, lang);
+  }
+
+  @Get(':id/unpublish')
+  unpublishStoryGet(
+    @Param('spaceId') spaceId: string,
+    @Param('id') id: string,
+    @Query('lang') lang?: string,
+    @Req() req?: any,
+  ) {
+    return this.storiesService.unpublishStory(parseInt(spaceId), parseInt(id), req?.adminUser?.sbxUserId);
+  }
+
   @Get(':id')
   async getStory(
     @Param('spaceId') spaceId: string,
@@ -131,13 +196,17 @@ export class StoriesController {
   @Post()
   async createStory(
     @Param('spaceId') spaceId: string,
-    @Body() body: { story: { name: string; slug: string; content?: Record<string, any>; parent_id?: number | null; tag_list?: string[]; path?: string | null; is_folder?: boolean; is_startpage?: boolean; first_published_at?: string | null }; publish?: boolean },
+    @Body() body: {
+      story: { name: string; slug: string; content?: Record<string, any>; parent_id?: number | null; tag_list?: string[]; path?: string | null; is_folder?: boolean; is_startpage?: boolean; first_published_at?: string | null; publish_at?: string | null; expire_at?: string | null };
+      publish?: boolean;
+      release_id?: number;
+    },
     @Req() req: any,
   ) {
-    const result = await this.storiesService.createStory(parseInt(spaceId), body.story, req.adminUser?.sbxUserId);
+    const result = await this.storiesService.createStory(parseInt(spaceId), body.story, req.adminUser?.sbxUserId, body.release_id);
 
     if (body.publish) {
-      const storyId = result.story.id;
+      const storyId = (result.story as any).id;
       return this.storiesService.publishStory(parseInt(spaceId), storyId);
     }
 
@@ -148,10 +217,22 @@ export class StoriesController {
   async updateStory(
     @Param('spaceId') spaceId: string,
     @Param('id') id: string,
-    @Body() body: { story: { name?: string; slug?: string; content?: Record<string, any>; tag_list?: string[]; path?: string | null; sort_by_date?: string | null; first_published_at?: string | null }; publish?: boolean },
+    @Body() body: {
+      story: { name?: string; slug?: string; content?: Record<string, any>; tag_list?: string[]; path?: string | null; sort_by_date?: string | null; first_published_at?: string | null; publish_at?: string | null; expire_at?: string | null; is_startpage?: boolean; disable_fe_editor?: boolean };
+      publish?: boolean;
+      force_update?: string;
+      release_id?: number;
+      group_id?: string;
+      lang?: string;
+    },
     @Req() req: any,
   ) {
-    const result = await this.storiesService.updateStoryAdmin(parseInt(spaceId), parseInt(id), body.story, req.adminUser?.sbxUserId);
+    // Merge release_id from body root into data for the service
+    const storyData = {
+      ...body.story,
+      ...(body.release_id != null && { release_id: body.release_id }),
+    };
+    const result = await this.storiesService.updateStoryAdmin(parseInt(spaceId), parseInt(id), storyData, req.adminUser?.sbxUserId);
 
     if (body.publish) {
       return this.storiesService.publishStory(parseInt(spaceId), parseInt(id));
@@ -167,12 +248,12 @@ export class StoriesController {
   }
 
   @Post(':id/publish')
-  publishStory(@Param('spaceId') spaceId: string, @Param('id') id: string, @Req() req: any) {
+  publishStoryPost(@Param('spaceId') spaceId: string, @Param('id') id: string, @Req() req: any) {
     return this.storiesService.publishStory(parseInt(spaceId), parseInt(id), req.adminUser?.sbxUserId);
   }
 
   @Post(':id/unpublish')
-  unpublishStory(@Param('spaceId') spaceId: string, @Param('id') id: string, @Req() req: any) {
+  unpublishStoryPost(@Param('spaceId') spaceId: string, @Param('id') id: string, @Req() req: any) {
     return this.storiesService.unpublishStory(parseInt(spaceId), parseInt(id), req.adminUser?.sbxUserId);
   }
 

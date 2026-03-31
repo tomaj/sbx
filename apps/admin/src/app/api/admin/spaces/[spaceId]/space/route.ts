@@ -38,18 +38,7 @@ export async function PATCH(
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      space: {
-        name: body.name,
-        default_root: body.defaultRoot,
-        domain: body.domain,
-        preview_urls: body.previewUrls,
-        encode_url: body.encodeUrl,
-        mobile_width: body.mobileWidth,
-        visual_editor_disabled: body.visualEditorDisabled,
-        asset_library_settings: body.assetLibrarySettings,
-      },
-    }),
+    body: JSON.stringify({ space: body }),
   })
   const data = await res.json()
   return NextResponse.json(data, { status: res.status })

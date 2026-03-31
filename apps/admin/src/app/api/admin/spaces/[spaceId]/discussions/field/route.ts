@@ -13,6 +13,8 @@ async function getSessionToken() {
 }
 
 // POST: get or create a discussion for a specific field
+// Admin UI sends { story_id, field_key }
+// We first try to find an existing unsolved discussion via list, then create if not found
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ spaceId: string }> },
@@ -20,11 +22,42 @@ export async function POST(
   const { spaceId } = await params
   const token = await getSessionToken()
   const body = await req.json()
-  const res = await fetch(`${API_URL}/v1/spaces/${spaceId}/discussions/field`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
-  const data = await res.json()
-  return NextResponse.json(data, { status: res.status })
+  const storyId = body.story_id
+  const fieldKey = body.field_key
+
+  if (!storyId || !fieldKey) {
+    return NextResponse.json({ error: 'story_id and field_key required' }, { status: 400 })
+  }
+
+  // Check existing unsolved discussions for this story
+  const listRes = await fetch(
+    `${API_URL}/v1/spaces/${spaceId}/stories/${storyId}/discussions?by_status=unsolved&per_page=100`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  )
+  if (listRes.ok) {
+    const listData = await listRes.json()
+    const existing = (listData.discussions ?? []).find(
+      (d: any) => d.field_key === fieldKey || d.fieldname === fieldKey,
+    )
+    if (existing) {
+      return NextResponse.json({ discussion: existing })
+    }
+  }
+
+  // Create new discussion via MAPI
+  const createRes = await fetch(
+    `${API_URL}/v1/spaces/${spaceId}/stories/${storyId}/discussions`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        discussion: {
+          fieldname: fieldKey,
+          title: fieldKey,
+        },
+      }),
+    },
+  )
+  const data = await createRes.json()
+  return NextResponse.json(data, { status: createRes.status })
 }

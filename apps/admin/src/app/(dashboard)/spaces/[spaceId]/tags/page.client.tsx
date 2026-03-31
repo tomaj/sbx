@@ -8,7 +8,6 @@ import { RightSidebar } from '@/components/ui/right-sidebar'
 import { InputWithCounter } from '@/components/ui/input-with-counter'
 
 interface TagItem {
-  id: number
   name: string
   taggings_count: number
   [key: string]: unknown
@@ -16,7 +15,6 @@ interface TagItem {
 
 interface ApiResponse {
   tags: TagItem[]
-  total: number
 }
 
 const COLUMNS: Column<TagItem>[] = [
@@ -59,12 +57,11 @@ export default function TagsPage({ params }: { params: Promise<{ spaceId: string
     try {
       const qs = new URLSearchParams()
       if (search) qs.set('search', search)
-      if (sort.field) qs.set('sort_field', sort.field)
-      if (sort.direction) qs.set('sort_dir', sort.direction)
+      if (sort.field && sort.direction) qs.set('sort_by', `${sort.field}:${sort.direction}`)
       const res = await fetch(`/api/admin/spaces/${spaceId}/tags?${qs}`)
       const data: ApiResponse = await res.json()
       setTags(data.tags ?? [])
-      setTotal(data.total ?? 0)
+      setTotal(data.tags?.length ?? 0)
     } finally {
       setIsLoading(false)
     }
@@ -102,7 +99,7 @@ export default function TagsPage({ params }: { params: Promise<{ spaceId: string
       const url =
         sidebarMode === 'create'
           ? `/api/admin/spaces/${spaceId}/tags`
-          : `/api/admin/spaces/${spaceId}/tags/${selectedTag!.id}`
+          : `/api/admin/spaces/${spaceId}/tags/${encodeURIComponent(selectedTag!.name)}`
       const res = await fetch(url, {
         method: sidebarMode === 'create' ? 'POST' : 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -148,7 +145,7 @@ export default function TagsPage({ params }: { params: Promise<{ spaceId: string
       <DataTable
         columns={COLUMNS}
         data={tags}
-        keyField="id"
+        keyField="name"
         sort={sort}
         onSort={(field, direction) => setSort({ field, direction })}
         isLoading={isLoading}

@@ -349,8 +349,8 @@ export class DatasourcesService {
       })
       .returning();
 
-    void this.dispatchDatasourceEntryEvent(datasourceId, WEBHOOK_ACTIONS.DATASOURCE_ENTRY_CREATED, {
-      action: 'datasource_entry_created',
+    void this.dispatchDatasourceEntryEvent(datasourceId, WEBHOOK_ACTIONS.DATASOURCE_ENTRIES_UPDATED, {
+      action: 'datasource_entries_updated',
       entry_id: Number(row.id),
       name: row.name,
       value: row.value,
@@ -360,6 +360,7 @@ export class DatasourcesService {
       id: Number(row.id),
       name: row.name,
       value: row.value,
+      dimension_value: null,
       position: row.position,
       datasource_id: Number(datasourceId),
     };
@@ -397,8 +398,8 @@ export class DatasourcesService {
       .returning();
     if (!row) throw new NotFoundException('Entry not found');
 
-    void this.dispatchDatasourceEntryEvent(datasourceId, WEBHOOK_ACTIONS.DATASOURCE_ENTRY_UPDATED, {
-      action: 'datasource_entry_updated',
+    void this.dispatchDatasourceEntryEvent(datasourceId, WEBHOOK_ACTIONS.DATASOURCE_ENTRIES_UPDATED, {
+      action: 'datasource_entries_updated',
       entry_id: Number(row.id),
       name: row.name,
       value: row.value,
@@ -408,6 +409,7 @@ export class DatasourcesService {
       id: Number(row.id),
       name: row.name,
       value: row.value,
+      dimension_value: data.dimension_value ?? null,
       position: row.position,
       datasource_id: Number(datasourceId),
     };
@@ -423,8 +425,8 @@ export class DatasourcesService {
         ),
       );
 
-    void this.dispatchDatasourceEntryEvent(datasourceId, WEBHOOK_ACTIONS.DATASOURCE_ENTRY_DELETED, {
-      action: 'datasource_entry_deleted',
+    void this.dispatchDatasourceEntryEvent(datasourceId, WEBHOOK_ACTIONS.DATASOURCE_ENTRIES_UPDATED, {
+      action: 'datasource_entries_updated',
       entry_id: Number(entryId),
     });
 

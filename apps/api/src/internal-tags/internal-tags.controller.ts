@@ -11,8 +11,9 @@ export class InternalTagsController {
   list(
     @Param('spaceId') spaceId: string,
     @Query('by_object_type') byObjectType?: string,
+    @Query('search') search?: string,
   ) {
-    return this.service.listTags(parseInt(spaceId), byObjectType);
+    return this.service.listTags(parseInt(spaceId), byObjectType, search);
   }
 
   @Post('internal_tags')
@@ -27,9 +28,9 @@ export class InternalTagsController {
   update(
     @Param('spaceId') spaceId: string,
     @Param('id') id: string,
-    @Body() body: { internal_tag: { name: string } },
+    @Body() body: { internal_tag: { name?: string; object_type?: string } },
   ) {
-    return this.service.updateTag(parseInt(spaceId), parseInt(id), body.internal_tag.name);
+    return this.service.updateTag(parseInt(spaceId), parseInt(id), body.internal_tag);
   }
 
   @Delete('internal_tags/:id')

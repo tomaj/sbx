@@ -41,13 +41,13 @@ export class AccessTokensController {
     @Body() body: {
       api_key: {
         name?: string;
-        token_type?: 'public' | 'private' | 'management';
+        access?: 'public' | 'private' | 'theme' | 'release';
         branch_id?: number | null;
         min_cache?: number | null;
       };
     },
   ) {
-    const access = (body.api_key?.token_type ?? 'public') as 'public' | 'private';
+    const access = (body.api_key?.access ?? 'public') as 'public' | 'private';
     return this.accessTokensService.adminCreate(req.space.id, {
       name: body.api_key?.name,
       access,
@@ -63,7 +63,7 @@ export class AccessTokensController {
     @Body() body: {
       api_key: {
         name?: string;
-        token_type?: 'public' | 'private';
+        access?: 'public' | 'private' | 'theme' | 'release';
         branch_id?: number | null;
         min_cache?: number | null;
       };
@@ -74,7 +74,7 @@ export class AccessTokensController {
       parseInt(id),
       {
         name: body.api_key?.name,
-        access: body.api_key?.token_type,
+        access: body.api_key?.access as 'public' | 'private' | undefined,
         branchId: body.api_key?.branch_id,
         minCache: body.api_key?.min_cache ?? undefined,
       },
@@ -86,7 +86,11 @@ export class AccessTokensController {
   @Delete(':id')
   @HttpCode(200)
   async deleteApiKey(@Req() req: any, @Param('id') id: string) {
-    await this.accessTokensService.adminDelete(req.space.id, parseInt(id));
-    return {};
+    const result = await this.accessTokensService.adminDelete(
+      req.space.id,
+      parseInt(id),
+    );
+    if (!result) throw new NotFoundException();
+    return result;
   }
 }

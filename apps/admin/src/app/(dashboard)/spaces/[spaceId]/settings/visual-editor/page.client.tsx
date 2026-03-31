@@ -57,10 +57,10 @@ export default function VisualEditorPage({ params }: { params: Promise<{ spaceId
           const s = data.space
           setSettings({
             domain: s.domain ?? '',
-            previewUrls: s.previewUrls ?? [],
-            encodeUrl: s.encodeUrl ?? false,
-            mobileWidth: s.mobileWidth ?? 360,
-            visualEditorDisabled: s.visualEditorDisabled ?? false,
+            previewUrls: s.preview_urls ?? [],
+            encodeUrl: s.encode_url ?? false,
+            mobileWidth: s.mobile_width ?? 360,
+            visualEditorDisabled: s.visual_editor_disabled ?? false,
           })
         }
       })
@@ -76,10 +76,10 @@ export default function VisualEditorPage({ params }: { params: Promise<{ spaceId
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           domain: settings.domain || null,
-          previewUrls: settings.previewUrls,
-          encodeUrl: settings.encodeUrl,
-          mobileWidth: settings.mobileWidth,
-          visualEditorDisabled: settings.visualEditorDisabled,
+          preview_urls: settings.previewUrls,
+          encode_url: settings.encodeUrl,
+          mobile_width: settings.mobileWidth,
+          visual_editor_disabled: settings.visualEditorDisabled,
         }),
       })
       if (!res.ok) {
@@ -91,10 +91,10 @@ export default function VisualEditorPage({ params }: { params: Promise<{ spaceId
         const s = data.space
         setSettings({
           domain: s.domain ?? '',
-          previewUrls: s.previewUrls ?? [],
-          encodeUrl: s.encodeUrl ?? false,
-          mobileWidth: s.mobileWidth ?? 360,
-          visualEditorDisabled: s.visualEditorDisabled ?? false,
+          previewUrls: s.preview_urls ?? [],
+          encodeUrl: s.encode_url ?? false,
+          mobileWidth: s.mobile_width ?? 360,
+          visualEditorDisabled: s.visual_editor_disabled ?? false,
         })
       }
       setSaved(true)

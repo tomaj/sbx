@@ -22,8 +22,17 @@ export class AssetsController {
   // ─── Asset Folders ───────────────────────────────────────────────────────────
 
   @Get('asset_folders')
-  async listFolders(@Param('spaceId') spaceId: string) {
-    return this.assetsService.listFolders(parseInt(spaceId));
+  async listFolders(
+    @Param('spaceId') spaceId: string,
+    @Query('by_ids') byIds?: string,
+    @Query('search') search?: string,
+    @Query('with_parent') withParent?: string,
+  ) {
+    return this.assetsService.listFolders(parseInt(spaceId), {
+      byIds: byIds ? byIds.split(',').map((id) => parseInt(id.trim())).filter((id) => !isNaN(id)) : undefined,
+      search,
+      withParent: withParent !== undefined ? parseInt(withParent) : undefined,
+    });
   }
 
   @Get('asset_folders/:id')
@@ -75,13 +84,18 @@ export class AssetsController {
     @Query('in_folder') inFolder?: string,
     @Query('content_type') contentType?: string,
     @Query('sort_by') sortBy?: string,
+    @Query('is_private') isPrivate?: string,
+    @Query('by_alt') byAlt?: string,
+    @Query('by_copyright') byCopyright?: string,
+    @Query('by_title') byTitle?: string,
+    @Query('with_tags') withTags?: string,
   ) {
     // sort_by format: "created_at:desc" or "short_filename:asc"
     let sortField: string | undefined;
     let sortDir: 'asc' | 'desc' | undefined;
     if (sortBy) {
       const [field, dir] = sortBy.split(':');
-      sortField = field === 'short_filename' ? 'filename' : field;
+      sortField = field === 'short_filename' ? 'short_filename' : field;
       sortDir = dir === 'asc' ? 'asc' : 'desc';
     }
 
@@ -94,6 +108,11 @@ export class AssetsController {
       contentType,
       sortField,
       sortDir,
+      isPrivate: isPrivate === '1',
+      byAlt,
+      byCopyright,
+      byTitle,
+      withTags,
     });
     return { assets: result.assets, total: result.total };
   }
@@ -138,6 +157,10 @@ export class AssetsController {
         expire_at?: string | null;
         locked?: boolean;
         asset_folder_id?: number | null;
+        is_private?: boolean;
+        meta_data?: Record<string, any>;
+        internal_tag_ids?: number[];
+        publish_at?: string | null;
       };
     },
   ) {
@@ -150,6 +173,8 @@ export class AssetsController {
       expire_at: data.expire_at,
       locked: data.locked,
       folder_id: data.asset_folder_id,
+      meta_data: data.meta_data,
+      internal_tag_ids: data.internal_tag_ids,
     });
     return { asset };
   }
@@ -160,8 +185,8 @@ export class AssetsController {
     @Param('spaceId') spaceId: string,
     @Param('id') id: string,
   ) {
-    await this.assetsService.softDeleteAsset(parseInt(id), parseInt(spaceId));
-    return {};
+    const asset = await this.assetsService.softDeleteAsset(parseInt(id), parseInt(spaceId));
+    return { asset };
   }
 
   @Post('assets/:id/restore')

@@ -106,9 +106,9 @@ export function StoryHistoryPanel({ spaceId, storyId, storyName, previewUrl, onC
     setRestoring(true)
     try {
       const res = await fetch(`/api/admin/spaces/${spaceId}/stories/${storyId}`, {
-        method: 'PATCH',
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: v.name, name: v.name }),
+        body: JSON.stringify({ story: { content: v.name, name: v.name } }),
       })
       // After restore, reload versions and notify parent
       if (res.ok) {

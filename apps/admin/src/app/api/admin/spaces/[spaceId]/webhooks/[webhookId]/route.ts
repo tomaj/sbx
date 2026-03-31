@@ -22,10 +22,10 @@ export async function GET(
     headers: { Authorization: `Bearer ${token}` },
   })
   const data = await res.json()
-  return NextResponse.json({ webhook: data.webhook_endpoint }, { status: res.status })
+  return NextResponse.json(data, { status: res.status })
 }
 
-export async function PATCH(
+export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ spaceId: string; webhookId: string }> },
 ) {
@@ -41,7 +41,7 @@ export async function PATCH(
     body: JSON.stringify({ webhook_endpoint: body }),
   })
   const data = await res.json()
-  return NextResponse.json({ webhook: data.webhook_endpoint }, { status: res.status })
+  return NextResponse.json(data, { status: res.status })
 }
 
 export async function DELETE(
@@ -54,6 +54,5 @@ export async function DELETE(
     method: 'DELETE',
     headers: { Authorization: `Bearer ${token}` },
   })
-  const data = await res.json()
-  return NextResponse.json(data, { status: res.status })
+  return new NextResponse(null, { status: res.status })
 }

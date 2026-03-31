@@ -29,7 +29,7 @@ export async function GET(
   return NextResponse.json(data, { status: res.status })
 }
 
-export async function PATCH(
+export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ spaceId: string; storyId: string }> },
 ) {
@@ -39,7 +39,7 @@ export async function PATCH(
   const res = await fetch(`${API_URL}/v1/spaces/${spaceId}/stories/${storyId}`, {
     method: 'PUT',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ story: body }),
+    body: JSON.stringify(body),
   })
   const data = await res.json()
   return NextResponse.json(data, { status: res.status })

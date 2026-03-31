@@ -88,10 +88,12 @@ export class AccessTokensService {
   }
 
   async adminDelete(spaceId: number, id: number) {
-    await this.db
+    const [deleted] = await this.db
       .delete(apiTokens)
-      .where(and(eq(apiTokens.id, id), eq(apiTokens.spaceId, spaceId)));
-    return { deleted: true };
+      .where(and(eq(apiTokens.id, id), eq(apiTokens.spaceId, spaceId)))
+      .returning();
+    if (!deleted) return null;
+    return { api_key: this.format(deleted) };
   }
 
   private format(t: typeof apiTokens.$inferSelect) {

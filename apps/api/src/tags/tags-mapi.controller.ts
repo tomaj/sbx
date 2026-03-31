@@ -24,14 +24,26 @@ export class TagsMAPIController {
     @Req() req: any,
     @Query('search') search?: string,
     @Query('sort_by') sortBy?: string,
+    @Query('all_tags') allTags?: string,
+    @Query('page') page?: string,
+    @Query('per_page') perPage?: string,
   ) {
-    return this.tagsService.listMapi(req.space.id, { search, sortBy });
+    return this.tagsService.listMapi(req.space.id, {
+      search,
+      sortBy,
+      allTags: allTags !== undefined,
+      page: page ? parseInt(page) : 1,
+      perPage: perPage ? parseInt(perPage) : 25,
+    });
   }
 
   @Post()
   @HttpCode(201)
-  create(@Req() req: any, @Body() body: { tag: { name: string } }) {
-    return this.tagsService.createTag(req.space.id, { name: body.tag.name });
+  create(@Req() req: any, @Body() body: { tag: { name: string; story_id?: number } }) {
+    return this.tagsService.createTag(req.space.id, {
+      name: body.tag.name,
+      storyId: body.tag.story_id,
+    });
   }
 
   @Put(':id')
@@ -43,9 +55,9 @@ export class TagsMAPIController {
     return this.tagsService.updateTag(parseInt(id), req.space.id, { name: body.tag.name });
   }
 
-  @Delete(':id')
-  @HttpCode(200)
-  remove(@Req() req: any, @Param('id') id: string) {
-    return this.tagsService.deleteTag(parseInt(id), req.space.id);
+  @Delete(':tagName')
+  @HttpCode(204)
+  remove(@Req() req: any, @Param('tagName') tagName: string) {
+    return this.tagsService.deleteTagByName(tagName, req.space.id);
   }
 }

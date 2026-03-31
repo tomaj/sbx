@@ -8,6 +8,7 @@ import {
   Param,
   Post,
   Put,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -20,8 +21,11 @@ export class PresetsController {
   constructor(private readonly presetsService: PresetsService) {}
 
   @Get()
-  async getPresets(@Req() req: any) {
-    return this.presetsService.findAll(req.space.id);
+  async getPresets(@Req() req: any, @Query('component_id') componentId?: string) {
+    return this.presetsService.findAll(
+      req.space.id,
+      componentId ? parseInt(componentId) : undefined,
+    );
   }
 
   @Get(':id')
@@ -59,6 +63,7 @@ export class PresetsController {
     body: {
       preset: {
         name?: string;
+        component_id?: number;
         preset?: Record<string, any>;
         image?: string | null;
         color?: string | null;
@@ -75,6 +80,8 @@ export class PresetsController {
   @Delete(':id')
   @HttpCode(200)
   async deletePreset(@Req() req: any, @Param('id') id: string) {
-    return this.presetsService.remove(req.space.id, parseInt(id));
+    const result = await this.presetsService.remove(req.space.id, parseInt(id));
+    if (!result) throw new NotFoundException();
+    return result;
   }
 }

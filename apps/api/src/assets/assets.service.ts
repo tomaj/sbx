@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { and, asc, desc, count, eq, ilike, isNull, isNotNull, or } from 'drizzle-orm';
+import { and, asc, desc, count, eq, ilike, isNull, isNotNull, or, sql } from 'drizzle-orm';
 import { DB } from '../db/db.module';
 import type { DbType } from '../db/db.module';
 import { assets, assetFolders, internalTags } from '../db/schema';
@@ -22,11 +22,34 @@ export class AssetsService {
 
   // ─── Folders ────────────────────────────────────────────────────────────────
 
-  async listFolders(spaceId: number) {
+  async listFolders(
+    spaceId: number,
+    opts?: {
+      byIds?: number[];
+      search?: string;
+      withParent?: number;
+    },
+  ) {
+    const conditions: any[] = [eq(assetFolders.spaceId, spaceId)];
+
+    if (opts?.byIds && opts.byIds.length > 0) {
+      conditions.push(inArray(assetFolders.id, opts.byIds));
+    }
+    if (opts?.search) {
+      conditions.push(ilike(assetFolders.name, `%${opts.search}%`));
+    }
+    if (opts?.withParent !== undefined) {
+      if (opts.withParent === 0) {
+        conditions.push(isNull(assetFolders.parentId));
+      } else {
+        conditions.push(eq(assetFolders.parentId, opts.withParent));
+      }
+    }
+
     const rows = await this.db
       .select()
       .from(assetFolders)
-      .where(eq(assetFolders.spaceId, spaceId))
+      .where(and(...conditions))
       .orderBy(asc(assetFolders.name));
 
     const idToUuid = new Map(rows.map((f) => [f.id, f.uuid]));
@@ -48,7 +71,7 @@ export class AssetsService {
       const [parent] = await this.db.select({ uuid: assetFolders.uuid }).from(assetFolders).where(eq(assetFolders.id, row.parentId)).limit(1);
       parentUuid = parent?.uuid ?? null;
     }
-    return this.formatFolder(row, new Map([[row.id, row.uuid], ...(row.parentId ? [[row.parentId, parentUuid ?? '']] as [bigint, string][] : [])]));
+    return this.formatFolder(row, new Map<number, string>([[row.id, row.uuid], ...(row.parentId ? [[row.parentId, parentUuid ?? '']] as [number, string][] : [])]));
   }
 
   async createFolder(spaceId: number, data: { name: string; parent_id?: number | null }) {
@@ -57,7 +80,7 @@ export class AssetsService {
 
     let parentUuid: string | null = null;
     if (data.parent_id) {
-      const [parent] = await this.db.select({ uuid: assetFolders.uuid }).from(assetFolders).where(eq(assetFolders.id, BigInt(data.parent_id))).limit(1);
+      const [parent] = await this.db.select({ uuid: assetFolders.uuid }).from(assetFolders).where(eq(assetFolders.id, data.parent_id)).limit(1);
       parentUuid = parent?.uuid ?? null;
     }
 
@@ -66,7 +89,7 @@ export class AssetsService {
       .values({ id, spaceId, name: data.name, parentId: data.parent_id ?? null, uuid })
       .returning();
 
-    const idToUuid = new Map<bigint, string>([[row.id, row.uuid]]);
+    const idToUuid = new Map<number, string>([[row.id, row.uuid]]);
     if (row.parentId && parentUuid) idToUuid.set(row.parentId, parentUuid);
     return this.formatFolder(row, idToUuid);
   }
@@ -88,7 +111,7 @@ export class AssetsService {
       const [parent] = await this.db.select({ uuid: assetFolders.uuid }).from(assetFolders).where(eq(assetFolders.id, row.parentId)).limit(1);
       parentUuid = parent?.uuid ?? null;
     }
-    const idToUuid = new Map<bigint, string>([[row.id, row.uuid]]);
+    const idToUuid = new Map<number, string>([[row.id, row.uuid]]);
     if (row.parentId && parentUuid) idToUuid.set(row.parentId, parentUuid);
     return this.formatFolder(row, idToUuid);
   }
@@ -115,9 +138,14 @@ export class AssetsService {
       sortDir?: 'asc' | 'desc';
       deleted?: boolean;
       contentType?: string;
+      isPrivate?: boolean;
+      byAlt?: string;
+      byCopyright?: string;
+      byTitle?: string;
+      withTags?: string;
     },
   ) {
-    const { page, perPage, search, folderId, sortField, sortDir, deleted, contentType } = opts;
+    const { page, perPage, search, folderId, sortField, sortDir, deleted, contentType, isPrivate, byAlt, byCopyright, byTitle, withTags } = opts;
 
     const conditions: any[] = [eq(assets.spaceId, spaceId)];
 
@@ -148,12 +176,59 @@ export class AssetsService {
       conditions.push(ilike(assets.contentType, `${contentType}%`));
     }
 
+    if (byAlt) {
+      conditions.push(ilike(assets.alt, `%${byAlt}%`));
+    }
+
+    if (byCopyright) {
+      conditions.push(ilike(assets.copyright, `%${byCopyright}%`));
+    }
+
+    if (byTitle) {
+      conditions.push(ilike(assets.title, `%${byTitle}%`));
+    }
+
+    // with_tags: comma-separated tag names, OR logic — filter assets that have any of these tags
+    if (withTags) {
+      const tagNames = withTags.split(',').map((t) => t.trim()).filter(Boolean);
+      if (tagNames.length > 0) {
+        // Look up tag IDs by name
+        const tagRows = await this.db
+          .select({ id: internalTags.id })
+          .from(internalTags)
+          .where(and(
+            eq(internalTags.spaceId, spaceId),
+            inArray(internalTags.name, tagNames),
+          ));
+        if (tagRows.length === 0) {
+          // No matching tags — return empty result
+          return { assets: [], total: 0, page, per_page: perPage };
+        }
+        const tagIdStrings = tagRows.map((t) => String(t.id));
+        // internal_tag_ids is a JSON array of string IDs; use SQL to check overlap
+        const tagConditions = tagIdStrings.map((tagId) =>
+          // Check if the JSON array contains this tag ID string
+          // Using raw SQL: internal_tag_ids::jsonb @> '["tagId"]'::jsonb
+          // With Drizzle, use sql template
+          sql`${assets.internalTagIds}::jsonb @> ${JSON.stringify([tagId])}::jsonb`,
+        );
+        conditions.push(or(...tagConditions));
+      }
+    }
+
+    // is_private filter: since we don't store is_private in DB (all assets are public),
+    // filtering for private-only returns no results
+    if (isPrivate) {
+      return { assets: [], total: 0, page, per_page: perPage };
+    }
+
     const where = and(...conditions);
 
     let orderCol: any;
     switch (sortField) {
       case 'created_at': orderCol = assets.createdAt; break;
       case 'updated_at': orderCol = assets.updatedAt; break;
+      case 'short_filename':
       case 'filename': orderCol = assets.shortFilename; break;
       case 'content_length': orderCol = assets.contentLength; break;
       default: orderCol = assets.createdAt;
@@ -240,7 +315,7 @@ export class AssetsService {
       .returning();
     if (!row) throw new NotFoundException('Asset not found');
 
-    void this.webhooks.dispatch(spaceId, WEBHOOK_ACTIONS.ASSET_UPDATED, {
+    void this.webhooks.dispatch(spaceId, 'asset.updated', {
       action: 'asset_updated',
       space_id: spaceId,
       asset_id: id,
@@ -335,7 +410,7 @@ export class AssetsService {
       text: `Asset "${row.shortFilename}" was deleted.`,
     });
 
-    return { deleted: true };
+    return this.formatAsset(row);
   }
 
   async restoreAsset(id: number, spaceId: number) {
@@ -373,7 +448,7 @@ export class AssetsService {
     return `/f/${match[1]}/${match[2]}`;
   }
 
-  private formatFolder(f: typeof assetFolders.$inferSelect, idToUuid: Map<bigint, string>) {
+  private formatFolder(f: typeof assetFolders.$inferSelect, idToUuid: Map<number, string>) {
     return {
       id: f.id,
       name: f.name,

@@ -21,7 +21,6 @@ import { TasksModule } from './tasks/tasks.module';
 import { WorkflowsModule } from './workflows/workflows.module';
 import { FieldTypesModule } from './field-types/field-types.module';
 import { BridgeModule } from './bridge/bridge.module';
-import { PipelinesModule } from './pipelines/pipelines.module';
 import { WorkflowStageChangesModule } from './workflow-stage-changes/workflow-stage-changes.module';
 import { ApprovalsModule } from './approvals/approvals.module';
 import { DiscussionsModule } from './discussions/discussions.module';
@@ -29,6 +28,6 @@ import { JobsModule } from './jobs/jobs.module';
 import { InternalTagsModule } from './internal-tags/internal-tags.module';
 
 @Module({
-  imports: [JobsModule, DbModule, StorageModule, AuthModule, DatasourcesModule, SpacesModule, UsersModule, TagsModule, ComponentsModule, AccessTokensModule, SpaceRolesModule, WebhooksModule, PresetsModule, ActivitiesModule, PersonalTokensModule, AssetsModule, BranchesModule, ReleasesModule, StoriesModule, TasksModule, WorkflowsModule, FieldTypesModule, BridgeModule, PipelinesModule, WorkflowStageChangesModule, ApprovalsModule, DiscussionsModule, InternalTagsModule],
+  imports: [JobsModule, DbModule, StorageModule, AuthModule, DatasourcesModule, SpacesModule, UsersModule, TagsModule, ComponentsModule, AccessTokensModule, SpaceRolesModule, WebhooksModule, PresetsModule, ActivitiesModule, PersonalTokensModule, AssetsModule, BranchesModule, ReleasesModule, StoriesModule, TasksModule, WorkflowsModule, FieldTypesModule, BridgeModule, WorkflowStageChangesModule, ApprovalsModule, DiscussionsModule, InternalTagsModule],
 })
 export class AppModule {}

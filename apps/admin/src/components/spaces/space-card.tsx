@@ -15,8 +15,8 @@ interface Member {
 interface Space {
   id: number
   name: string
-  updatedAt: string
-  lastActivityAt: string | null
+  updated_at: string
+  last_activity_at: string | null
   members: Member[]
 }
 
@@ -84,7 +84,7 @@ export function SpaceCard({ space, isFav = false, onToggleFav }: SpaceCardProps)
         <div className="pt-4 border-t border-gray-100 dark:border-gray-800 flex items-center gap-1">
           <span className="text-xs text-gray-400 group-hover:text-teal-500 dark:group-hover:text-teal-400 transition-colors">Updated</span>
           <TimeAgo
-            date={space.lastActivityAt ?? space.updatedAt}
+            date={space.last_activity_at ?? space.updated_at}
             className="text-xs text-gray-400 group-hover:text-teal-500 dark:group-hover:text-teal-400 transition-colors"
           />
         </div>

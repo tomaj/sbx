@@ -15,8 +15,8 @@ interface Member {
 interface Space {
   id: number
   name: string
-  updatedAt: string
-  lastActivityAt: string | null
+  updated_at: string
+  last_activity_at: string | null
   members: Member[]
 }
 

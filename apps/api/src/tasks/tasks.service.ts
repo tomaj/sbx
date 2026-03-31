@@ -1,8 +1,8 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { asc, eq, ilike, or, sql, desc } from 'drizzle-orm';
+import { asc, eq } from 'drizzle-orm';
 import { DB } from '../db/db.module';
 import type { DbType } from '../db/db.module';
-import { tasks, spaces } from '../db/schema';
+import { tasks } from '../db/schema';
 
 @Injectable()
 export class TasksService {
@@ -85,12 +85,19 @@ export class TasksService {
     return {};
   }
 
-  async execute(spaceId: number, id: number, userInput?: any) {
+  async execute(spaceId: number, id: number, dialogValues?: Record<string, any>, user?: any) {
     const [row] = await this.db.select().from(tasks).where(eq(tasks.id, id)).limit(1);
     if (!row || row.spaceId !== spaceId) throw new NotFoundException();
     if (!row.webhookUrl) throw new NotFoundException();
 
-    const payload = { task: { id: row.id, name: row.name }, space_id: spaceId, ...(userInput ?? {}) };
+    const userEmail = user?.email ?? 'unknown';
+    const payload = {
+      task: { id: row.id, name: row.name },
+      text: `The user ${userEmail} executed the task "${row.name}"`,
+      action: 'task_execution',
+      space_id: spaceId,
+      dialog_values: dialogValues ?? {},
+    };
 
     let lastResponse: any = null;
     try {
@@ -116,13 +123,24 @@ export class TasksService {
     return { task: this.format(updated) };
   }
 
+  private formatDatetime(d: Date | null | undefined): string | null {
+    if (!d) return null;
+    const date = new Date(d);
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const h = String(date.getHours()).padStart(2, '0');
+    const min = String(date.getMinutes()).padStart(2, '0');
+    return `${y}-${m}-${day} ${h}:${min}`;
+  }
+
   private format(t: typeof tasks.$inferSelect) {
     return {
       id: Number(t.id),
       name: t.name,
       description: t.description ?? null,
       task_type: t.taskType,
-      last_execution: t.lastExecution ?? null,
+      last_execution: this.formatDatetime(t.lastExecution),
       running: t.running,
       last_response: t.lastResponse ?? null,
       protected_vars: t.webhookUrl ? '•••••••' : null,

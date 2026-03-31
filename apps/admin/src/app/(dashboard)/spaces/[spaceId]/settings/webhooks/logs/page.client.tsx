@@ -199,7 +199,7 @@ export default function WebhookLogsPage({ params }: { params: Promise<{ spaceId:
   async function loadWebhooks() {
     const res = await fetch(`/api/admin/spaces/${spaceId}/webhooks`)
     const data = await res.json()
-    setWebhooks(data.webhooks ?? [])
+    setWebhooks(data.webhook_endpoints ?? [])
   }
 
   async function loadLogs() {

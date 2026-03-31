@@ -58,7 +58,9 @@ export class TasksController {
       task: {
         name?: string;
         description?: string;
+        task_type?: string;
         webhook_url?: string;
+        user_dialog?: any;
       };
     },
   ) {
@@ -66,13 +68,14 @@ export class TasksController {
   }
 
   @Delete(':id')
-  @HttpCode(200)
+  @HttpCode(204)
   async deleteTask(@Req() req: any, @Param('id') id: string) {
-    return this.tasksService.remove(req.space.id, parseInt(id));
+    await this.tasksService.remove(req.space.id, parseInt(id));
   }
 
   @Post(':id/execute')
   async executeTask(@Req() req: any, @Param('id') id: string, @Body() body: any) {
-    return this.tasksService.execute(req.space.id, parseInt(id), body);
+    const user = req.user;
+    return this.tasksService.execute(req.space.id, parseInt(id), body?.dialog_values ?? body ?? {}, user);
   }
 }

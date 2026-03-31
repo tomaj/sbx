@@ -8,11 +8,16 @@ import { presets } from '../db/schema';
 export class PresetsService {
   constructor(@Inject(DB) private db: DbType) {}
 
-  async findAll(spaceId: number) {
+  async findAll(spaceId: number, componentId?: number) {
+    const conditions = [eq(presets.spaceId, spaceId)];
+    if (componentId !== undefined) {
+      conditions.push(eq(presets.componentId, BigInt(componentId)));
+    }
+
     const rows = await this.db
       .select()
       .from(presets)
-      .where(eq(presets.spaceId, spaceId))
+      .where(and(...conditions))
       .orderBy(asc(presets.id));
 
     return { presets: rows.map((p) => this.format(p)) };
@@ -66,6 +71,7 @@ export class PresetsService {
     id: number,
     data: {
       name?: string;
+      component_id?: number;
       preset?: Record<string, any>;
       image?: string | null;
       color?: string | null;
@@ -77,6 +83,7 @@ export class PresetsService {
       .update(presets)
       .set({
         ...(data.name !== undefined && { name: data.name }),
+        ...(data.component_id !== undefined && { componentId: BigInt(data.component_id) }),
         ...(data.preset !== undefined && { preset: data.preset }),
         ...(data.image !== undefined && { image: data.image }),
         ...(data.color !== undefined && { color: data.color }),
@@ -92,11 +99,13 @@ export class PresetsService {
   }
 
   async remove(spaceId: number, id: number) {
-    await this.db
+    const [deleted] = await this.db
       .delete(presets)
-      .where(and(eq(presets.id, BigInt(id)), eq(presets.spaceId, spaceId)));
+      .where(and(eq(presets.id, BigInt(id)), eq(presets.spaceId, spaceId)))
+      .returning();
 
-    return {};
+    if (!deleted) return null;
+    return { preset: this.format(deleted) };
   }
 
   private format(p: typeof presets.$inferSelect) {
@@ -106,12 +115,12 @@ export class PresetsService {
       preset: p.preset,
       component_id: Number(p.componentId),
       space_id: p.spaceId,
-      image: p.image ?? '',
-      color: p.color ?? '',
-      icon: p.icon ?? '',
-      description: p.description ?? '',
       created_at: p.createdAt,
       updated_at: p.updatedAt,
+      image: p.image ?? null,
+      color: p.color ?? null,
+      icon: p.icon ?? null,
+      description: p.description ?? null,
     };
   }
 }

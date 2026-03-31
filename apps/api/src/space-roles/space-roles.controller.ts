@@ -8,6 +8,7 @@ import {
   Param,
   Post,
   Put,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -20,8 +21,12 @@ export class SpaceRolesController {
   constructor(private readonly spaceRolesService: SpaceRolesService) {}
 
   @Get()
-  async getSpaceRoles(@Req() req: any) {
-    return this.spaceRolesService.adminList(req.space.id);
+  async getSpaceRoles(
+    @Req() req: any,
+    @Query('search') search?: string,
+    @Query('by_ids') byIds?: string,
+  ) {
+    return this.spaceRolesService.adminList(req.space.id, { search, by_ids: byIds });
   }
 
   @Get(':id')
@@ -55,8 +60,8 @@ export class SpaceRolesController {
   @Delete(':id')
   @HttpCode(200)
   async deleteSpaceRole(@Req() req: any, @Param('id') id: string) {
-    const deleted = await this.spaceRolesService.remove(req.space.id, parseInt(id));
-    if (!deleted) throw new NotFoundException();
-    return {};
+    const result = await this.spaceRolesService.remove(req.space.id, parseInt(id));
+    if (!result) throw new NotFoundException();
+    return result;
   }
 }

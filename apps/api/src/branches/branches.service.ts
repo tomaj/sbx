@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { asc, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, ilike, inArray } from 'drizzle-orm';
 import { DB } from '../db/db.module';
 import type { DbType } from '../db/db.module';
 import { branches } from '../db/schema';
@@ -8,32 +8,54 @@ import { branches } from '../db/schema';
 export class BranchesService {
   constructor(@Inject(DB) private db: DbType) {}
 
-  async findAll(spaceId: number) {
+  async findAll(spaceId: number, opts?: { by_ids?: string; search?: string }) {
+    const conditions = [eq(branches.spaceId, spaceId)];
+
+    if (opts?.by_ids) {
+      const ids = opts.by_ids.split(',').map((s) => parseInt(s.trim())).filter((n) => !isNaN(n));
+      if (ids.length > 0) {
+        conditions.push(inArray(branches.id, ids));
+      }
+    }
+
+    if (opts?.search) {
+      conditions.push(ilike(branches.name, `%${opts.search}%`));
+    }
+
     const rows = await this.db
       .select()
       .from(branches)
-      .where(eq(branches.spaceId, spaceId))
+      .where(and(...conditions))
       .orderBy(asc(branches.position), asc(branches.id));
 
     return { branches: rows.map((b) => this.format(b)) };
   }
 
-  async create(spaceId: number, data: { name: string; url?: string }) {
+  async create(spaceId: number, data: { name: string; url?: string; position?: number; source_id?: number }) {
     const [last] = await this.db.select({ id: branches.id }).from(branches).orderBy(desc(branches.id)).limit(1);
     const nextId = last ? last.id + 1 : 1;
     const [row] = await this.db
       .insert(branches)
-      .values({ id: nextId, spaceId, name: data.name, url: data.url ?? null })
+      .values({
+        id: nextId,
+        spaceId,
+        name: data.name,
+        url: data.url ?? null,
+        ...(data.position !== undefined && { position: data.position }),
+        ...(data.source_id !== undefined && { sourceId: data.source_id }),
+      })
       .returning();
     return { branch: this.format(row) };
   }
 
-  async update(spaceId: number, id: number, data: { name?: string; url?: string | null }) {
+  async update(spaceId: number, id: number, data: { name?: string; url?: string | null; position?: number; source_id?: number | null }) {
     const [row] = await this.db
       .update(branches)
       .set({
         ...(data.name !== undefined && { name: data.name }),
         ...(data.url !== undefined && { url: data.url }),
+        ...(data.position !== undefined && { position: data.position }),
+        ...(data.source_id !== undefined && { sourceId: data.source_id }),
         updatedAt: new Date(),
       })
       .where(eq(branches.id, id))
@@ -48,7 +70,7 @@ export class BranchesService {
       .where(eq(branches.id, id))
       .returning();
     if (!row || row.spaceId !== spaceId) return null;
-    return { branch: this.format(row) };
+    return true;
   }
 
   async findOne(spaceId: number, id: number) {

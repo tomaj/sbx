@@ -38,16 +38,6 @@ export class WebhooksService {
 
   // ─── Admin CRUD ───────────────────────────────────────────────────────────
 
-  async adminList(spaceId: number) {
-    const rows = await this.db
-      .select()
-      .from(webhookEndpoints)
-      .where(eq(webhookEndpoints.spaceId, spaceId))
-      .orderBy(asc(webhookEndpoints.id));
-
-    return { webhooks: rows.map((w) => this.format(w)) };
-  }
-
   async adminCreate(
     spaceId: number,
     data: {

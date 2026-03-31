@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, ne, inArray, ilike } from 'drizzle-orm';
 import { DB } from '../db/db.module';
 import type { DbType } from '../db/db.module';
 import { workflows, workflowStages } from '../db/schema';
@@ -10,12 +10,19 @@ export class WorkflowsService {
 
   // ─── List ──────────────────────────────────────────────────────────────────
 
-  async adminList(spaceId: number) {
-    const wfs = await this.db
+  async adminList(spaceId: number, opts?: { contentType?: string }) {
+    let wfs = await this.db
       .select()
       .from(workflows)
       .where(eq(workflows.spaceId, spaceId))
       .orderBy(asc(workflows.id));
+
+    if (opts?.contentType) {
+      wfs = wfs.filter((w) => {
+        const ct = w.contentTypes as string[];
+        return ct && ct.includes(opts.contentType!);
+      });
+    }
 
     const stages = await this.db
       .select()
@@ -130,10 +137,14 @@ export class WorkflowsService {
         position: nextPos,
         isDefault: data.isDefault ?? false,
         allowPublish: data.allowPublish ?? false,
+        allowAdminPublish: data.allowAdminPublish ?? false,
         allowAllStages: data.allowAllStages ?? true,
         allowAllUsers: data.allowAllUsers ?? true,
+        allowAdminChange: data.allowAdminChange ?? false,
+        allowEditorChange: data.allowEditorChange ?? false,
         storyEditingLocked: data.storyEditingLocked ?? false,
         autoRemoveAssignee: data.autoRemoveAssignee ?? false,
+        afterPublishId: data.afterPublishId ?? null,
         userIds: data.userIds ?? [],
         spaceRoleIds: data.spaceRoleIds ?? [],
         workflowStageIds: data.workflowStageIds ?? [],
@@ -152,15 +163,41 @@ export class WorkflowsService {
       position: number;
       isDefault: boolean;
       allowPublish: boolean;
+      allowAdminPublish: boolean;
       allowAllStages: boolean;
       allowAllUsers: boolean;
+      allowAdminChange: boolean;
+      allowEditorChange: boolean;
       storyEditingLocked: boolean;
       autoRemoveAssignee: boolean;
+      userIds: number[];
+      spaceRoleIds: number[];
+      workflowStageIds: number[];
+      afterPublishId: number;
     }>,
   ) {
+    // Filter out undefined values to avoid overwriting with undefined
+    const setData: Record<string, any> = { updatedAt: new Date() };
+    if (data.name !== undefined) setData.name = data.name;
+    if (data.color !== undefined) setData.color = data.color;
+    if (data.position !== undefined) setData.position = data.position;
+    if (data.isDefault !== undefined) setData.isDefault = data.isDefault;
+    if (data.allowPublish !== undefined) setData.allowPublish = data.allowPublish;
+    if (data.allowAdminPublish !== undefined) setData.allowAdminPublish = data.allowAdminPublish;
+    if (data.allowAllStages !== undefined) setData.allowAllStages = data.allowAllStages;
+    if (data.allowAllUsers !== undefined) setData.allowAllUsers = data.allowAllUsers;
+    if (data.allowAdminChange !== undefined) setData.allowAdminChange = data.allowAdminChange;
+    if (data.allowEditorChange !== undefined) setData.allowEditorChange = data.allowEditorChange;
+    if (data.storyEditingLocked !== undefined) setData.storyEditingLocked = data.storyEditingLocked;
+    if (data.autoRemoveAssignee !== undefined) setData.autoRemoveAssignee = data.autoRemoveAssignee;
+    if (data.userIds !== undefined) setData.userIds = data.userIds;
+    if (data.spaceRoleIds !== undefined) setData.spaceRoleIds = data.spaceRoleIds;
+    if (data.workflowStageIds !== undefined) setData.workflowStageIds = data.workflowStageIds;
+    if (data.afterPublishId !== undefined) setData.afterPublishId = data.afterPublishId;
+
     const [updated] = await this.db
       .update(workflowStages)
-      .set({ ...data, updatedAt: new Date() })
+      .set(setData)
       .where(and(eq(workflowStages.id, stageId), eq(workflowStages.spaceId, spaceId)))
       .returning();
     if (!updated) return null;
@@ -174,11 +211,29 @@ export class WorkflowsService {
     return { deleted: true };
   }
 
-  async listStages(spaceId: number) {
+  async listStages(
+    spaceId: number,
+    opts?: { excludeId?: number; byIds?: number[]; search?: string; inWorkflow?: number },
+  ) {
+    const conditions = [eq(workflowStages.spaceId, spaceId)];
+
+    if (opts?.excludeId) {
+      conditions.push(ne(workflowStages.id, opts.excludeId));
+    }
+    if (opts?.byIds && opts.byIds.length > 0) {
+      conditions.push(inArray(workflowStages.id, opts.byIds));
+    }
+    if (opts?.search) {
+      conditions.push(ilike(workflowStages.name, `%${opts.search}%`));
+    }
+    if (opts?.inWorkflow) {
+      conditions.push(eq(workflowStages.workflowId, opts.inWorkflow));
+    }
+
     const stages = await this.db
       .select()
       .from(workflowStages)
-      .where(eq(workflowStages.spaceId, spaceId))
+      .where(and(...conditions))
       .orderBy(asc(workflowStages.position));
     return { workflow_stages: stages.map(this.formatStage) };
   }
@@ -197,18 +252,62 @@ export class WorkflowsService {
     spaceId: number,
     data: {
       name: string;
-      workflow_id: number;
+      workflow_id?: number;
       color?: string;
       position?: number;
+      is_default?: boolean;
       allow_publish?: boolean;
+      allow_admin_publish?: boolean;
       allow_all_users?: boolean;
+      allow_admin_change?: boolean;
+      allow_editor_change?: boolean;
+      allow_all_stages?: boolean;
+      story_editing_locked?: boolean;
+      auto_remove_assignee?: boolean;
+      user_ids?: number[];
+      space_role_ids?: number[];
+      workflow_stage_ids?: number[];
+      after_publish_id?: number;
     },
   ) {
-    return this.adminCreateStage(spaceId, data.workflow_id, {
+    // If workflow_id is omitted, use the default workflow
+    let workflowId = data.workflow_id;
+    if (!workflowId) {
+      const [defaultWf] = await this.db
+        .select({ id: workflows.id })
+        .from(workflows)
+        .where(and(eq(workflows.spaceId, spaceId), eq(workflows.isDefault, true)))
+        .limit(1);
+      if (defaultWf) {
+        workflowId = defaultWf.id;
+      } else {
+        // Fallback to first workflow
+        const [firstWf] = await this.db
+          .select({ id: workflows.id })
+          .from(workflows)
+          .where(eq(workflows.spaceId, spaceId))
+          .orderBy(asc(workflows.id))
+          .limit(1);
+        workflowId = firstWf?.id ?? 0;
+      }
+    }
+
+    return this.adminCreateStage(spaceId, workflowId, {
       name: data.name,
       color: data.color,
+      isDefault: data.is_default,
       allowPublish: data.allow_publish,
+      allowAdminPublish: data.allow_admin_publish,
       allowAllUsers: data.allow_all_users,
+      allowAdminChange: data.allow_admin_change,
+      allowEditorChange: data.allow_editor_change,
+      allowAllStages: data.allow_all_stages,
+      storyEditingLocked: data.story_editing_locked,
+      autoRemoveAssignee: data.auto_remove_assignee,
+      userIds: data.user_ids,
+      spaceRoleIds: data.space_role_ids,
+      workflowStageIds: data.workflow_stage_ids,
+      afterPublishId: data.after_publish_id,
     });
   }
 
@@ -219,16 +318,38 @@ export class WorkflowsService {
       name?: string;
       color?: string;
       position?: number;
+      is_default?: boolean;
       allow_publish?: boolean;
+      allow_admin_publish?: boolean;
       allow_all_users?: boolean;
+      allow_admin_change?: boolean;
+      allow_editor_change?: boolean;
+      allow_all_stages?: boolean;
+      story_editing_locked?: boolean;
+      auto_remove_assignee?: boolean;
+      user_ids?: number[];
+      space_role_ids?: number[];
+      workflow_stage_ids?: number[];
+      after_publish_id?: number;
     },
   ) {
     return this.adminUpdateStage(spaceId, id, {
       name: data.name,
       color: data.color,
       position: data.position,
+      isDefault: data.is_default,
       allowPublish: data.allow_publish,
+      allowAdminPublish: data.allow_admin_publish,
       allowAllUsers: data.allow_all_users,
+      allowAdminChange: data.allow_admin_change,
+      allowEditorChange: data.allow_editor_change,
+      allowAllStages: data.allow_all_stages,
+      storyEditingLocked: data.story_editing_locked,
+      autoRemoveAssignee: data.auto_remove_assignee,
+      userIds: data.user_ids,
+      spaceRoleIds: data.space_role_ids,
+      workflowStageIds: data.workflow_stage_ids,
+      afterPublishId: data.after_publish_id,
     });
   }
 

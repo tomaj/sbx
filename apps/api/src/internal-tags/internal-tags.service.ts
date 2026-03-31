@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, asc, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, ilike, sql } from 'drizzle-orm';
 import { DB } from '../db/db.module';
 import type { DbType } from '../db/db.module';
 import { internalTags, components, assets } from '../db/schema';
@@ -8,9 +8,10 @@ import { internalTags, components, assets } from '../db/schema';
 export class InternalTagsService {
   constructor(@Inject(DB) private db: DbType) {}
 
-  async listTags(spaceId: number, objectType?: string) {
+  async listTags(spaceId: number, objectType?: string, search?: string) {
     const conditions = [eq(internalTags.spaceId, spaceId)];
     if (objectType) conditions.push(eq(internalTags.objectType, objectType));
+    if (search) conditions.push(ilike(internalTags.name, `%${search}%`));
 
     const tableRows = await this.db
       .select()
@@ -93,41 +94,49 @@ export class InternalTagsService {
     return { internal_tag: this.format(row, 0) };
   }
 
-  async updateTag(spaceId: number, id: number, name: string) {
+  async updateTag(spaceId: number, id: number, data: { name?: string; object_type?: string }) {
+    const setData: Record<string, any> = {};
+    if (data.name !== undefined) setData.name = data.name;
+    if (data.object_type !== undefined) setData.objectType = data.object_type;
+    if (Object.keys(setData).length === 0) throw new NotFoundException('Tag not found');
+
     const [row] = await this.db
       .update(internalTags)
-      .set({ name })
+      .set(setData)
       .where(and(eq(internalTags.id, id), eq(internalTags.spaceId, spaceId)))
       .returning();
     if (!row) throw new NotFoundException('Tag not found');
 
     // Update name on all components/assets that reference this tag
-    if (row.objectType === 'component') {
-      const compRows = await this.db
-        .select({ id: components.id, internalTagsList: components.internalTagsList })
-        .from(components)
-        .where(eq(components.spaceId, spaceId));
-      for (const c of compRows) {
-        const list: { id: number; name: string }[] = (c.internalTagsList as any) ?? [];
-        if (list.some((t) => t.id === id)) {
-          await this.db
-            .update(components)
-            .set({ internalTagsList: list.map((t) => (t.id === id ? { ...t, name } : t)), updatedAt: new Date() })
-            .where(eq(components.id, c.id));
+    if (data.name !== undefined) {
+      const newName = data.name;
+      if (row.objectType === 'component') {
+        const compRows = await this.db
+          .select({ id: components.id, internalTagsList: components.internalTagsList })
+          .from(components)
+          .where(eq(components.spaceId, spaceId));
+        for (const c of compRows) {
+          const list: { id: number; name: string }[] = (c.internalTagsList as any) ?? [];
+          if (list.some((t) => t.id === id)) {
+            await this.db
+              .update(components)
+              .set({ internalTagsList: list.map((t) => (t.id === id ? { ...t, name: newName } : t)), updatedAt: new Date() })
+              .where(eq(components.id, c.id));
+          }
         }
-      }
-    } else {
-      const assetRows = await this.db
-        .select({ id: assets.id, internalTagsList: assets.internalTagsList })
-        .from(assets)
-        .where(eq(assets.spaceId, spaceId));
-      for (const a of assetRows) {
-        const list: { id: number; name: string }[] = (a.internalTagsList as any) ?? [];
-        if (list.some((t) => t.id === id)) {
-          await this.db
-            .update(assets)
-            .set({ internalTagsList: list.map((t) => (t.id === id ? { ...t, name } : t)), updatedAt: new Date() })
-            .where(eq(assets.id, a.id));
+      } else {
+        const assetRows = await this.db
+          .select({ id: assets.id, internalTagsList: assets.internalTagsList })
+          .from(assets)
+          .where(eq(assets.spaceId, spaceId));
+        for (const a of assetRows) {
+          const list: { id: number; name: string }[] = (a.internalTagsList as any) ?? [];
+          if (list.some((t) => t.id === id)) {
+            await this.db
+              .update(assets)
+              .set({ internalTagsList: list.map((t) => (t.id === id ? { ...t, name: newName } : t)), updatedAt: new Date() })
+              .where(eq(assets.id, a.id));
+          }
         }
       }
     }

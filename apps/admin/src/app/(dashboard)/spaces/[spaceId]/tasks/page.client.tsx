@@ -66,7 +66,7 @@ function ExecuteDialog({ open, task, spaceId, onClose, onExecuted }: ExecuteDial
       const res = await fetch(`/api/admin/spaces/${spaceId}/tasks/${task.id}/execute`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(values),
+        body: JSON.stringify({ dialog_values: values }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.message ?? 'Execution failed')

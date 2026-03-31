@@ -12,20 +12,27 @@ export class ActivitiesAdminController {
     @Param('spaceId') spaceId: string,
     @Query('page') page = '1',
     @Query('per_page') perPage = '25',
-    @Query('user_ids') userIds?: string,
-    @Query('keys') keys?: string,
-    @Query('date_from') dateFrom?: string,
-    @Query('date_to') dateTo?: string,
+    @Query('by_owner_ids') byOwnerIds?: string,
+    @Query('types') types?: string,
+    @Query('created_at_gte') createdAtGte?: string,
+    @Query('created_at_lte') createdAtLte?: string,
   ) {
-    return this.activitiesService.findAllAdmin(
+    return this.activitiesService.findAllWithMeta(
       parseInt(spaceId),
       Math.max(1, parseInt(page) || 1),
       Math.min(100, parseInt(perPage) || 25),
       {
-        userIds: userIds ? userIds.split(',').map(Number).filter(Boolean) : undefined,
-        keys: keys ? keys.split(',').filter(Boolean) : undefined,
-        dateFrom: dateFrom ? new Date(dateFrom) : undefined,
-        dateTo: dateTo ? new Date(dateTo + 'T23:59:59') : undefined,
+        byOwnerIds: byOwnerIds
+          ? byOwnerIds
+              .split(',')
+              .map(Number)
+              .filter(Boolean)
+          : undefined,
+        types: types
+          ? types.split(',').filter(Boolean)
+          : undefined,
+        createdAtGte: createdAtGte || undefined,
+        createdAtLte: createdAtLte || undefined,
       },
     );
   }

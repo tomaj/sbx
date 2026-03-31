@@ -9,7 +9,7 @@ interface Space {
   uuid: string
   name: string
   domain: string
-  defaultRoot: string | null
+  default_root: string | null
 }
 
 interface ContentType {
@@ -48,7 +48,7 @@ export default function SpaceSettingsPage({ params }: { params: Promise<{ spaceI
         if (data.space) {
           setSpace(data.space)
           setName(data.space.name)
-          setDefaultRoot(data.space.defaultRoot ?? null)
+          setDefaultRoot(data.space.default_root ?? null)
         }
       })
 
@@ -73,7 +73,7 @@ export default function SpaceSettingsPage({ params }: { params: Promise<{ spaceI
       const res = await fetch(`/api/admin/spaces/${spaceId}/space`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, defaultRoot }),
+        body: JSON.stringify({ name, default_root: defaultRoot }),
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
@@ -83,7 +83,7 @@ export default function SpaceSettingsPage({ params }: { params: Promise<{ spaceI
       if (data.space) {
         setSpace(data.space)
         setName(data.space.name)
-        setDefaultRoot(data.space.defaultRoot ?? null)
+        setDefaultRoot(data.space.default_root ?? null)
       }
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)

@@ -8,6 +8,7 @@ import {
   Param,
   Post,
   Put,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -20,8 +21,19 @@ export class WorkflowStagesController {
   constructor(private readonly workflowsService: WorkflowsService) {}
 
   @Get()
-  async list(@Req() req: any) {
-    return this.workflowsService.listStages(req.space.id);
+  async list(
+    @Req() req: any,
+    @Query('exclude_id') excludeId?: string,
+    @Query('by_ids') byIds?: string,
+    @Query('search') search?: string,
+    @Query('in_workflow') inWorkflow?: string,
+  ) {
+    return this.workflowsService.listStages(req.space.id, {
+      excludeId: excludeId ? parseInt(excludeId) : undefined,
+      byIds: byIds ? byIds.split(',').map(Number) : undefined,
+      search,
+      inWorkflow: inWorkflow ? parseInt(inWorkflow) : undefined,
+    });
   }
 
   @Get(':id')
@@ -39,11 +51,22 @@ export class WorkflowStagesController {
     body: {
       workflow_stage: {
         name: string;
-        workflow_id: number;
+        workflow_id?: number;
         color?: string;
         position?: number;
+        is_default?: boolean;
         allow_publish?: boolean;
+        allow_admin_publish?: boolean;
         allow_all_users?: boolean;
+        allow_admin_change?: boolean;
+        allow_editor_change?: boolean;
+        allow_all_stages?: boolean;
+        user_ids?: number[];
+        space_role_ids?: number[];
+        workflow_stage_ids?: number[];
+        story_editing_locked?: boolean;
+        auto_remove_assignee?: boolean;
+        after_publish_id?: number;
       };
     },
   ) {
@@ -60,8 +83,19 @@ export class WorkflowStagesController {
         name?: string;
         color?: string;
         position?: number;
+        is_default?: boolean;
         allow_publish?: boolean;
+        allow_admin_publish?: boolean;
         allow_all_users?: boolean;
+        allow_admin_change?: boolean;
+        allow_editor_change?: boolean;
+        allow_all_stages?: boolean;
+        story_editing_locked?: boolean;
+        auto_remove_assignee?: boolean;
+        user_ids?: number[];
+        space_role_ids?: number[];
+        workflow_stage_ids?: number[];
+        after_publish_id?: number;
       };
     },
   ) {
@@ -71,9 +105,8 @@ export class WorkflowStagesController {
   }
 
   @Delete(':id')
-  @HttpCode(200)
+  @HttpCode(204)
   async remove(@Req() req: any, @Param('id') id: string) {
     await this.workflowsService.deleteStage(req.space.id, parseInt(id));
-    return {};
   }
 }

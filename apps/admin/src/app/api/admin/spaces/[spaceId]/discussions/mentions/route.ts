@@ -18,9 +18,14 @@ export async function GET(
 ) {
   const { spaceId } = await params
   const token = await getSessionToken()
-  const search = req.nextUrl.searchParams.toString()
+  const url = req.nextUrl
+  const qs = new URLSearchParams()
+  if (url.searchParams.get('page')) qs.set('page', url.searchParams.get('page')!)
+  if (url.searchParams.get('per_page')) qs.set('per_page', url.searchParams.get('per_page')!)
+  if (url.searchParams.get('by_status')) qs.set('by_status', url.searchParams.get('by_status')!)
+
   const res = await fetch(
-    `${API_URL}/v1/spaces/${spaceId}/discussions/mentions${search ? `?${search}` : ''}`,
+    `${API_URL}/v1/spaces/${spaceId}/mentioned_discussions/me${qs.toString() ? `?${qs}` : ''}`,
     { headers: { Authorization: `Bearer ${token}` } },
   )
   const data = await res.json()

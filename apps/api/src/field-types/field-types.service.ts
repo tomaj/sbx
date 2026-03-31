@@ -89,9 +89,11 @@ export class FieldTypesService {
         const sbRes = await fetch(sbUrl);
         if (sbRes.ok) {
           let html = await sbRes.text();
-          // Patch hardcoded Storyblok origin in new field-plugin SDK so it communicates with our admin
+          // Patch hardcoded Storyblok origin so plugin communicates with our admin
           const adminOrigin = `${extraParams.protocol ?? 'http:'}\/\/${extraParams.host ?? 'localhost:3001'}`;
           html = html.replace(/https?:\/\/app\.storyblok\.com/g, adminOrigin);
+          // Inject transparent background so our dark wrapper shows through
+          html = html.replace('</head>', '<style>html,body{background:transparent!important}</style></head>');
           return html;
         }
       } catch {

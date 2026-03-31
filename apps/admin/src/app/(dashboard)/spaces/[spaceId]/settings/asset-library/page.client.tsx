@@ -85,8 +85,8 @@ export default function AssetLibraryPage({ params }: { params: Promise<{ spaceId
     fetch(`/api/admin/spaces/${spaceId}/space`)
       .then((r) => r.json())
       .then((data) => {
-        if (data.space?.assetLibrarySettings && Object.keys(data.space.assetLibrarySettings).length > 0) {
-          const s = data.space.assetLibrarySettings as AssetLibrarySettings
+        if (data.space?.asset_library_settings && Object.keys(data.space.asset_library_settings).length > 0) {
+          const s = data.space.asset_library_settings as AssetLibrarySettings
           setSettings({
             defaultMetadataFields: {
               altText: s.defaultMetadataFields?.altText ?? DEFAULT_SETTINGS.defaultMetadataFields.altText,
@@ -110,7 +110,7 @@ export default function AssetLibraryPage({ params }: { params: Promise<{ spaceId
       const res = await fetch(`/api/admin/spaces/${spaceId}/space`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ assetLibrarySettings: settings }),
+        body: JSON.stringify({ asset_library_settings: settings }),
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))

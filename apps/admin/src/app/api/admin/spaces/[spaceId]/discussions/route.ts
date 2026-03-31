@@ -18,9 +18,18 @@ export async function GET(
 ) {
   const { spaceId } = await params
   const token = await getSessionToken()
-  const search = req.nextUrl.searchParams.toString()
+  const url = req.nextUrl
+  const storyId = url.searchParams.get('story_id')
+
+  if (!storyId) return NextResponse.json({ discussions: [] })
+
+  const qs = new URLSearchParams()
+  for (const [key, value] of url.searchParams.entries()) {
+    if (key !== 'story_id') qs.set(key, value)
+  }
+
   const res = await fetch(
-    `${API_URL}/v1/spaces/${spaceId}/discussions${search ? `?${search}` : ''}`,
+    `${API_URL}/v1/spaces/${spaceId}/stories/${storyId}/discussions?${qs}`,
     { headers: { Authorization: `Bearer ${token}` } },
   )
   const data = await res.json()
@@ -34,10 +43,13 @@ export async function POST(
   const { spaceId } = await params
   const token = await getSessionToken()
   const body = await req.json()
-  const res = await fetch(`${API_URL}/v1/spaces/${spaceId}/discussions`, {
+  const storyId = body.story_id
+  if (!storyId) return NextResponse.json({ error: 'story_id required' }, { status: 400 })
+
+  const res = await fetch(`${API_URL}/v1/spaces/${spaceId}/stories/${storyId}/discussions`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ discussion: body.discussion }),
   })
   const data = await res.json()
   return NextResponse.json(data, { status: res.status })

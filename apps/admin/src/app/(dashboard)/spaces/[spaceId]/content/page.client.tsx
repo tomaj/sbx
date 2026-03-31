@@ -364,16 +364,14 @@ export default function ContentPage({ params }: { params: Promise<{ spaceId: str
         if (search.trim()) qs.set('text_search', search.trim())
         qs.set('in_release', String(activeReleaseId))
         const { field, dir } = parseSortOption(sort)
-        qs.set('sort_field', field)
-        qs.set('sort_dir', dir)
+        qs.set('sort_by', `${field}:${dir}`)
       } else {
         qs.set('page', String(page))
         qs.set('per_page', String(perPage))
         if (search.trim()) qs.set('text_search', search.trim())
         if (!search.trim() && !showFavoritesOnly) qs.set('parent_id', currentParentId !== null ? String(currentParentId) : '')
         const { field, dir } = parseSortOption(sort)
-        qs.set('sort_field', field)
-        qs.set('sort_dir', dir)
+        qs.set('sort_by', `${field}:${dir}`)
         for (const f of activeFilters) {
           if (f.value) qs.set(f.key, f.value)
         }

@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, desc, eq, ilike, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, ilike, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import { DB } from '../db/db.module';
 import type { DbType } from '../db/db.module';
 import { discussions, comments, users, stories } from '../db/schema';
@@ -8,133 +8,284 @@ import { discussions, comments, users, stories } from '../db/schema';
 export class DiscussionsService {
   constructor(@Inject(DB) private db: DbType) {}
 
-  async createDiscussion(spaceId: number, storyId?: number, fieldKey?: string) {
+  /**
+   * POST /v1/spaces/:spaceId/stories/:storyId/discussions
+   */
+  async createDiscussion(
+    spaceId: number,
+    storyId: number,
+    data: {
+      block_uid?: string;
+      title?: string;
+      fieldname?: string;
+      component?: string;
+      lang?: string;
+      comment?: { message?: string; message_json?: any[] };
+    },
+    adminUser?: { id?: number; email?: string; name?: string },
+  ) {
+    const uuid = crypto.randomUUID();
+
     const [created] = await this.db
       .insert(discussions)
       .values({
         spaceId,
-        storyId: storyId ?? null,
-        fieldKey: fieldKey ?? null,
+        storyId,
+        uuid,
+        title: data.title ?? null,
+        blockUid: data.block_uid ?? null,
+        fieldname: data.fieldname ?? null,
+        fieldKey: data.fieldname ?? null,
+        component: data.component ?? null,
+        lang: data.lang ?? null,
       })
       .returning();
 
-    return this.formatDiscussion(created);
+    // Create the initial comment if provided
+    if (data.comment) {
+      await this.createCommentInternal(spaceId, created.id, data.comment, adminUser);
+    }
+
+    // Re-fetch with last_comment
+    const disc = await this.getDiscussionWithLastComment(spaceId, created.id);
+    return { discussion: disc };
   }
 
-  async getOrCreateDiscussionForField(spaceId: number, storyId: number, fieldKey: string) {
-    const [existing] = await this.db
-      .select()
-      .from(discussions)
-      .where(
-        and(
-          eq(discussions.spaceId, spaceId),
-          eq(discussions.storyId, storyId),
-          eq(discussions.fieldKey, fieldKey),
-          isNull(discussions.resolvedAt),
-        ),
-      )
-      .limit(1);
+  /**
+   * GET /v1/spaces/:spaceId/discussions/:discussionId
+   */
+  async getDiscussion(spaceId: number, discussionId: number) {
+    return this.getDiscussionWithLastComment(spaceId, discussionId);
+  }
 
-    if (existing) return { discussion: this.formatDiscussion(existing) };
+  /**
+   * PUT /v1/spaces/:spaceId/discussions/:discussionId
+   * Used to resolve/unresolve a discussion via solved_at field.
+   */
+  async updateDiscussion(
+    spaceId: number,
+    discussionId: number,
+    data: { solved_at?: string | null },
+  ) {
+    const solvedAt = data.solved_at !== undefined
+      ? (data.solved_at ? new Date(data.solved_at) : null)
+      : undefined;
 
-    const [created] = await this.db
-      .insert(discussions)
-      .values({ spaceId, storyId, fieldKey })
+    const updateSet: Record<string, any> = { updatedAt: new Date() };
+    if (solvedAt !== undefined) {
+      updateSet.solvedAt = solvedAt;
+      updateSet.resolvedAt = solvedAt;
+    }
+
+    const [updated] = await this.db
+      .update(discussions)
+      .set(updateSet)
+      .where(and(eq(discussions.id, discussionId), eq(discussions.spaceId, spaceId)))
       .returning();
 
-    return { discussion: this.formatDiscussion(created) };
+    if (!updated) return null;
+    return this.getDiscussionWithLastComment(spaceId, updated.id);
   }
 
-  async findOrCreateDiscussion(spaceId: number, discussionId: number) {
-    const [row] = await this.db
-      .select()
-      .from(discussions)
-      .where(and(eq(discussions.id, discussionId), eq(discussions.spaceId, spaceId)))
-      .limit(1);
-
-    return row ?? null;
+  /**
+   * DELETE /v1/spaces/:spaceId/discussions/:discussionId
+   */
+  async deleteDiscussion(spaceId: number, discussionId: number) {
+    await this.db
+      .delete(discussions)
+      .where(and(eq(discussions.id, discussionId), eq(discussions.spaceId, spaceId)));
   }
 
-  async listByStory(spaceId: number, storyId: number, resolved: boolean = false) {
+  /**
+   * GET /v1/spaces/:spaceId/stories/:storyId/discussions
+   */
+  async listByStory(
+    spaceId: number,
+    storyId: number,
+    page: number = 1,
+    perPage: number = 25,
+    byStatus?: string,
+  ) {
+    const conditions = [
+      eq(discussions.spaceId, spaceId),
+      eq(discussions.storyId, storyId),
+    ];
+
+    if (byStatus === 'solved') {
+      conditions.push(isNotNull(discussions.solvedAt));
+    } else if (byStatus === 'unsolved') {
+      conditions.push(isNull(discussions.solvedAt));
+    }
+
+    const offset = (page - 1) * perPage;
+
     const disc = await this.db
       .select()
       .from(discussions)
-      .where(
-        and(
-          eq(discussions.spaceId, spaceId),
-          eq(discussions.storyId, storyId),
-          resolved ? isNotNull(discussions.resolvedAt) : isNull(discussions.resolvedAt),
-        ),
-      )
-      .orderBy(desc(discussions.createdAt));
+      .where(and(...conditions))
+      .orderBy(desc(discussions.createdAt))
+      .limit(perPage)
+      .offset(offset);
 
     if (disc.length === 0) return { discussions: [] };
 
     const discIds = disc.map((d) => d.id);
 
+    // Fetch last comment for each discussion
     const allComments = await this.db
       .select({
         id: comments.id,
         discussionId: comments.discussionId,
-        spaceId: comments.spaceId,
         userId: comments.userId,
         message: comments.message,
         messageJson: comments.messageJson,
         uuid: comments.uuid,
         createdAt: comments.createdAt,
         updatedAt: comments.updatedAt,
-        userFirstname: users.firstname,
-        userLastname: users.lastname,
-        userAvatar: users.avatar,
       })
       .from(comments)
-      .leftJoin(users, eq(users.id, comments.userId))
       .where(and(eq(comments.spaceId, spaceId), inArray(comments.discussionId, discIds)))
-      .orderBy(comments.createdAt);
+      .orderBy(desc(comments.createdAt));
 
-    const commentsByDiscussion = allComments.reduce(
-      (acc, c) => {
-        const id = Number(c.discussionId);
-        if (!acc[id]) acc[id] = [];
-        acc[id].push(this.formatCommentWithUser(c));
-        return acc;
-      },
-      {} as Record<number, any[]>,
-    );
+    const lastCommentByDiscussion: Record<number, any> = {};
+    for (const c of allComments) {
+      const did = Number(c.discussionId);
+      if (!lastCommentByDiscussion[did]) {
+        lastCommentByDiscussion[did] = {
+          id: Number(c.id),
+          created_at: c.createdAt,
+          updated_at: c.updatedAt,
+          message: c.message ?? null,
+          message_json: c.messageJson,
+          user_id: c.userId ? Number(c.userId) : null,
+          uuid: c.uuid,
+        };
+      }
+    }
 
     return {
-      discussions: disc
-        .map((d) => ({
-          ...this.formatDiscussion(d),
-          comments: commentsByDiscussion[Number(d.id)] ?? [],
-        }))
-        .filter((d) => d.comments.length > 0),
+      discussions: disc.map((d) => ({
+        ...this.formatDiscussion(d),
+        last_comment: lastCommentByDiscussion[Number(d.id)] ?? null,
+      })),
     };
   }
 
-  async resolveDiscussion(spaceId: number, discussionId: number) {
-    const [updated] = await this.db
-      .update(discussions)
-      .set({ resolvedAt: new Date(), updatedAt: new Date() })
-      .where(and(eq(discussions.id, discussionId), eq(discussions.spaceId, spaceId)))
-      .returning();
+  /**
+   * GET /v1/spaces/:spaceId/mentioned_discussions/me
+   */
+  async findMentionedDiscussions(
+    spaceId: number,
+    userId: number,
+    page: number = 1,
+    perPage: number = 25,
+    byStatus?: string,
+  ) {
+    const offset = (page - 1) * perPage;
 
-    if (!updated) return null;
-    return { discussion: this.formatDiscussion(updated) };
+    // Find discussions where the user is mentioned in comments (via message_json mention attrs)
+    const userIdStr = String(userId);
+
+    const conditions = [
+      eq(comments.spaceId, spaceId),
+      or(
+        sql`${comments.message}::text LIKE '%@%'`,
+        sql`${comments.messageJson}::text LIKE ${'%"type":"mention"%'}`,
+      ),
+    ];
+
+    // Get discussion IDs where user is mentioned
+    const mentionedComments = await this.db
+      .select({ discussionId: comments.discussionId })
+      .from(comments)
+      .where(and(...conditions));
+
+    const mentionedDiscIds = [...new Set(mentionedComments.map((c) => Number(c.discussionId)))];
+    if (mentionedDiscIds.length === 0) return { discussions: [] };
+
+    const discConditions = [
+      eq(discussions.spaceId, spaceId),
+      inArray(discussions.id, mentionedDiscIds),
+    ];
+
+    if (byStatus === 'solved') {
+      discConditions.push(isNotNull(discussions.solvedAt));
+    } else if (byStatus === 'unsolved') {
+      discConditions.push(isNull(discussions.solvedAt));
+    }
+
+    const disc = await this.db
+      .select()
+      .from(discussions)
+      .where(and(...discConditions))
+      .orderBy(desc(discussions.createdAt))
+      .limit(perPage)
+      .offset(offset);
+
+    if (disc.length === 0) return { discussions: [] };
+
+    const discIds = disc.map((d) => d.id);
+    const allComments = await this.db
+      .select({
+        id: comments.id,
+        discussionId: comments.discussionId,
+        userId: comments.userId,
+        message: comments.message,
+        messageJson: comments.messageJson,
+        uuid: comments.uuid,
+        createdAt: comments.createdAt,
+        updatedAt: comments.updatedAt,
+      })
+      .from(comments)
+      .where(and(eq(comments.spaceId, spaceId), inArray(comments.discussionId, discIds)))
+      .orderBy(desc(comments.createdAt));
+
+    const lastCommentByDiscussion: Record<number, any> = {};
+    for (const c of allComments) {
+      const did = Number(c.discussionId);
+      if (!lastCommentByDiscussion[did]) {
+        lastCommentByDiscussion[did] = {
+          id: Number(c.id),
+          created_at: c.createdAt,
+          updated_at: c.updatedAt,
+          message: c.message ?? null,
+          message_json: c.messageJson,
+          user_id: c.userId ? Number(c.userId) : null,
+          uuid: c.uuid,
+        };
+      }
+    }
+
+    return {
+      discussions: disc.map((d) => ({
+        ...this.formatDiscussion(d),
+        last_comment: lastCommentByDiscussion[Number(d.id)] ?? null,
+      })),
+    };
   }
 
-  async unresolveDiscussion(spaceId: number, discussionId: number) {
-    const [updated] = await this.db
-      .update(discussions)
-      .set({ resolvedAt: null, updatedAt: new Date() })
-      .where(and(eq(discussions.id, discussionId), eq(discussions.spaceId, spaceId)))
-      .returning();
+  /**
+   * GET /v1/spaces/:spaceId/discussions/:discussionId/comments
+   * Note: discussionId can be either numeric ID or UUID per Storyblok docs.
+   */
+  async listComments(spaceId: number, discussionIdOrUuid: string) {
+    // Determine if it's a numeric ID or UUID
+    const isNumeric = /^\d+$/.test(discussionIdOrUuid);
 
-    if (!updated) return null;
-    return { discussion: this.formatDiscussion(updated) };
-  }
+    let discussionId: number;
+    if (isNumeric) {
+      discussionId = parseInt(discussionIdOrUuid);
+    } else {
+      // Look up by UUID
+      const [disc] = await this.db
+        .select({ id: discussions.id })
+        .from(discussions)
+        .where(and(eq(discussions.uuid, discussionIdOrUuid), eq(discussions.spaceId, spaceId)))
+        .limit(1);
+      if (!disc) return { comments: [] };
+      discussionId = disc.id;
+    }
 
-  async listComments(spaceId: number, discussionId: number) {
     const rows = await this.db
       .select({
         id: comments.id,
@@ -158,69 +309,24 @@ export class DiscussionsService {
     return { comments: rows.map((r) => this.formatCommentWithUser(r)) };
   }
 
-  async getComment(spaceId: number, discussionId: number, commentId: number) {
-    const [row] = await this.db
-      .select()
-      .from(comments)
-      .where(
-        and(
-          eq(comments.id, commentId),
-          eq(comments.discussionId, discussionId),
-          eq(comments.spaceId, spaceId),
-        ),
-      )
-      .limit(1);
-
-    if (!row) return null;
-    return { comment: this.formatComment(row) };
-  }
-
+  /**
+   * POST /v1/spaces/:spaceId/discussions/:discussionId/comments
+   */
   async createComment(
     spaceId: number,
     discussionId: number,
     data: { message?: string; message_json?: any[]; user_id?: number; user_email?: string; user_name?: string },
   ) {
-    const uuid = crypto.randomUUID();
-
-    // Resolve user_id from email; auto-create SBX user from better-auth data if missing
-    let userId = data.user_id ?? null;
-    if (!userId && data.user_email) {
-      const [existing] = await this.db
-        .select({ id: users.id })
-        .from(users)
-        .where(eq(users.email, data.user_email))
-        .limit(1);
-
-      if (existing) {
-        userId = existing.id;
-      } else {
-        // Auto-create user from session data (better-auth user not yet in SBX users table)
-        const parts = (data.user_name ?? '').split(' ');
-        const firstname = parts[0] || data.user_email.split('@')[0];
-        const lastname = parts.slice(1).join(' ');
-        const [created] = await this.db
-          .insert(users)
-          .values({ uuid: crypto.randomUUID(), email: data.user_email, firstname, lastname })
-          .returning({ id: users.id });
-        userId = created?.id ?? null;
-      }
-    }
-
-    const [created] = await this.db
-      .insert(comments)
-      .values({
-        spaceId,
-        discussionId,
-        uuid,
-        message: data.message ?? null,
-        messageJson: data.message_json ?? [],
-        userId,
-      })
-      .returning();
-
-    return { comment: this.formatComment(created) };
+    return this.createCommentInternal(spaceId, discussionId, data, {
+      email: data.user_email,
+      name: data.user_name,
+      id: data.user_id,
+    });
   }
 
+  /**
+   * PUT /v1/spaces/:spaceId/discussions/:discussionId/comments/:commentId
+   */
   async updateComment(
     spaceId: number,
     discussionId: number,
@@ -247,66 +353,9 @@ export class DiscussionsService {
     return { comment: this.formatComment(updated) };
   }
 
-  async findMentions(spaceId: number, userName: string, page = 1, perPage = 10) {
-    const pattern = `%@${userName}%`;
-    const offset = (page - 1) * perPage;
-
-    const rows = await this.db
-      .select({
-        id: comments.id,
-        discussionId: comments.discussionId,
-        spaceId: comments.spaceId,
-        userId: comments.userId,
-        message: comments.message,
-        uuid: comments.uuid,
-        createdAt: comments.createdAt,
-        updatedAt: comments.updatedAt,
-        userFirstname: users.firstname,
-        userLastname: users.lastname,
-        userAvatar: users.avatar,
-        storyId: discussions.storyId,
-        fieldKey: discussions.fieldKey,
-        storyName: stories.name,
-        storyFullSlug: stories.fullSlug,
-      })
-      .from(comments)
-      .innerJoin(discussions, eq(discussions.id, comments.discussionId))
-      .leftJoin(users, eq(users.id, comments.userId))
-      .leftJoin(stories, and(sql`${stories.id} = ${discussions.storyId}`, eq(stories.spaceId, spaceId)))
-      .where(and(eq(comments.spaceId, spaceId), ilike(comments.message, pattern)))
-      .orderBy(desc(comments.createdAt))
-      .limit(perPage)
-      .offset(offset);
-
-    const totalResult = await this.db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(comments)
-      .innerJoin(discussions, eq(discussions.id, comments.discussionId))
-      .where(and(eq(comments.spaceId, spaceId), ilike(comments.message, pattern)));
-
-    const total = totalResult[0]?.count ?? 0;
-
-    return {
-      comments: rows.map((r) => ({
-        id: Number(r.id),
-        uuid: r.uuid,
-        discussion_id: Number(r.discussionId),
-        space_id: r.spaceId,
-        user_id: r.userId ? Number(r.userId) : null,
-        user_name: [r.userFirstname, r.userLastname].filter(Boolean).join(' ') || null,
-        user_avatar: r.userAvatar ?? null,
-        message: r.message ?? null,
-        field_key: r.fieldKey ?? null,
-        story_id: r.storyId ? Number(r.storyId) : null,
-        story_name: r.storyName ?? null,
-        story_full_slug: r.storyFullSlug ?? null,
-        created_at: r.createdAt,
-        updated_at: r.updatedAt,
-      })),
-      total,
-    };
-  }
-
+  /**
+   * DELETE /v1/spaces/:spaceId/discussions/:discussionId/comments/:commentId
+   */
   async deleteComment(spaceId: number, discussionId: number, commentId: number) {
     await this.db
       .delete(comments)
@@ -330,13 +379,133 @@ export class DiscussionsService {
         .delete(discussions)
         .where(and(eq(discussions.id, discussionId), eq(discussions.spaceId, spaceId)));
     }
+  }
 
-    return {};
+  // ---- Internal helpers kept for admin UI backward compat via MAPI ----
+
+  /**
+   * Get or create a discussion for a field (used by admin field discussion panel).
+   * This is implemented as: POST /stories/:storyId/discussions with fieldname,
+   * but we keep a convenience method that checks for existing open discussion first.
+   */
+  async getOrCreateDiscussionForField(spaceId: number, storyId: number, fieldKey: string) {
+    const [existing] = await this.db
+      .select()
+      .from(discussions)
+      .where(
+        and(
+          eq(discussions.spaceId, spaceId),
+          eq(discussions.storyId, storyId),
+          or(eq(discussions.fieldKey, fieldKey), eq(discussions.fieldname, fieldKey)),
+          isNull(discussions.solvedAt),
+        ),
+      )
+      .limit(1);
+
+    if (existing) {
+      return { discussion: this.formatDiscussion(existing) };
+    }
+
+    const uuid = crypto.randomUUID();
+    const [created] = await this.db
+      .insert(discussions)
+      .values({ spaceId, storyId, fieldKey, fieldname: fieldKey, uuid })
+      .returning();
+
+    return { discussion: this.formatDiscussion(created) };
+  }
+
+  // ---- Private helpers ----
+
+  private async createCommentInternal(
+    spaceId: number,
+    discussionId: number,
+    data: { message?: string; message_json?: any[] },
+    adminUser?: { id?: number; email?: string; name?: string },
+  ) {
+    const uuid = crypto.randomUUID();
+
+    let userId: number | null = adminUser?.id ?? null;
+    if (!userId && adminUser?.email) {
+      const [existing] = await this.db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.email, adminUser.email))
+        .limit(1);
+
+      if (existing) {
+        userId = existing.id;
+      } else {
+        const parts = (adminUser.name ?? '').split(' ');
+        const firstname = parts[0] || adminUser.email.split('@')[0];
+        const lastname = parts.slice(1).join(' ');
+        const [created] = await this.db
+          .insert(users)
+          .values({ uuid: crypto.randomUUID(), email: adminUser.email, firstname, lastname })
+          .returning({ id: users.id });
+        userId = created?.id ?? null;
+      }
+    }
+
+    const [created] = await this.db
+      .insert(comments)
+      .values({
+        spaceId,
+        discussionId,
+        uuid,
+        message: data.message ?? null,
+        messageJson: data.message_json ?? [],
+        userId,
+      })
+      .returning();
+
+    return { comment: this.formatComment(created) };
+  }
+
+  private async getDiscussionWithLastComment(spaceId: number, discussionId: number) {
+    const [row] = await this.db
+      .select()
+      .from(discussions)
+      .where(and(eq(discussions.id, discussionId), eq(discussions.spaceId, spaceId)))
+      .limit(1);
+
+    if (!row) return null;
+
+    // Get last comment
+    const [lastComment] = await this.db
+      .select()
+      .from(comments)
+      .where(and(eq(comments.discussionId, discussionId), eq(comments.spaceId, spaceId)))
+      .orderBy(desc(comments.createdAt))
+      .limit(1);
+
+    return {
+      ...this.formatDiscussion(row),
+      last_comment: lastComment
+        ? {
+            id: Number(lastComment.id),
+            created_at: lastComment.createdAt,
+            updated_at: lastComment.updatedAt,
+            message: lastComment.message ?? null,
+            message_json: lastComment.messageJson,
+            user_id: lastComment.userId ? Number(lastComment.userId) : null,
+            uuid: lastComment.uuid,
+          }
+        : null,
+    };
   }
 
   private formatDiscussion(r: typeof discussions.$inferSelect) {
     return {
       id: Number(r.id),
+      title: r.title ?? null,
+      block_uid: r.blockUid ?? null,
+      fieldname: r.fieldname ?? null,
+      solved_at: r.solvedAt ?? null,
+      component: r.component ?? null,
+      lang: r.lang ?? null,
+      uuid: r.uuid,
+      // Keep extra fields for backward compat with admin UI
       space_id: r.spaceId,
       story_id: r.storyId ? Number(r.storyId) : null,
       field_key: r.fieldKey ?? null,

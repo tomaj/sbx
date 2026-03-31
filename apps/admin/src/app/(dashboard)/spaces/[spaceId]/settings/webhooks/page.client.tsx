@@ -28,33 +28,24 @@ const TRIGGER_GROUPS: TriggerGroup[] = [
   { label: 'Story', triggers: [
     { value: 'story.published', label: 'Published' },
     { value: 'story.unpublished', label: 'Unpublished' },
-    { value: 'story.created', label: 'Created' },
     { value: 'story.deleted', label: 'Deleted' },
     { value: 'story.moved', label: 'Moved' },
   ]},
   { label: 'Datasource', triggers: [
     { value: 'datasource.entries_updated', label: 'Entries Updated' },
-    { value: 'datasource.created', label: 'Created' },
   ]},
   { label: 'Asset', triggers: [
     { value: 'asset.created', label: 'Created' },
-    { value: 'asset.deleted', label: 'Deleted' },
     { value: 'asset.replaced', label: 'Replaced' },
+    { value: 'asset.deleted', label: 'Deleted' },
     { value: 'asset.restored', label: 'Restored' },
   ]},
   { label: 'User management', triggers: [
-    { value: 'user.created', label: 'Created' },
-    { value: 'user.deleted', label: 'Deleted' },
+    { value: 'user.added', label: 'Added' },
+    { value: 'user.removed', label: 'Removed' },
     { value: 'user.roles_updated', label: 'Roles Updated' },
   ]},
-  { label: 'Discussion', triggers: [
-    { value: 'discussion.created', label: 'Created' },
-    { value: 'discussion.resolved', label: 'Resolved' },
-    { value: 'discussion.unresolved', label: 'Unresolved' },
-    { value: 'discussion.deleted', label: 'Deleted' },
-    { value: 'discussion.comment_added', label: 'Comment Added' },
-  ]},
-  { label: 'Workflow', triggers: [{ value: 'workflow.stage_changed', label: 'Stage Changed' }] },
+  { label: 'Workflow', triggers: [{ value: 'stage.changed', label: 'Stage Changed' }] },
   { label: 'Pipeline', triggers: [{ value: 'pipeline.deployed', label: 'Deployed' }] },
   { label: 'Release', triggers: [{ value: 'release.merged', label: 'Merged' }] },
 ]
@@ -229,7 +220,7 @@ function WebhookForm({ spaceId, webhook, open, onClose, onSaved }: WebhookFormPr
     try {
       const url = webhook ? `/api/admin/spaces/${spaceId}/webhooks/${webhook.id}` : `/api/admin/spaces/${spaceId}/webhooks`
       const res = await fetch(url, {
-        method: webhook ? 'PATCH' : 'POST',
+        method: webhook ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: name.trim(), endpoint: endpoint.trim(), description: description.trim() || null, secret: secret.trim() || null, actions, activated }),
       })
@@ -457,7 +448,7 @@ export default function WebhooksPage({ params }: { params: Promise<{ spaceId: st
     setLoading(true)
     const res = await fetch(`/api/admin/spaces/${spaceId}/webhooks`)
     const data = await res.json()
-    setWebhooks(data.webhooks ?? [])
+    setWebhooks(data.webhook_endpoints ?? [])
     setLoading(false)
   }
 

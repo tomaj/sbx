@@ -22,7 +22,7 @@ export async function GET(
     headers: { Authorization: `Bearer ${token}` },
   })
   const data = await res.json()
-  return NextResponse.json({ webhooks: data.webhook_endpoints }, { status: res.status })
+  return NextResponse.json(data, { status: res.status })
 }
 
 export async function POST(
@@ -41,5 +41,5 @@ export async function POST(
     body: JSON.stringify({ webhook_endpoint: body }),
   })
   const data = await res.json()
-  return NextResponse.json({ webhook: data.webhook_endpoint }, { status: res.status })
+  return NextResponse.json(data, { status: res.status })
 }

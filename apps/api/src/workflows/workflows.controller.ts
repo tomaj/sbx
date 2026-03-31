@@ -8,6 +8,7 @@ import {
   Param,
   Post,
   Put,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -20,8 +21,8 @@ export class WorkflowsController {
   constructor(private readonly workflowsService: WorkflowsService) {}
 
   @Get()
-  async list(@Req() req: any) {
-    return this.workflowsService.adminList(req.space.id);
+  async list(@Req() req: any, @Query('content_type') contentType?: string) {
+    return this.workflowsService.adminList(req.space.id, { contentType });
   }
 
   @Get(':id')
@@ -60,9 +61,8 @@ export class WorkflowsController {
   }
 
   @Delete(':id')
-  @HttpCode(200)
+  @HttpCode(204)
   async remove(@Req() req: any, @Param('id') id: string) {
     await this.workflowsService.adminDelete(req.space.id, parseInt(id));
-    return {};
   }
 }

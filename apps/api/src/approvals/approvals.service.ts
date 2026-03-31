@@ -61,7 +61,7 @@ export class ApprovalsService {
     return { approval: this.format(row) };
   }
 
-  async create(spaceId: number, data: { approver_id: number; story_id: number }) {
+  async create(spaceId: number, data: { approver_id: number; story_id: number }, _releaseId?: number) {
     const [created] = await this.db
       .insert(approvals)
       .values({
@@ -78,8 +78,6 @@ export class ApprovalsService {
     await this.db
       .delete(approvals)
       .where(and(eq(approvals.id, id), eq(approvals.spaceId, spaceId)));
-
-    return {};
   }
 
   private format(r: typeof approvals.$inferSelect) {

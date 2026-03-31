@@ -25,7 +25,7 @@ export async function PATCH(
     body: JSON.stringify({
       api_key: {
         name: body.name,
-        token_type: body.access,
+        access: body.access,
         branch_id: body.branchId,
         min_cache: body.minCache,
       },

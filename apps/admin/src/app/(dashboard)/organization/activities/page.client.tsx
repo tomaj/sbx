@@ -72,10 +72,10 @@ export default function OrgActivitiesPage() {
     if (!spaceId) return
     setLoading(true)
     const params = new URLSearchParams({ spaceId, page: String(page), per_page: String(perPage) })
-    if (activityKeys.length) params.set('keys', activityKeys.join(','))
-    if (userIds.length) params.set('user_ids', userIds.join(','))
-    if (dateFrom) params.set('date_from', dateFrom)
-    if (dateTo) params.set('date_to', dateTo)
+    if (activityKeys.length) params.set('types', activityKeys.join(','))
+    if (userIds.length) params.set('by_owner_ids', userIds.join(','))
+    if (dateFrom) params.set('created_at_gte', dateFrom)
+    if (dateTo) params.set('created_at_lte', dateTo)
     const res = await fetch(`/api/admin/activities?${params}`)
     if (res.ok) {
       const data = await res.json()

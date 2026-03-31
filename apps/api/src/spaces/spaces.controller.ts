@@ -42,6 +42,8 @@ export class SpacesController {
         mobile_width?: number;
         visual_editor_disabled?: boolean;
         asset_library_settings?: Record<string, unknown>;
+        story_published_hook?: string | null;
+        environments?: { name: string; location: string }[];
       };
     },
   ) {
@@ -49,12 +51,15 @@ export class SpacesController {
     const result = await this.spacesService.updateSpace(parseInt(id), {
       name: s.name,
       domain: s.domain,
+      defaultLang: s.default_lang,
       defaultRoot: s.default_root,
       previewUrls: s.preview_urls,
       encodeUrl: s.encode_url,
       mobileWidth: s.mobile_width,
       visualEditorDisabled: s.visual_editor_disabled,
       assetLibrarySettings: s.asset_library_settings,
+      storyPublishedHook: s.story_published_hook,
+      environments: s.environments,
     });
     if (!result) throw new NotFoundException();
     return result;

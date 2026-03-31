@@ -47,19 +47,24 @@ interface ActivityRow {
   } | null
 }
 
-interface MentionComment {
+interface MentionDiscussion {
   id: number
   uuid: string
-  discussion_id: number
-  user_id: number | null
-  user_name: string | null
-  user_avatar: string | null
-  message: string | null
+  title: string | null
+  fieldname: string | null
   field_key: string | null
   story_id: number | null
-  story_name: string | null
-  story_full_slug: string | null
+  solved_at: string | null
   created_at: string
+  last_comment: {
+    id: number
+    message: string | null
+    message_json: any[]
+    user_id: number | null
+    uuid: string
+    created_at: string
+    updated_at: string
+  } | null
 }
 
 interface ApprovalRow {
@@ -233,7 +238,7 @@ export default function SpaceDashboardPage({ params }: { params: Promise<{ space
   const [tab, setTab] = useState<ActivityTab>('team')
   const [currentUserId, setCurrentUserId] = useState<number | null>(null)
   const [currentUserName, setCurrentUserName] = useState<string | null>(null)
-  const [mentionComments, setMentionComments] = useState<MentionComment[] | null>(null)
+  const [mentionDiscussions, setMentionDiscussions] = useState<MentionDiscussion[] | null>(null)
   const [mentionTotal, setMentionTotal] = useState(0)
   const [approvalRows, setApprovalRows] = useState<ApprovalRow[] | null>(null)
 
@@ -298,17 +303,16 @@ export default function SpaceDashboardPage({ params }: { params: Promise<{ space
   // Load mentions (My Mentions tab)
   const fetchMentions = useCallback(async () => {
     if (tab !== 'mentions') return
-    if (!currentUserName) { setActivitiesLoading(false); return }
     setActivitiesLoading(true)
-    const p = new URLSearchParams({ user_name: currentUserName, page: String(activitiesPage), per_page: String(PER_PAGE) })
+    const p = new URLSearchParams({ page: String(activitiesPage), per_page: String(PER_PAGE) })
     const res = await fetch(`/api/admin/spaces/${spaceId}/discussions/mentions?${p}`)
     if (res.ok) {
       const d = await res.json()
-      setMentionComments(d.comments ?? [])
-      setMentionTotal(d.total ?? 0)
+      setMentionDiscussions(d.discussions ?? [])
+      setMentionTotal((d.discussions ?? []).length)
     }
     setActivitiesLoading(false)
-  }, [spaceId, tab, activitiesPage, currentUserName])
+  }, [spaceId, tab, activitiesPage])
 
   // Load approvals (Assigned to me tab)
   const fetchApprovals = useCallback(async () => {
@@ -332,7 +336,7 @@ export default function SpaceDashboardPage({ params }: { params: Promise<{ space
     setTab(t)
     setActivitiesPage(1)
     setActivities(null)
-    setMentionComments(null)
+    setMentionDiscussions(null)
     setApprovalRows(null)
     setActivitiesLoading(true)
   }
@@ -475,33 +479,34 @@ export default function SpaceDashboardPage({ params }: { params: Promise<{ space
               ))
             )
           ) : tab === 'mentions' ? (
-            mentionComments === null || mentionComments.length === 0 ? (
+            mentionDiscussions === null || mentionDiscussions.length === 0 ? (
               <p className="px-6 py-10 text-sm text-gray-400 text-center">No mentions yet.</p>
             ) : (
-              mentionComments.map((comment) => (
-                <div key={comment.id} className="flex items-start gap-4 px-6 py-3.5">
+              mentionDiscussions.map((disc) => (
+                <div key={disc.id} className="flex items-start gap-4 px-6 py-3.5">
                   <div className="size-8 flex items-center justify-center shrink-0 mt-0.5">
                     <MessageSquare className="size-4 text-teal-400" />
                   </div>
-                  <UserAvatar name={comment.user_name} src={comment.user_avatar} size="sm" className="shrink-0 mt-0.5" />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
-                      {comment.user_name ?? 'Unknown'}
+                      {disc.title ?? disc.fieldname ?? 'Discussion'}
                     </p>
-                    <p className="text-xs text-gray-600 dark:text-gray-400 truncate mt-0.5 italic">
-                      {comment.message}
-                    </p>
-                    {comment.story_name && (
+                    {disc.last_comment && (
+                      <p className="text-xs text-gray-600 dark:text-gray-400 truncate mt-0.5 italic">
+                        {disc.last_comment.message}
+                      </p>
+                    )}
+                    {disc.story_id && (
                       <Link
-                        href={`/spaces/${spaceId}/content/${comment.story_id}`}
+                        href={`/spaces/${spaceId}/content/${disc.story_id}`}
                         className="text-xs text-teal-600 dark:text-teal-400 hover:underline mt-0.5 block truncate"
                       >
-                        {comment.story_name}{comment.field_key ? ` · ${comment.field_key}` : ''}
+                        Story #{disc.story_id}{disc.fieldname ? ` · ${disc.fieldname}` : ''}
                       </Link>
                     )}
                   </div>
                   <span className="text-xs text-gray-400 whitespace-nowrap shrink-0">
-                    {timeAgo(comment.created_at)}
+                    {timeAgo(disc.last_comment?.created_at ?? disc.created_at)}
                   </span>
                 </div>
               ))

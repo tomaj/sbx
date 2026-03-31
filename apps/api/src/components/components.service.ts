@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { SQL, and, asc, count, desc, eq, ilike, inArray, isNull } from 'drizzle-orm';
+import { SQL, and, asc, count, desc, eq, ilike, inArray, isNull, or, sql } from 'drizzle-orm';
 import { DB } from '../db/db.module';
 import type { DbType } from '../db/db.module';
 import { componentGroups, components } from '../db/schema';
@@ -27,7 +27,8 @@ export class ComponentsService {
     const conditions: (SQL | undefined)[] = [eq(components.spaceId, spaceId)];
 
     if (opts.search?.trim()) {
-      conditions.push(ilike(components.name, `%${opts.search.trim()}%`));
+      const term = `%${opts.search.trim()}%`;
+      conditions.push(or(ilike(components.name, term), ilike(components.displayName, term)));
     }
     if (opts.in_group !== undefined) {
       conditions.push(
@@ -47,10 +48,20 @@ export class ComponentsService {
     }
 
     let order: ReturnType<typeof asc>;
-    if (opts.sort_by === 'updated_at') order = desc(components.updatedAt) as any;
-    else if (opts.sort_by === 'is_nestable') order = desc(components.isNestable) as any;
-    else if (opts.sort_by === 'is_root') order = desc(components.isRoot) as any;
-    else order = asc(components.name);
+    if (opts.sort_by) {
+      const [field, dir] = opts.sort_by.split(':');
+      const dirFn = dir === 'desc' ? desc : asc;
+      const colMap: Record<string, any> = {
+        name: components.name,
+        updated_at: components.updatedAt,
+        created_at: components.createdAt,
+        is_nestable: components.isNestable,
+        is_root: components.isRoot,
+      };
+      order = dirFn(colMap[field] ?? components.name) as any;
+    } else {
+      order = asc(components.name);
+    }
 
     const [rows, groupRows] = await Promise.all([
       this.db
@@ -78,11 +89,20 @@ export class ComponentsService {
     return { component: this.formatComponent(row) };
   }
 
-  async findAllComponentGroups(spaceId: number) {
+  async findAllComponentGroups(spaceId: number, opts?: { search?: string; withParent?: string }) {
+    const conditions: (SQL | undefined)[] = [eq(componentGroups.spaceId, spaceId)];
+    if (opts?.search?.trim()) {
+      conditions.push(ilike(componentGroups.name, `%${opts.search.trim()}%`));
+    }
+    if (opts?.withParent !== undefined) {
+      const parentId = parseInt(opts.withParent);
+      conditions.push(isNaN(parentId) ? isNull(componentGroups.parentId) : eq(componentGroups.parentId, BigInt(parentId)));
+    }
+
     const rows = await this.db
       .select()
       .from(componentGroups)
-      .where(eq(componentGroups.spaceId, spaceId))
+      .where(and(...conditions))
       .orderBy(asc(componentGroups.name));
 
     return {
@@ -333,14 +353,25 @@ export class ComponentsService {
 
   // ─── Admin: component group CRUD ────────────────────────────────────────────
 
-  async createComponentGroup(spaceId: number, data: { name: string; parent_uuid?: string | null }) {
+  async createComponentGroup(spaceId: number, data: { name: string; parent_id?: number | null; parent_uuid?: string | null }) {
     const id = BigInt(Date.now() * 1000 + Math.floor(Math.random() * 1000));
     const uuid = crypto.randomUUID();
 
     let parentId: bigint | null = null;
-    if (data.parent_uuid) {
+    let parentUuid: string | null = data.parent_uuid ?? null;
+
+    if (data.parent_id) {
+      parentId = BigInt(data.parent_id);
+      // Resolve parent_uuid from parent_id
       const [parent] = await this.db
-        .select()
+        .select({ uuid: componentGroups.uuid })
+        .from(componentGroups)
+        .where(and(eq(componentGroups.id, parentId), eq(componentGroups.spaceId, spaceId)))
+        .limit(1);
+      if (parent) parentUuid = parent.uuid;
+    } else if (data.parent_uuid) {
+      const [parent] = await this.db
+        .select({ id: componentGroups.id })
         .from(componentGroups)
         .where(and(eq(componentGroups.uuid, data.parent_uuid), eq(componentGroups.spaceId, spaceId)))
         .limit(1);
@@ -355,15 +386,29 @@ export class ComponentsService {
         spaceId,
         name: data.name,
         parentId,
-        parentUuid: data.parent_uuid ?? null,
+        parentUuid,
       })
       .returning();
     return this.formatGroup(row);
   }
 
-  async updateComponentGroup(spaceId: number, id: number, data: { name?: string }) {
+  async updateComponentGroup(spaceId: number, id: number, data: { name?: string; parent_id?: number | null }) {
     const set: Record<string, any> = {};
     if (data.name !== undefined) set.name = data.name;
+    if (data.parent_id !== undefined) {
+      if (data.parent_id === null) {
+        set.parentId = null;
+        set.parentUuid = null;
+      } else {
+        set.parentId = BigInt(data.parent_id);
+        const [parent] = await this.db
+          .select({ uuid: componentGroups.uuid })
+          .from(componentGroups)
+          .where(and(eq(componentGroups.id, BigInt(data.parent_id)), eq(componentGroups.spaceId, spaceId)))
+          .limit(1);
+        if (parent) set.parentUuid = parent.uuid;
+      }
+    }
 
     const [row] = await this.db
       .update(componentGroups)

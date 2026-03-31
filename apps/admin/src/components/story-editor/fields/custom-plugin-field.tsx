@@ -24,31 +24,42 @@ export function CustomPluginField({ fieldKey, def, value, onChange }: Props) {
       ? 'dark'
       : 'light'
 
+  const valueRef = useRef(value)
+  valueRef.current = value
+  const defRef = useRef(def)
+  defRef.current = def
+
+  const sendContext = (callbackId?: string) => {
+    iframeRef.current?.contentWindow?.postMessage(
+      {
+        action: 'loaded',
+        uid: uid.current,
+        ...(callbackId ? { callbackId } : {}),
+        schema: { ...defRef.current as any },
+        model: valueRef.current ?? null,
+        content: valueRef.current ?? null,
+        token: null,
+        spaceId: null,
+        storyId: null,
+        userId: null,
+        blockId: null,
+        story: { content: {} },
+        language: 'default',
+        isModalOpen: false,
+      },
+      window.location.origin,
+    )
+  }
+
   useEffect(() => {
     function handleMessage(e: MessageEvent) {
       if (e.source !== iframeRef.current?.contentWindow) return
 
-      const { action, event: evt, model, height } = e.data ?? {}
+      const { action, event: evt, model, height, callbackId } = e.data ?? {}
 
-      // Storyblok fieldtype-wrapper protocol
       if (action === 'plugin-changed') {
         if (evt === 'loaded') {
-          // Plugin ready — send value + schema back
-          iframeRef.current!.contentWindow!.postMessage(
-            {
-              uid: uid.current,
-              schema: { ...(def as any) },
-              model: value ?? null,
-              token: null,
-              spaceId: null,
-              storyId: null,
-              userId: null,
-              blockId: null,
-              story: null,
-              language: 'default',
-            },
-            window.location.origin,
-          )
+          sendContext(callbackId)
         } else if (evt === 'heightChange' && typeof height === 'number') {
           setIframeHeight(Math.max(40, height + 16))
         } else if (evt === 'update' && model !== undefined) {
@@ -59,7 +70,7 @@ export function CustomPluginField({ fieldKey, def, value, onChange }: Props) {
 
     window.addEventListener('message', handleMessage)
     return () => window.removeEventListener('message', handleMessage)
-  }, [value, def, onChange])
+  }, [onChange])
 
   // Sync external value changes into iframe
   useEffect(() => {
@@ -88,11 +99,12 @@ export function CustomPluginField({ fieldKey, def, value, onChange }: Props) {
   return (
     <div>
       <FieldLabel label={fieldLabel(def.display_name, fieldKey)} description={(def as any).description} />
-      <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+      <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-[#1e1e2e]">
         <iframe
           ref={iframeRef}
           src={src}
-          style={{ width: '100%', height: iframeHeight, border: 'none', display: 'block' }}
+          onLoad={() => sendContext()}
+          style={{ width: '100%', height: iframeHeight, border: 'none', display: 'block', colorScheme: 'normal' }}
           title={`Plugin: ${pluginName}`}
         />
       </div>

@@ -8,11 +8,16 @@ import { releases, storyReleases, stories } from '../db/schema';
 export class ReleasesService {
   constructor(@Inject(DB) private db: DbType) {}
 
-  async findAll(spaceId: number) {
+  async findAll(spaceId: number, branchId?: number) {
+    const conditions = [eq(releases.spaceId, spaceId)];
+    if (branchId !== undefined) {
+      conditions.push(sql`${branchId} = ANY(${releases.branchesToDeploy})`);
+    }
+
     const rows = await this.db
       .select()
       .from(releases)
-      .where(eq(releases.spaceId, spaceId))
+      .where(and(...conditions))
       .orderBy(desc(releases.createdAt));
 
     return { releases: rows.map((r) => this.format(r)) };
@@ -29,7 +34,7 @@ export class ReleasesService {
     return { release: this.format(row) };
   }
 
-  async create(spaceId: number, data: { name: string; release_at?: string | null; timezone?: string }) {
+  async create(spaceId: number, data: { name: string; release_at?: string | null; timezone?: string; branches_to_deploy?: number[] }) {
     const id = Number(Date.now()) * 1000 + Math.floor(Math.random() * 1000);
     const uuid = crypto.randomUUID();
 
@@ -42,6 +47,7 @@ export class ReleasesService {
         name: data.name,
         releaseAt: data.release_at ? new Date(data.release_at) : null,
         timezone: data.timezone ?? null,
+        ...(data.branches_to_deploy !== undefined && { branchesToDeploy: data.branches_to_deploy }),
       })
       .returning();
 
@@ -51,7 +57,7 @@ export class ReleasesService {
   async update(
     spaceId: number,
     id: number,
-    data: { name?: string; release_at?: string | null; timezone?: string; do_release?: boolean },
+    data: { name?: string; release_at?: string | null; timezone?: string; branches_to_deploy?: number[]; do_release?: boolean },
   ) {
     if (data.do_release) {
       return this.publishRelease(spaceId, id);
@@ -63,6 +69,7 @@ export class ReleasesService {
         ...(data.name !== undefined && { name: data.name }),
         ...(data.release_at !== undefined && { releaseAt: data.release_at ? new Date(data.release_at) : null }),
         ...(data.timezone !== undefined && { timezone: data.timezone }),
+        ...(data.branches_to_deploy !== undefined && { branchesToDeploy: data.branches_to_deploy }),
         updatedAt: new Date(),
       })
       .where(and(eq(releases.id, id), eq(releases.spaceId, spaceId)))
@@ -73,11 +80,13 @@ export class ReleasesService {
   }
 
   async remove(spaceId: number, id: number) {
-    await this.db
+    const [deleted] = await this.db
       .delete(releases)
-      .where(and(eq(releases.id, id), eq(releases.spaceId, spaceId)));
+      .where(and(eq(releases.id, id), eq(releases.spaceId, spaceId)))
+      .returning();
 
-    return {};
+    if (!deleted) return { release: {} };
+    return { release: this.format(deleted) };
   }
 
   async conflictCheck(spaceId: number, releaseId: number) {

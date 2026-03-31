@@ -8,6 +8,7 @@ import {
   Param,
   Post,
   Put,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -21,21 +22,22 @@ export class CollaboratorsController {
   constructor(private readonly usersService: UsersService) {}
 
   @Get()
-  async getCollaborators(@Req() req: any) {
-    return this.usersService.getCollaborators(req.space.id);
-  }
-
-  @Get(':id')
-  async getCollaborator(@Req() req: any, @Param('id') id: string) {
-    const result = await this.usersService.getCollaboratorById(req.space.id, parseInt(id));
-    if (!result) throw new NotFoundException();
-    return result;
+  async getCollaborators(
+    @Req() req: any,
+    @Query('page') page?: string,
+    @Query('per_page') perPage?: string,
+  ) {
+    return this.usersService.getCollaborators(req.space.id, {
+      page: page ? parseInt(page) : 1,
+      perPage: perPage ? parseInt(perPage) : 25,
+    });
   }
 
   @Post()
   @HttpCode(201)
-  async addCollaborator(@Req() req: any, @Body() body: { collaborator: any }) {
-    const data = body.collaborator ?? {};
+  async addCollaborator(@Req() req: any, @Body() body: any) {
+    // Accept both root-level fields (standard) and wrapped in "collaborator" (SSO)
+    const data = body.collaborator ?? body;
     const spaceId: number = req.space.id;
 
     // Resolve user_id: accept either user_id or email
@@ -81,7 +83,7 @@ export class CollaboratorsController {
   }
 
   @Delete(':id')
-  @HttpCode(200)
+  @HttpCode(204)
   async removeCollaborator(@Req() req: any, @Param('id') id: string) {
     const memberId = parseInt(id);
     const spaceId: number = req.space.id;
@@ -90,6 +92,5 @@ export class CollaboratorsController {
     if (!existing) throw new NotFoundException();
 
     await this.usersService.removeSpaceMember(spaceId, memberId);
-    return {};
   }
 }

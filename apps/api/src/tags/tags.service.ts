@@ -81,8 +81,17 @@ export class TagsService {
 
   async listMapi(
     spaceId: number,
-    opts: { search?: string; sortBy?: string } = {},
+    opts: {
+      search?: string;
+      sortBy?: string;
+      allTags?: boolean;
+      page?: number;
+      perPage?: number;
+    } = {},
   ) {
+    const page = Math.max(1, opts.page ?? 1);
+    const perPage = Math.min(100, Math.max(1, opts.perPage ?? 25));
+
     const conditions: ReturnType<typeof eq>[] = [eq(tags.spaceId, spaceId)];
     if (opts.search) {
       conditions.push(ilike(tags.name, `%${opts.search}%`) as any);
@@ -103,14 +112,15 @@ export class TagsService {
       .select()
       .from(tags)
       .where(and(...conditions))
-      .orderBy(orderBy);
+      .orderBy(orderBy)
+      .limit(perPage)
+      .offset((page - 1) * perPage);
 
     return {
       tags: rows.map((t) => ({
-        id: t.id,
         name: t.name,
         taggings_count: t.taggingsCount,
-        created_at: t.createdAt,
+        ...(opts.allTags ? { tag_on_stories: t.taggingsCount } : {}),
       })),
     };
   }
@@ -145,13 +155,35 @@ export class TagsService {
     };
   }
 
-  async createTag(spaceId: number, body: { name: string }) {
+  async createTag(spaceId: number, body: { name: string; storyId?: number }) {
     const [row] = await this.db
       .insert(tags)
       .values({ spaceId, name: body.name })
       .returning();
 
-    return { tag: { id: row.id, name: row.name, taggings_count: row.taggingsCount } };
+    // If story_id provided, associate tag with story
+    if (body.storyId) {
+      const [story] = await this.db
+        .select({ tagList: stories.tagList })
+        .from(stories)
+        .where(and(eq(stories.id, BigInt(body.storyId)), eq(stories.spaceId, spaceId)));
+      if (story) {
+        const currentTags = (story.tagList as string[]) ?? [];
+        if (!currentTags.includes(row.name)) {
+          await this.db
+            .update(stories)
+            .set({ tagList: [...currentTags, row.name] })
+            .where(eq(stories.id, BigInt(body.storyId)));
+        }
+      }
+    }
+
+    return {
+      tag: {
+        name: row.name,
+        ...(body.storyId ? { story_id: body.storyId } : {}),
+      },
+    };
   }
 
   async updateTag(id: number, spaceId: number, body: { name: string }) {
@@ -175,5 +207,14 @@ export class TagsService {
     if (!row) throw new NotFoundException('Tag not found');
 
     return {};
+  }
+
+  async deleteTagByName(name: string, spaceId: number) {
+    const [row] = await this.db
+      .delete(tags)
+      .where(and(eq(tags.name, name), eq(tags.spaceId, spaceId)))
+      .returning();
+
+    if (!row) throw new NotFoundException('Tag not found');
   }
 }
