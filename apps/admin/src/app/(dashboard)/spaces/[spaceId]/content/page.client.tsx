@@ -304,9 +304,9 @@ export default function ContentPage({ params }: { params: Promise<{ spaceId: str
 
   useEffect(() => {
     if (!currentParentId) { setBreadcrumb([]); return }
-    fetch(`/api/admin/spaces/${spaceId}/stories/ancestors?story_id=${currentParentId}`)
+    fetch(`/api/admin/spaces/${spaceId}/breadcrumbs?currentPage=1&parent_id=${currentParentId}`)
       .then((r) => r.json())
-      .then((data) => setBreadcrumb((data.ancestors ?? []).map((s: Story) => ({ id: s.id, name: s.name }))))
+      .then((data) => setBreadcrumb((data.breadcrumbs ?? []).map((s: Story) => ({ id: s.id, name: s.name }))))
       .catch(() => {})
   }, [currentParentId, spaceId])
 
@@ -368,8 +368,12 @@ export default function ContentPage({ params }: { params: Promise<{ spaceId: str
       } else {
         qs.set('page', String(page))
         qs.set('per_page', String(perPage))
+        qs.set('with_summary', '1')
         if (search.trim()) qs.set('text_search', search.trim())
-        if (!search.trim() && !showFavoritesOnly) qs.set('parent_id', currentParentId !== null ? String(currentParentId) : '')
+        if (!search.trim() && !showFavoritesOnly) {
+          qs.set('with_parent', currentParentId !== null ? String(currentParentId) : '0')
+          if (currentParentId !== null) qs.set('in_current_folder', 'true')
+        }
         const { field, dir } = parseSortOption(sort)
         qs.set('sort_by', `${field}:${dir}`)
         for (const f of activeFilters) {

@@ -76,6 +76,7 @@ export class StoriesController {
     @Query('reference_search') referenceSearch?: string | string[],
     @Query('reference_search[]') referenceSearchBracket?: string | string[],
     @Query('with_summary') withSummary?: string,
+    @Query('in_current_folder') inCurrentFolder?: string,
   ) {
     let parentId: bigint | null | undefined = undefined;
     const rawParent = parentIdParam !== undefined ? parentIdParam : withParent;
@@ -145,6 +146,13 @@ export class StoriesController {
   @Get('ancestors')
   getAncestors(@Param('spaceId') spaceId: string, @Query('story_id') storyId: string) {
     return this.storiesService.getAncestors(parseInt(spaceId), BigInt(storyId));
+  }
+
+  // Storyblok-compatible breadcrumbs endpoint: /v1/spaces/:spaceId/breadcrumbs?parent_id=:id&currentPage=1
+  @Get('breadcrumbs')
+  async getBreadcrumbs(@Param('spaceId') spaceId: string, @Query('parent_id') parentId: string) {
+    const result = await this.storiesService.getAncestors(parseInt(spaceId), BigInt(parentId));
+    return { breadcrumbs: result.ancestors };
   }
 
   @Get(':id/compare')

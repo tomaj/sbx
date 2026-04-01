@@ -1,12 +1,17 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, desc, eq, ilike, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
+import { and, desc, eq, ilike, inArray, isNotNull, isNull, ne, or, sql } from 'drizzle-orm';
 import { DB } from '../db/db.module';
 import type { DbType } from '../db/db.module';
+import { JOBS_CLIENT } from '../jobs/jobs.module';
+import type { JobsClient } from '@sbx/jobs';
 import { discussions, comments, users, stories } from '../db/schema';
 
 @Injectable()
 export class DiscussionsService {
-  constructor(@Inject(DB) private db: DbType) {}
+  constructor(
+    @Inject(DB) private db: DbType,
+    @Inject(JOBS_CLIENT) private jobs: JobsClient,
+  ) {}
 
   /**
    * POST /v1/spaces/:spaceId/stories/:storyId/discussions
@@ -459,7 +464,94 @@ export class DiscussionsService {
       })
       .returning();
 
+    void this.sendCommentNotifications(spaceId, discussionId, userId, data.message ?? null);
+
     return { comment: this.formatComment(created) };
+  }
+
+  private async sendCommentNotifications(
+    spaceId: number,
+    discussionId: number,
+    commenterUserId: number | null,
+    messageText: string | null,
+  ) {
+    // Fetch discussion → storyId
+    const [disc] = await this.db
+      .select({ storyId: discussions.storyId })
+      .from(discussions)
+      .where(eq(discussions.id, discussionId))
+      .limit(1);
+
+    if (!disc?.storyId) return;
+
+    // Fetch story name + lastAuthorId
+    const [story] = await this.db
+      .select({ name: stories.name, lastAuthorId: stories.lastAuthorId, fullSlug: stories.fullSlug })
+      .from(stories)
+      .where(and(eq(stories.id, BigInt(disc.storyId)), eq(stories.spaceId, spaceId)))
+      .limit(1);
+
+    if (!story) return;
+
+    const adminUrl = process.env.ADMIN_URL ?? 'http://localhost:3001';
+    const storyUrl = `${adminUrl}/spaces/${spaceId}/stories/${disc.storyId}`;
+    const storyName = story.name;
+
+    // Collect recipient user IDs: story lastAuthor + previous commenters (excluding commenter)
+    const recipientIds = new Set<number>();
+
+    if (story.lastAuthorId && story.lastAuthorId !== commenterUserId) {
+      recipientIds.add(story.lastAuthorId);
+    }
+
+    // Previous participants in this discussion
+    const previousCommenters = await this.db
+      .select({ userId: comments.userId })
+      .from(comments)
+      .where(
+        and(
+          eq(comments.discussionId, discussionId),
+          eq(comments.spaceId, spaceId),
+          commenterUserId ? ne(comments.userId, commenterUserId) : undefined,
+        ),
+      );
+
+    for (const c of previousCommenters) {
+      if (c.userId) recipientIds.add(c.userId);
+    }
+
+    if (recipientIds.size === 0) return;
+
+    // Fetch commenter name
+    let commenterName = 'Someone';
+    if (commenterUserId) {
+      const [commenter] = await this.db
+        .select({ firstname: users.firstname, lastname: users.lastname })
+        .from(users)
+        .where(eq(users.id, commenterUserId))
+        .limit(1);
+      if (commenter) {
+        commenterName = [commenter.firstname, commenter.lastname].filter(Boolean).join(' ') || commenterName;
+      }
+    }
+
+    // Fetch recipient emails
+    const recipients = await this.db
+      .select({ email: users.email })
+      .from(users)
+      .where(inArray(users.id, [...recipientIds]));
+
+    for (const recipient of recipients) {
+      if (!recipient.email) continue;
+      void this.jobs.emails.send({
+        type: 'comment-notification',
+        to: recipient.email,
+        storyName,
+        commentAuthor: commenterName,
+        commentText: messageText ?? '',
+        storyUrl,
+      });
+    }
   }
 
   private async getDiscussionWithLastComment(spaceId: number, discussionId: number) {
