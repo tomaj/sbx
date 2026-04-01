@@ -154,8 +154,7 @@ export class ComponentsController {
   @Delete('components/:id')
   @HttpCode(200)
   async deleteComponent(@Req() req: any, @Param('id') id: string) {
-    await this.componentsService.deleteComponent(req.space.id, parseInt(id));
-    return {};
+    return this.componentsService.deleteComponent(req.space.id, parseInt(id));
   }
 
   // ─── Component Versions ───────────────────────────────────────────────────

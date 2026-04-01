@@ -438,6 +438,30 @@ export class AssetsService {
     };
   }
 
+  async bulkUpdate(spaceId: number, ids: number[], assetFolderId: number) {
+    if (!ids.length) return;
+    await this.db
+      .update(assets)
+      .set({ folderId: assetFolderId, updatedAt: new Date() })
+      .where(and(eq(assets.spaceId, spaceId), inArray(assets.id, ids)));
+  }
+
+  async bulkDestroy(spaceId: number, ids: number[]) {
+    if (!ids.length) return;
+    await this.db
+      .update(assets)
+      .set({ deletedAt: new Date(), updatedAt: new Date() })
+      .where(and(eq(assets.spaceId, spaceId), inArray(assets.id, ids), isNull(assets.deletedAt)));
+  }
+
+  async bulkRestore(spaceId: number, ids: number[]) {
+    if (!ids.length) return;
+    await this.db
+      .update(assets)
+      .set({ deletedAt: null, updatedAt: new Date() })
+      .where(and(eq(assets.spaceId, spaceId), inArray(assets.id, ids), isNotNull(assets.deletedAt)));
+  }
+
   private normalizeFilename(filename: string): string {
     // Migrated assets may have S3/Storyblok URLs like:
     //   https://s3.amazonaws.com/a.storyblok.com/f/285923/path/img.jpg

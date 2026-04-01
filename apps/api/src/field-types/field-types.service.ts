@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException, ConflictException } from '@nestjs/common';
-import { eq, ilike, asc } from 'drizzle-orm';
+import { and, eq, ilike, asc } from 'drizzle-orm';
 import { DB } from '../db/db.module';
 import type { DbType } from '../db/db.module';
 import { fieldTypes } from '../db/schema';
@@ -8,22 +8,24 @@ import { fieldTypes } from '../db/schema';
 export class FieldTypesService {
   constructor(@Inject(DB) private db: DbType) {}
 
-  async list(opts: { search?: string; onlyMine?: boolean } = {}) {
-    const rows = await this.db
-      .select({ id: fieldTypes.id, name: fieldTypes.name, approvedVersion: fieldTypes.approvedVersion })
+  async list(opts: { search?: string; onlyMine?: boolean; page?: number; perPage?: number } = {}) {
+    const conditions: any[] = [];
+    if (opts.search?.trim()) {
+      conditions.push(ilike(fieldTypes.name, `%${opts.search.trim()}%`));
+    }
+
+    const query = this.db
+      .select()
       .from(fieldTypes)
+      .where(conditions.length ? and(...conditions) : undefined)
       .orderBy(asc(fieldTypes.name));
 
-    const filtered = opts.search?.trim()
-      ? rows.filter((r) => r.name.toLowerCase().includes(opts.search!.trim().toLowerCase()))
-      : rows;
+    const page = opts.page ?? 1;
+    const perPage = Math.min(opts.perPage ?? 25, 100);
+    const rows = await query.limit(perPage).offset((page - 1) * perPage);
 
     return {
-      field_types: filtered.map((r) => ({
-        id: r.id,
-        name: r.name,
-        approved_version: r.approvedVersion ?? null,
-      })),
+      field_types: rows.map((r) => this.format(r)),
     };
   }
 
@@ -50,7 +52,7 @@ export class FieldTypesService {
     return { field_type: this.format(row) };
   }
 
-  async update(id: number, data: { name?: string; body?: string; compiled_body?: string; space_ids?: number[]; options?: any[] }) {
+  async update(id: number, data: { name?: string; body?: string; compiled_body?: string; space_ids?: number[]; options?: any[] }, opts?: { publish?: boolean }) {
     const [existing] = await this.db.select({ id: fieldTypes.id }).from(fieldTypes).where(eq(fieldTypes.id, id)).limit(1);
     if (!existing) throw new NotFoundException('Field type not found');
 

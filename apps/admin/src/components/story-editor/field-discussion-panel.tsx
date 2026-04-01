@@ -251,14 +251,22 @@ export function FieldDiscussionPanel({
 
   async function handleResolve() {
     if (!discussion) return
-    await fetch(`/api/admin/spaces/${spaceId}/discussions/${discussion.id}?action=resolve`, { method: 'PUT' })
+    await fetch(`/api/admin/spaces/${spaceId}/discussions/${discussion.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ discussion: { solved_at: new Date().toISOString() } }),
+    })
     await load()
     onDiscussionChange?.()
   }
 
   async function handleUnresolve() {
     if (!discussion) return
-    await fetch(`/api/admin/spaces/${spaceId}/discussions/${discussion.id}?action=unresolve`, { method: 'PUT' })
+    await fetch(`/api/admin/spaces/${spaceId}/discussions/${discussion.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ discussion: { solved_at: null } }),
+    })
     await load()
     onDiscussionChange?.()
   }

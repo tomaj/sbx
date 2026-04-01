@@ -54,22 +54,3 @@ export async function DELETE(
   const data = await res.json()
   return NextResponse.json(data, { status: res.status })
 }
-
-export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ spaceId: string; assetId: string }> },
-) {
-  const { spaceId, assetId } = await params
-  const token = await getSessionToken()
-  // POST to this route = restore (client sends ?action=restore)
-  const action = req.nextUrl.searchParams.get('action')
-  const url = action === 'restore'
-    ? `${API_URL}/v1/admin/spaces/${spaceId}/assets/${assetId}/restore`
-    : `${API_URL}/v1/admin/spaces/${spaceId}/assets/${assetId}`
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  const data = await res.json()
-  return NextResponse.json(data, { status: res.status })
-}

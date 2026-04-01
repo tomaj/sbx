@@ -234,7 +234,7 @@ export default function AssetsPage({ params }: { params: Promise<{ spaceId: stri
   // ─── Asset delete/restore ────────────────────────────────────────────────
 
   async function handleRestoreAsset(asset: Asset) {
-    await fetch(`/api/admin/spaces/${spaceId}/assets/${asset.id}?action=restore`, {
+    await fetch(`/api/admin/spaces/${spaceId}/assets/${asset.id}/restore`, {
       method: 'POST',
     })
     await loadAssets()

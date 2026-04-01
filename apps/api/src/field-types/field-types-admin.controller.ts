@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Param, Body, Query, UseGuards, ParseIntPipe, Res } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Param, Body, Query, UseGuards, ParseIntPipe, Res, HttpCode, HttpStatus } from '@nestjs/common';
 import type { Response } from 'express';
 import { SessionGuard } from '../auth/session.guard';
 import { FieldTypesService } from './field-types.service';
@@ -9,8 +9,18 @@ export class FieldTypesAdminController {
   constructor(private readonly service: FieldTypesService) {}
 
   @Get()
-  list(@Query('search') search?: string, @Query('only_mine') onlyMine?: string) {
-    return this.service.list({ search, onlyMine: onlyMine === '1' });
+  list(
+    @Query('search') search?: string,
+    @Query('only_mine') onlyMine?: string,
+    @Query('page') page?: string,
+    @Query('per_page') perPage?: string,
+  ) {
+    return this.service.list({
+      search,
+      onlyMine: onlyMine === '1',
+      page: page ? parseInt(page) : 1,
+      perPage: perPage ? parseInt(perPage) : 25,
+    });
   }
 
   @Get(':name/get_html')
@@ -27,6 +37,7 @@ export class FieldTypesAdminController {
   }
 
   @Post()
+  @HttpCode(HttpStatus.CREATED)
   create(@Body() body: { field_type: { name: string; body?: string; compiled_body?: string } }) {
     return this.service.create(body.field_type);
   }
@@ -34,9 +45,9 @@ export class FieldTypesAdminController {
   @Put(':id')
   update(
     @Param('id', ParseIntPipe) id: number,
-    @Body() body: { field_type: { name?: string; body?: string; compiled_body?: string; space_ids?: number[]; options?: any[] } },
+    @Body() body: { field_type: { name?: string; body?: string; compiled_body?: string; space_ids?: number[]; options?: any[] }; publish?: number },
   ) {
-    return this.service.update(id, body.field_type);
+    return this.service.update(id, body.field_type, { publish: body.publish === 1 });
   }
 
   @Delete(':id')

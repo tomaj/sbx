@@ -32,20 +32,7 @@ export async function PUT(
 ) {
   const { spaceId, discussionId } = await params
   const token = await getSessionToken()
-  const url = new URL(req.url)
-  const action = url.searchParams.get('action')
-
-  // Map resolve/unresolve actions to MAPI body format
-  let body: string
-  if (action === 'resolve') {
-    body = JSON.stringify({ discussion: { solved_at: new Date().toISOString() } })
-  } else if (action === 'unresolve') {
-    body = JSON.stringify({ discussion: { solved_at: null } })
-  } else {
-    // Pass through raw body
-    body = await req.text()
-  }
-
+  const body = await req.text()
   const res = await fetch(
     `${API_URL}/v1/spaces/${spaceId}/discussions/${discussionId}`,
     {

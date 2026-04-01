@@ -26,8 +26,10 @@ import { ApprovalsModule } from './approvals/approvals.module';
 import { DiscussionsModule } from './discussions/discussions.module';
 import { JobsModule } from './jobs/jobs.module';
 import { InternalTagsModule } from './internal-tags/internal-tags.module';
+import { StorySchedulingsModule } from './story-schedulings/story-schedulings.module';
+import { StatisticsModule } from './statistics/statistics.module';
 
 @Module({
-  imports: [JobsModule, DbModule, StorageModule, AuthModule, DatasourcesModule, SpacesModule, UsersModule, TagsModule, ComponentsModule, AccessTokensModule, SpaceRolesModule, WebhooksModule, PresetsModule, ActivitiesModule, PersonalTokensModule, AssetsModule, BranchesModule, ReleasesModule, StoriesModule, TasksModule, WorkflowsModule, FieldTypesModule, BridgeModule, WorkflowStageChangesModule, ApprovalsModule, DiscussionsModule, InternalTagsModule],
+  imports: [JobsModule, DbModule, StorageModule, AuthModule, DatasourcesModule, SpacesModule, UsersModule, TagsModule, ComponentsModule, AccessTokensModule, SpaceRolesModule, WebhooksModule, PresetsModule, ActivitiesModule, PersonalTokensModule, AssetsModule, BranchesModule, ReleasesModule, StoriesModule, TasksModule, WorkflowsModule, FieldTypesModule, BridgeModule, WorkflowStageChangesModule, ApprovalsModule, DiscussionsModule, InternalTagsModule, StorySchedulingsModule, StatisticsModule],
 })
 export class AppModule {}

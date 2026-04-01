@@ -35,7 +35,8 @@ export class InternalTagsController {
 
   @Delete('internal_tags/:id')
   @HttpCode(200)
-  delete(@Param('spaceId') spaceId: string, @Param('id') id: string) {
-    return this.service.deleteTag(parseInt(spaceId), parseInt(id));
+  async delete(@Param('spaceId') spaceId: string, @Param('id') id: string) {
+    await this.service.deleteTag(parseInt(spaceId), parseInt(id));
+    return {};
   }
 }

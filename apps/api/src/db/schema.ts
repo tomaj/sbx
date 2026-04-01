@@ -577,7 +577,7 @@ export const storyReleases = pgTable(
 export const storyVersions = pgTable(
   'story_versions',
   {
-    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    id: bigint('id', { mode: 'number' }).primaryKey(),
     storyId: bigint('story_id', { mode: 'number' }).notNull().references(() => stories.id, { onDelete: 'cascade' }),
     spaceId: integer('space_id').notNull().references(() => spaces.id, { onDelete: 'cascade' }),
     releaseId: bigint('release_id', { mode: 'number' }),
@@ -740,4 +740,21 @@ export const approvals = pgTable(
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },
   (t) => [index('idx_approvals_space_id').on(t.spaceId)],
+);
+
+export const storySchedulings = pgTable(
+  'story_schedulings',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    spaceId: integer('space_id').notNull().references(() => spaces.id, { onDelete: 'cascade' }),
+    storyId: bigint('story_id', { mode: 'number' }).notNull(),
+    userId: bigint('user_id', { mode: 'number' }),
+    language: text('language').notNull().default(''),
+    publishAt: timestamp('publish_at').notNull(),
+    status: text('status').notNull().default('scheduled'),
+    deletedAt: timestamp('deleted_at'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (t) => [index('idx_story_schedulings_space_id').on(t.spaceId)],
 );

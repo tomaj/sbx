@@ -94,8 +94,12 @@ export function CommentTab({ spaceId, storyId, onDiscussionChange }: CommentTabP
 
   async function handleResolve(discussionId: number) {
     await fetch(
-      `/api/admin/spaces/${spaceId}/discussions/${discussionId}?action=resolve`,
-      { method: 'PUT' },
+      `/api/admin/spaces/${spaceId}/discussions/${discussionId}`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ discussion: { solved_at: new Date().toISOString() } }),
+      },
     )
     await loadDiscussions()
     onDiscussionChange?.()
@@ -103,8 +107,12 @@ export function CommentTab({ spaceId, storyId, onDiscussionChange }: CommentTabP
 
   async function handleUnresolve(discussionId: number) {
     await fetch(
-      `/api/admin/spaces/${spaceId}/discussions/${discussionId}?action=unresolve`,
-      { method: 'PUT' },
+      `/api/admin/spaces/${spaceId}/discussions/${discussionId}`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ discussion: { solved_at: null } }),
+      },
     )
     await loadDiscussions()
     onDiscussionChange?.()

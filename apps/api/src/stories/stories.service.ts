@@ -31,20 +31,24 @@ export class StoriesService {
     path?: string | null;
     isStartpage?: boolean;
   }) {
-    void this.db.insert(storyVersions).values({
-      storyId: params.storyId,
-      spaceId: params.spaceId,
-      userId: params.userId ?? null,
-      releaseId: params.releaseId ?? null,
-      action: params.action,
-      status: params.status,
-      name: params.name,
-      slug: params.slug,
-      fullSlug: params.fullSlug,
-      content: params.content,
-      tagList: params.tagList ?? [],
-      path: params.path ?? null,
-      isStartpage: params.isStartpage ?? false,
+    void this.db.execute(sql`SELECT nextval('story_versions_id_seq')`).then(({ rows }) => {
+      const versionId = Number((rows[0] as any).nextval);
+      return this.db.insert(storyVersions).values({
+        id: versionId,
+        storyId: params.storyId,
+        spaceId: params.spaceId,
+        userId: params.userId ?? null,
+        releaseId: params.releaseId ?? null,
+        action: params.action,
+        status: params.status,
+        name: params.name,
+        slug: params.slug,
+        fullSlug: params.fullSlug,
+        content: params.content,
+        tagList: params.tagList ?? [],
+        path: params.path ?? null,
+        isStartpage: params.isStartpage ?? false,
+      });
     }).catch(() => { /* non-critical — never block main flow */ });
   }
 

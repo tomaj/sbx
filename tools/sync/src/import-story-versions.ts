@@ -100,10 +100,11 @@ async function main() {
         const status = v.status === 'published' ? 'published' : 'draft';
 
         batch.push([
+          v.id,                // id — original Storyblok version ID
           v.story_id,          // story_id
           spaceId,             // space_id
           null,                // release_id
-          null,                // user_id
+          v.user_id ?? null,   // user_id — Storyblok user IDs == our user IDs
           action,              // action
           status,              // status
           story.name,          // name
@@ -144,7 +145,7 @@ async function main() {
 async function insertBatch(pool: Pool, rows: any[][]) {
   if (rows.length === 0) return;
 
-  const cols = 14;
+  const cols = 15;
   const placeholders = rows.map((_, i) =>
     `(${Array.from({ length: cols }, (_, j) => `$${i * cols + j + 1}`).join(', ')})`
   ).join(', ');
@@ -153,7 +154,7 @@ async function insertBatch(pool: Pool, rows: any[][]) {
   // For content (index 9 in each row), cast to jsonb
   const sql = `
     INSERT INTO story_versions
-      (story_id, space_id, release_id, user_id, action, status, name, slug, full_slug, content, tag_list, path, is_startpage, created_at)
+      (id, story_id, space_id, release_id, user_id, action, status, name, slug, full_slug, content, tag_list, path, is_startpage, created_at)
     VALUES ${placeholders}
     ON CONFLICT DO NOTHING
   `;

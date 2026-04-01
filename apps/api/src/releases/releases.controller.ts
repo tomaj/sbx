@@ -63,6 +63,7 @@ export class ReleasesController {
   }
 
   @Delete(':id')
+  @HttpCode(200)
   async deleteRelease(@Req() req: any, @Param('id') id: string) {
     return this.releasesService.remove(req.space.id, parseInt(id));
   }

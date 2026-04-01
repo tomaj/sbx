@@ -197,4 +197,36 @@ export class AssetsController {
     const asset = await this.assetsService.restoreAsset(parseInt(id), parseInt(spaceId));
     return { asset };
   }
+
+  // ─── Bulk Operations ────────────────────────────────────────────────────────
+
+  @Post('assets/bulk_update')
+  @HttpCode(HttpStatus.OK)
+  async bulkUpdate(
+    @Param('spaceId') spaceId: string,
+    @Body() body: { asset_folder_id: number; ids: number[] },
+  ) {
+    await this.assetsService.bulkUpdate(parseInt(spaceId), body.ids, body.asset_folder_id);
+    return {};
+  }
+
+  @Post('assets/bulk_destroy')
+  @HttpCode(HttpStatus.OK)
+  async bulkDestroy(
+    @Param('spaceId') spaceId: string,
+    @Body() body: { ids: number[] },
+  ) {
+    await this.assetsService.bulkDestroy(parseInt(spaceId), body.ids);
+    return {};
+  }
+
+  @Post('assets/bulk_restore')
+  @HttpCode(HttpStatus.OK)
+  async bulkRestore(
+    @Param('spaceId') spaceId: string,
+    @Body() body: { ids: number[] },
+  ) {
+    await this.assetsService.bulkRestore(parseInt(spaceId), body.ids);
+    return {};
+  }
 }

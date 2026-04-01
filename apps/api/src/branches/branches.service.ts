@@ -84,6 +84,27 @@ export class BranchesService {
     return { branch: this.format(row) };
   }
 
+  async createDeployment(
+    spaceId: number,
+    branchId: number,
+    releaseUuids?: string[],
+  ) {
+    // Update the branch deployed_at timestamp
+    const [row] = await this.db
+      .update(branches)
+      .set({ deployedAt: new Date(), updatedAt: new Date() })
+      .where(and(eq(branches.id, branchId), eq(branches.spaceId, spaceId)))
+      .returning();
+    if (!row) return { deployment: {} };
+    return {
+      deployment: {
+        branch_id: branchId,
+        release_uuids: releaseUuids ?? [],
+        deployed_at: row.deployedAt,
+      },
+    };
+  }
+
   private format(b: typeof branches.$inferSelect) {
     return {
       id: b.id,
