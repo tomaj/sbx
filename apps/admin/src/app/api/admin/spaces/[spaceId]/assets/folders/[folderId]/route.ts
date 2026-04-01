@@ -1,34 +1,16 @@
-import { cookies } from 'next/headers'
-import { NextRequest, NextResponse } from 'next/server'
-
-const API_URL = process.env.API_URL ?? 'http://localhost:3000'
-
-async function getSessionToken() {
-  const cookieStore = await cookies()
-  return (
-    cookieStore.get('better-auth.session_token')?.value ??
-    cookieStore.get('__Secure-better-auth.session_token')?.value ??
-    ''
-  )
-}
+import { NextRequest } from 'next/server'
+import { apiFetch, proxyResponse } from '@/lib/api-server'
 
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ spaceId: string; folderId: string }> },
 ) {
   const { spaceId, folderId } = await params
-  const token = await getSessionToken()
   const body = await req.json()
-  const res = await fetch(
-    `${API_URL}/v1/spaces/${spaceId}/asset_folders/${folderId}`,
-    {
-      method: 'PUT',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ asset_folder: body }),
-    },
-  )
-  const data = await res.json()
-  return NextResponse.json(data, { status: res.status })
+  return proxyResponse(await apiFetch(`/v1/spaces/${spaceId}/asset_folders/${folderId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ asset_folder: body }),
+  }))
 }
 
 export async function DELETE(
@@ -36,14 +18,5 @@ export async function DELETE(
   { params }: { params: Promise<{ spaceId: string; folderId: string }> },
 ) {
   const { spaceId, folderId } = await params
-  const token = await getSessionToken()
-  const res = await fetch(
-    `${API_URL}/v1/spaces/${spaceId}/asset_folders/${folderId}`,
-    {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${token}` },
-    },
-  )
-  const data = await res.json()
-  return NextResponse.json(data, { status: res.status })
+  return proxyResponse(await apiFetch(`/v1/spaces/${spaceId}/asset_folders/${folderId}`, { method: 'DELETE' }))
 }

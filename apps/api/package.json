@@ -23,6 +23,7 @@
     "@aws-sdk/client-s3": "^3.1013.0",
     "@nestjs/common": "^11.0.1",
     "@sbx/jobs": "workspace:*",
+    "@sbx/types": "workspace:*",
     "bullmq": "^5.56.0",
     "@nestjs/config": "^4.0.3",
     "@nestjs/core": "^11.0.1",

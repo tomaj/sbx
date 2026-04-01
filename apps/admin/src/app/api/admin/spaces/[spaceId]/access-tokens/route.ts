@@ -1,27 +1,12 @@
-import { cookies } from 'next/headers'
-import { NextRequest, NextResponse } from 'next/server'
-
-const API_URL = process.env.API_URL ?? 'http://localhost:3000'
-
-async function getSessionToken() {
-  const cookieStore = await cookies()
-  return (
-    cookieStore.get('better-auth.session_token')?.value ??
-    cookieStore.get('__Secure-better-auth.session_token')?.value ??
-    ''
-  )
-}
+import { NextRequest } from 'next/server'
+import { apiFetch, proxyResponse } from '@/lib/api-server'
 
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ spaceId: string }> },
 ) {
   const { spaceId } = await params
-  const token = await getSessionToken()
-  const res = await fetch(`${API_URL}/v1/spaces/${spaceId}/api_keys`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  return NextResponse.json(await res.json(), { status: res.status })
+  return proxyResponse(await apiFetch(`/v1/spaces/${spaceId}/api_keys`))
 }
 
 export async function POST(
@@ -29,11 +14,9 @@ export async function POST(
   { params }: { params: Promise<{ spaceId: string }> },
 ) {
   const { spaceId } = await params
-  const token = await getSessionToken()
   const body = await req.json()
-  const res = await fetch(`${API_URL}/v1/spaces/${spaceId}/api_keys`, {
+  return proxyResponse(await apiFetch(`/v1/spaces/${spaceId}/api_keys`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       api_key: {
         name: body.name,
@@ -42,6 +25,5 @@ export async function POST(
         min_cache: body.minCache,
       },
     }),
-  })
-  return NextResponse.json(await res.json(), { status: res.status })
+  }))
 }

@@ -1,36 +1,16 @@
-import { cookies } from 'next/headers'
-import { NextRequest, NextResponse } from 'next/server'
-
-const API_URL = process.env.API_URL ?? 'http://localhost:3000'
-
-async function getSessionToken() {
-  const cookieStore = await cookies()
-  return (
-    cookieStore.get('better-auth.session_token')?.value ??
-    cookieStore.get('__Secure-better-auth.session_token')?.value ??
-    ''
-  )
-}
+import { NextRequest } from 'next/server'
+import { apiFetch, proxyResponse } from '@/lib/api-server'
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ spaceId: string; tagId: string }> }) {
   const { spaceId, tagId } = await params
-  const token = await getSessionToken()
   const body = await req.json()
-  const res = await fetch(`${API_URL}/v1/spaces/${spaceId}/tags/${tagId}`, {
+  return proxyResponse(await apiFetch(`/v1/spaces/${spaceId}/tags/${tagId}`, {
     method: 'PUT',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ tag: body }),
-  })
-  return NextResponse.json(await res.json(), { status: res.status })
+  }))
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ spaceId: string; tagId: string }> }) {
   const { spaceId, tagId } = await params
-  const token = await getSessionToken()
-  const res = await fetch(`${API_URL}/v1/spaces/${spaceId}/tags/${encodeURIComponent(tagId)}`, {
-    method: 'DELETE',
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (res.status === 204) return new NextResponse(null, { status: 204 })
-  return NextResponse.json(await res.json(), { status: res.status })
+  return proxyResponse(await apiFetch(`/v1/spaces/${spaceId}/tags/${encodeURIComponent(tagId)}`, { method: 'DELETE' }))
 }

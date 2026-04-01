@@ -1,16 +1,5 @@
-import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
-
-const API_URL = process.env.API_URL ?? 'http://localhost:3000'
-
-async function getSessionToken() {
-  const cookieStore = await cookies()
-  return (
-    cookieStore.get('better-auth.session_token')?.value ??
-    cookieStore.get('__Secure-better-auth.session_token')?.value ??
-    ''
-  )
-}
+import { apiFetch, proxyResponse } from '@/lib/api-server'
 
 // POST: get or create a discussion for a specific field
 // Admin UI sends { story_id, field_key }
@@ -20,7 +9,6 @@ export async function POST(
   { params }: { params: Promise<{ spaceId: string }> },
 ) {
   const { spaceId } = await params
-  const token = await getSessionToken()
   const body = await req.json()
   const storyId = body.story_id
   const fieldKey = body.field_key
@@ -30,9 +18,8 @@ export async function POST(
   }
 
   // Check existing unsolved discussions for this story
-  const listRes = await fetch(
-    `${API_URL}/v1/spaces/${spaceId}/stories/${storyId}/discussions?by_status=unsolved&per_page=100`,
-    { headers: { Authorization: `Bearer ${token}` } },
+  const listRes = await apiFetch(
+    `/v1/spaces/${spaceId}/stories/${storyId}/discussions?by_status=unsolved&per_page=100`,
   )
   if (listRes.ok) {
     const listData = await listRes.json()
@@ -45,11 +32,10 @@ export async function POST(
   }
 
   // Create new discussion via MAPI
-  const createRes = await fetch(
-    `${API_URL}/v1/spaces/${spaceId}/stories/${storyId}/discussions`,
+  return proxyResponse(await apiFetch(
+    `/v1/spaces/${spaceId}/stories/${storyId}/discussions`,
     {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         discussion: {
           fieldname: fieldKey,
@@ -57,7 +43,5 @@ export async function POST(
         },
       }),
     },
-  )
-  const data = await createRes.json()
-  return NextResponse.json(data, { status: createRes.status })
+  ))
 }
