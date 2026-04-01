@@ -209,7 +209,7 @@ export function StoryList({ stories, usersMap, isLoading, selectedIds, onSelecti
                 >
                   <div className="flex items-center gap-1.5 font-medium text-gray-900 dark:text-gray-100 truncate">
                     <span className="truncate">{story.name}</span>
-                    {story.is_startpage && <Home className="w-3.5 h-3.5 text-gray-400 shrink-0" title="Root of folder" />}
+                    {story.is_startpage && <Home className="w-3.5 h-3.5 text-gray-400 shrink-0" aria-label="Root of folder" />}
                   </div>
                   <div className="text-xs text-gray-400">{story.full_slug}</div>
                 </button>

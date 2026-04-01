@@ -882,7 +882,6 @@ export default function ContentPage({ params }: { params: Promise<{ spaceId: str
       {/* Pagination — hidden in favorites mode */}
       {!showFavoritesOnly && (
         <Pagination
-              storageKey="perPage:stories"
           total={total}
           page={page}
           perPage={perPage}

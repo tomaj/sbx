@@ -461,7 +461,6 @@ export default function AssetsPage({ params }: { params: Promise<{ spaceId: stri
 
               {/* Pagination */}
               <Pagination
-              storageKey="perPage:assets"
                 total={total}
                 page={page}
                 perPage={perPage}

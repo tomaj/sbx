@@ -304,7 +304,7 @@ export function EditBlockModal({ open, block, spaceId, groups, onClose, onSaved 
     setGroupUuid(block.component_group_uuid)
     setPreviewField(block.preview_field ?? null)
     setPreviewTmpl(block.preview_tmpl ?? '')
-    setInternalTags(block.internal_tags_list ?? [])
+    setInternalTags((block.internal_tags_list ?? []).map((t: any) => ({ id: Number(t.id), name: t.name })))
     setColor(block.color ?? null)
     setView('fields')
     setMainTab('fields')

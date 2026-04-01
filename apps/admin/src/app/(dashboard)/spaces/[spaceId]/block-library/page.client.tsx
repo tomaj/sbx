@@ -391,7 +391,6 @@ export default function BlockLibraryPage({ params }: { params: Promise<{ spaceId
 
               {/* Pagination */}
               <Pagination
-              storageKey="perPage:blocks"
                 total={total}
                 page={page}
                 perPage={perPage}
