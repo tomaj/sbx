@@ -13,13 +13,16 @@
   },
   "scripts": {
     "build": "tsc",
-    "dev": "tsc --watch"
+    "dev": "tsc --watch",
+    "lint": "biome check src/",
+    "format": "biome format --write src/"
   },
   "dependencies": {
-    "bullmq": "^5.56.0"
+    "bullmq": "catalog:"
   },
   "devDependencies": {
-    "typescript": "^5.7.3",
-    "@types/node": "^22.10.7"
+    "@biomejs/biome": "catalog:",
+    "@types/node": "catalog:",
+    "typescript": "catalog:"
   }
 }

@@ -1,11 +1,11 @@
-'use client'
+'use client';
 
-import { HelpCircle } from 'lucide-react'
+import { HelpCircle } from 'lucide-react';
 
 interface Props {
-  label: string
-  required?: boolean
-  description?: string | null
+  label: string;
+  required?: boolean;
+  description?: string | null;
 }
 
 export function FieldLabel({ label, required, description }: Props) {
@@ -25,5 +25,5 @@ export function FieldLabel({ label, required, description }: Props) {
         </div>
       )}
     </div>
-  )
+  );
 }

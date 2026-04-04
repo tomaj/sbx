@@ -1,27 +1,28 @@
-'use client'
+'use client';
 
-import { useState, useRef } from 'react'
-import { LayoutTemplate } from 'lucide-react'
-import type { ComponentGroup } from './group-tree'
-import { formatDate } from '@/lib/date'
+import { useState, useRef } from 'react';
+import { LayoutTemplate } from 'lucide-react';
+import type { ComponentGroup } from './group-tree';
+import { formatDate } from '@/lib/date';
+import { BlockIcon } from './block-icons';
 
 export interface Block {
-  id: number
-  name: string
-  display_name: string | null
-  description: string
-  image: string | null
-  component_group_uuid: string | null
-  color: string | null
-  icon: string | null
-  is_root: boolean
-  is_nestable: boolean
-  created_at: string
-  updated_at: string
-  schema: Record<string, any>
-  preview_field: string | null
-  preview_tmpl: string | null
-  internal_tags_list: { id: string | number; name: string }[]
+  id: number;
+  name: string;
+  display_name: string | null;
+  description: string;
+  image: string | null;
+  component_group_uuid: string | null;
+  color: string | null;
+  icon: string | null;
+  is_root: boolean;
+  is_nestable: boolean;
+  created_at: string;
+  updated_at: string;
+  schema: Record<string, any>;
+  preview_field: string | null;
+  preview_tmpl: string | null;
+  internal_tags_list: { id: string | number; name: string }[];
 }
 
 function BlockType({ is_root, is_nestable }: { is_root: boolean; is_nestable: boolean }) {
@@ -30,46 +31,44 @@ function BlockType({ is_root, is_nestable }: { is_root: boolean; is_nestable: bo
       <span className="px-2 py-0.5 text-xs rounded-md bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 font-medium whitespace-nowrap">
         Universal
       </span>
-    )
+    );
   }
   if (is_nestable) {
     return (
       <span className="px-2 py-0.5 text-xs rounded-md bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-medium whitespace-nowrap">
         Nestable
       </span>
-    )
+    );
   }
   return (
     <span className="px-2 py-0.5 text-xs rounded-md bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 font-medium whitespace-nowrap">
       Block
     </span>
-  )
+  );
 }
 
 interface BlockRowProps {
-  block: Block
-  group: ComponentGroup | undefined
-  selected: boolean
-  onToggle: (id: number) => void
-  onEdit: (block: Block) => void
+  block: Block;
+  group: ComponentGroup | undefined;
+  selected: boolean;
+  onToggle: (id: number) => void;
+  onEdit: (block: Block) => void;
 }
 
 function BlockRow({ block, group, selected, onToggle, onEdit }: BlockRowProps) {
-  const [previewPos, setPreviewPos] = useState<{ x: number; y: number } | null>(null)
-  const thumbRef = useRef<HTMLDivElement>(null)
+  const [previewPos, setPreviewPos] = useState<{ x: number; y: number } | null>(null);
+  const thumbRef = useRef<HTMLDivElement>(null);
 
   function handleThumbEnter() {
-    if (!block.image || !thumbRef.current) return
-    const rect = thumbRef.current.getBoundingClientRect()
-    setPreviewPos({ x: rect.right + 8, y: rect.top + rect.height / 2 })
+    if (!block.image || !thumbRef.current) return;
+    const rect = thumbRef.current.getBoundingClientRect();
+    setPreviewPos({ x: rect.right + 8, y: rect.top + rect.height / 2 });
   }
 
   return (
     <div
       className={`relative flex items-center gap-4 py-2.5 px-3 border-b border-gray-100 dark:border-gray-800/60 transition-colors ${
-        selected
-          ? 'bg-teal-50 dark:bg-teal-950/40'
-          : 'hover:bg-gray-50 dark:hover:bg-gray-800/50'
+        selected ? 'bg-teal-50 dark:bg-teal-950/40' : 'hover:bg-gray-50 dark:hover:bg-gray-800/50'
       }`}
     >
       {/* Checkbox */}
@@ -80,7 +79,7 @@ function BlockRow({ block, group, selected, onToggle, onEdit }: BlockRowProps) {
         className="w-4 h-4 shrink-0 rounded border-gray-300 text-teal-600 focus:ring-teal-500 cursor-pointer"
       />
 
-      {/* Preview thumbnail */}
+      {/* Preview thumbnail — always icon+color, image only on hover */}
       <div
         ref={thumbRef}
         className="w-10 h-10 rounded-lg shrink-0 flex items-center justify-center overflow-hidden"
@@ -88,8 +87,8 @@ function BlockRow({ block, group, selected, onToggle, onEdit }: BlockRowProps) {
         onMouseEnter={handleThumbEnter}
         onMouseLeave={() => setPreviewPos(null)}
       >
-        {block.image ? (
-          <img src={block.image} alt={block.display_name ?? block.name} className="w-full h-full object-cover" />
+        {block.icon ? (
+          <BlockIcon icon={block.icon} className="w-5 h-5 text-white/80" />
         ) : (
           <LayoutTemplate className="w-5 h-5 text-white/80" />
         )}
@@ -99,9 +98,19 @@ function BlockRow({ block, group, selected, onToggle, onEdit }: BlockRowProps) {
       {previewPos && block.image && (
         <div
           className="pointer-events-none bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl p-2"
-          style={{ position: 'fixed', left: previewPos.x, top: previewPos.y, transform: 'translateY(-50%)', zIndex: 9999 }}
+          style={{
+            position: 'fixed',
+            left: previewPos.x,
+            top: previewPos.y,
+            transform: 'translateY(-50%)',
+            zIndex: 9999,
+          }}
         >
-          <img src={block.image} alt={block.display_name ?? block.name} className="w-52 h-auto object-contain rounded-lg" />
+          <img
+            src={block.image}
+            alt={block.display_name ?? block.name}
+            className="w-52 h-auto object-contain rounded-lg"
+          />
         </div>
       )}
 
@@ -120,9 +129,11 @@ function BlockRow({ block, group, selected, onToggle, onEdit }: BlockRowProps) {
 
       {/* Folder (group) */}
       <span className="text-sm w-36 shrink-0 truncate hidden md:block">
-        {group?.name
-          ? <span className="text-gray-500 dark:text-gray-400">{group.name}</span>
-          : <span className="italic text-gray-300 dark:text-gray-600">no group</span>}
+        {group?.name ? (
+          <span className="text-gray-500 dark:text-gray-400">{group.name}</span>
+        ) : (
+          <span className="italic text-gray-300 dark:text-gray-600">no group</span>
+        )}
       </span>
 
       {/* Updated at */}
@@ -130,46 +141,56 @@ function BlockRow({ block, group, selected, onToggle, onEdit }: BlockRowProps) {
         {formatDate(block.updated_at)}
       </span>
     </div>
-  )
+  );
 }
 
 interface BlockListProps {
-  blocks: Block[]
-  groups: ComponentGroup[]
-  isLoading?: boolean
-  selectedIds: Set<number>
-  onSelectionChange: (ids: Set<number>) => void
-  onEdit: (block: Block) => void
+  blocks: Block[];
+  groups: ComponentGroup[];
+  isLoading?: boolean;
+  selectedIds: Set<number>;
+  onSelectionChange: (ids: Set<number>) => void;
+  onEdit: (block: Block) => void;
 }
 
-export function BlockList({ blocks, groups, isLoading, selectedIds, onSelectionChange, onEdit }: BlockListProps) {
-  const groupMap = new Map(groups.map((g) => [g.uuid, g]))
-  const allSelected = blocks.length > 0 && blocks.every((b) => selectedIds.has(b.id))
+export function BlockList({
+  blocks,
+  groups,
+  isLoading,
+  selectedIds,
+  onSelectionChange,
+  onEdit,
+}: BlockListProps) {
+  const groupMap = new Map(groups.map((g) => [g.uuid, g]));
+  const allSelected = blocks.length > 0 && blocks.every((b) => selectedIds.has(b.id));
 
   function toggleAll() {
     if (allSelected) {
-      const next = new Set(selectedIds)
-      blocks.forEach((b) => next.delete(b.id))
-      onSelectionChange(next)
+      const next = new Set(selectedIds);
+      blocks.forEach((b) => next.delete(b.id));
+      onSelectionChange(next);
     } else {
-      const next = new Set(selectedIds)
-      blocks.forEach((b) => next.add(b.id))
-      onSelectionChange(next)
+      const next = new Set(selectedIds);
+      blocks.forEach((b) => next.add(b.id));
+      onSelectionChange(next);
     }
   }
 
   function toggleOne(id: number) {
-    const next = new Set(selectedIds)
-    if (next.has(id)) next.delete(id)
-    else next.add(id)
-    onSelectionChange(next)
+    const next = new Set(selectedIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    onSelectionChange(next);
   }
 
   if (isLoading) {
     return (
       <div className="flex flex-col">
         {Array.from({ length: 10 }).map((_, i) => (
-          <div key={i} className="flex items-center gap-4 px-3 py-2.5 border-b border-gray-100 dark:border-gray-800/60">
+          <div
+            key={i}
+            className="flex items-center gap-4 px-3 py-2.5 border-b border-gray-100 dark:border-gray-800/60"
+          >
             <div className="w-4 h-4 rounded bg-gray-100 dark:bg-gray-800 animate-pulse shrink-0" />
             <div className="w-10 h-10 rounded-lg bg-gray-100 dark:bg-gray-800 animate-pulse shrink-0" />
             <div className="flex-1">
@@ -182,7 +203,7 @@ export function BlockList({ blocks, groups, isLoading, selectedIds, onSelectionC
           </div>
         ))}
       </div>
-    )
+    );
   }
 
   if (blocks.length === 0) {
@@ -191,7 +212,7 @@ export function BlockList({ blocks, groups, isLoading, selectedIds, onSelectionC
         <LayoutTemplate className="w-10 h-10 mb-3 text-gray-300 dark:text-gray-700" />
         <p className="text-sm">No blocks found</p>
       </div>
-    )
+    );
   }
 
   return (
@@ -222,5 +243,5 @@ export function BlockList({ blocks, groups, isLoading, selectedIds, onSelectionC
         />
       ))}
     </div>
-  )
+  );
 }

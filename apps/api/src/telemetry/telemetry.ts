@@ -10,7 +10,7 @@ export function initTelemetry() {
   if (process.env.OTEL_ENABLED !== 'true') return;
 
   const prometheusExporter = new PrometheusExporter({
-    port: parseInt(process.env.METRICS_PORT ?? '9464'),
+    port: parseInt(process.env.METRICS_PORT ?? '9464', 10),
   });
 
   sdk = new NodeSDK({

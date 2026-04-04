@@ -1,15 +1,15 @@
-'use client'
+'use client';
 
-import { authClient } from '@/lib/auth-client'
-import { useRouter } from 'next/navigation'
+import { logout } from '@/lib/auth-client';
+import { useRouter } from 'next/navigation';
 
 export function SignOutButton() {
-  const router = useRouter()
+  const router = useRouter();
 
   async function handleSignOut() {
-    await authClient.signOut()
-    router.push('/login')
-    router.refresh()
+    await logout();
+    router.push('/login');
+    router.refresh();
   }
 
   return (
@@ -19,5 +19,5 @@ export function SignOutButton() {
     >
       Sign out
     </button>
-  )
+  );
 }

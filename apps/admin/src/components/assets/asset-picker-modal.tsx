@@ -1,105 +1,84 @@
-'use client'
+'use client';
 
-import { useState, useCallback, useEffect } from 'react'
-import { X, Search, LayoutGrid, List, Check, Images } from 'lucide-react'
-import { Pagination } from '@/components/ui/pagination'
-import { FolderTree, type AssetFolder } from '@/components/assets/folder-tree'
-import { AssetThumb } from '@/components/assets/asset-thumb'
-import type { Asset } from '@/components/assets/asset-grid'
+import { useState } from 'react';
+import { X, Search, LayoutGrid, List, Check, Images } from 'lucide-react';
+import { Pagination } from '@/components/ui/pagination';
+import { FolderTree, type AssetFolder } from '@/components/assets/folder-tree';
+import { AssetThumb } from '@/components/assets/asset-thumb';
+import type { Asset } from '@/components/assets/asset-grid';
+import { useApi } from '@/lib/swr';
 
 const SORT_OPTIONS = [
   { value: 'created_at_desc', label: 'Default' },
   { value: 'filename_asc', label: 'Name (asc)' },
   { value: 'filename_desc', label: 'Name (desc)' },
   { value: 'updated_at_desc', label: 'Update Date (desc)' },
-]
+];
 
 function parseSortOption(sort: string): { field: string; dir: string } {
-  const lastUnderscore = sort.lastIndexOf('_')
-  return { field: sort.slice(0, lastUnderscore), dir: sort.slice(lastUnderscore + 1) }
+  const lastUnderscore = sort.lastIndexOf('_');
+  return { field: sort.slice(0, lastUnderscore), dir: sort.slice(lastUnderscore + 1) };
 }
 
 interface AssetPickerModalProps {
-  spaceId: string
+  spaceId: string;
   /** 'single' = pick one and auto-confirm; 'multi' = pick many, confirm button */
-  mode: 'single' | 'multi'
-  onSelect: (assets: Asset[]) => void
-  onClose: () => void
+  mode: 'single' | 'multi';
+  onSelect: (assets: Asset[]) => void;
+  onClose: () => void;
 }
 
 export function AssetPickerModal({ spaceId, mode, onSelect, onClose }: AssetPickerModalProps) {
-  const [assets, setAssets] = useState<Asset[]>([])
-  const [total, setTotal] = useState(0)
-  const [totalCount, setTotalCount] = useState(0)
-  const [folders, setFolders] = useState<AssetFolder[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
-  const [selectedFolder, setSelectedFolder] = useState<number | null | undefined>(undefined)
-  const [search, setSearch] = useState('')
-  const [sort, setSort] = useState('created_at_desc')
-  const [page, setPage] = useState(1)
-  const [perPage, setPerPage] = useState(24)
-  const [folderSearch, setFolderSearch] = useState('')
-  const [selected, setSelected] = useState<Asset[]>([])
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [selectedFolder, setSelectedFolder] = useState<number | null | undefined>(undefined);
+  const [search, setSearch] = useState('');
+  const [sort, setSort] = useState('created_at_desc');
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(24);
+  const [folderSearch, setFolderSearch] = useState('');
+  const [selected, setSelected] = useState<Asset[]>([]);
 
-  const loadFolders = useCallback(async () => {
-    const res = await fetch(`/api/admin/spaces/${spaceId}/assets/folders`)
-    if (res.ok) {
-      const data = await res.json()
-      setFolders(data.asset_folders ?? [])
-    }
-  }, [spaceId])
+  // Static fetches
+  const { data: foldersData } = useApi<{ asset_folders: AssetFolder[] }>(
+    `/api/admin/spaces/${spaceId}/assets/folders`,
+  );
+  const { data: countsData } = useApi<{ total: number }>(
+    `/api/admin/spaces/${spaceId}/assets/counts`,
+  );
+  const folders = foldersData?.asset_folders ?? [];
+  const totalCount = countsData?.total ?? 0;
 
-  const loadCounts = useCallback(async () => {
-    const res = await fetch(`/api/admin/spaces/${spaceId}/assets/counts`)
-    if (res.ok) {
-      const data = await res.json()
-      setTotalCount(data.total ?? 0)
-    }
-  }, [spaceId])
-
-  const loadAssets = useCallback(async () => {
-    setIsLoading(true)
-    try {
-      const qs = new URLSearchParams()
-      qs.set('page', String(page))
-      qs.set('per_page', String(perPage))
-      if (search.trim()) qs.set('search', search.trim())
-      if (selectedFolder !== undefined) {
-        qs.set('folder_id', selectedFolder === null ? 'null' : String(selectedFolder))
-      }
-      const { field, dir } = parseSortOption(sort)
-      qs.set('sort_field', field)
-      qs.set('sort_dir', dir)
-      const res = await fetch(`/api/admin/spaces/${spaceId}/assets?${qs}`)
-      if (res.ok) {
-        const data = await res.json()
-        setAssets(data.assets ?? [])
-        setTotal(data.total ?? 0)
-      }
-    } finally {
-      setIsLoading(false)
-    }
-  }, [spaceId, page, perPage, search, sort, selectedFolder])
-
-  useEffect(() => { loadFolders(); loadCounts() }, [loadFolders, loadCounts])
-  useEffect(() => { loadAssets() }, [loadAssets])
-  useEffect(() => { setPage(1) }, [search, sort, selectedFolder])
+  // Dynamic assets fetch — key changes on any filter/page change
+  const assetsQs = new URLSearchParams();
+  assetsQs.set('page', String(page));
+  assetsQs.set('per_page', String(perPage));
+  if (search.trim()) assetsQs.set('search', search.trim());
+  if (selectedFolder !== undefined) {
+    assetsQs.set('folder_id', selectedFolder === null ? 'null' : String(selectedFolder));
+  }
+  const { field, dir } = parseSortOption(sort);
+  assetsQs.set('sort_field', field);
+  assetsQs.set('sort_dir', dir);
+  const { data: assetsData, isLoading } = useApi<{ assets: Asset[]; total: number }>(
+    `/api/admin/spaces/${spaceId}/assets?${assetsQs}`,
+  );
+  const assets = assetsData?.assets ?? [];
+  const total = assetsData?.total ?? 0;
 
   function toggleAsset(asset: Asset) {
     if (mode === 'single') {
-      onSelect([asset])
-      onClose()
-      return
+      onSelect([asset]);
+      onClose();
+      return;
     }
-    setSelected(prev => {
-      const exists = prev.find(a => a.id === asset.id)
-      return exists ? prev.filter(a => a.id !== asset.id) : [...prev, asset]
-    })
+    setSelected((prev) => {
+      const exists = prev.find((a) => a.id === asset.id);
+      return exists ? prev.filter((a) => a.id !== asset.id) : [...prev, asset];
+    });
   }
 
   function isSelected(asset: Asset) {
-    return selected.some(a => a.id === asset.id)
+    return selected.some((a) => a.id === asset.id);
   }
 
   return (
@@ -116,7 +95,10 @@ export function AssetPickerModal({ spaceId, mode, onSelect, onClose }: AssetPick
             {mode === 'multi' && selected.length > 0 && (
               <button
                 type="button"
-                onClick={() => { onSelect(selected); onClose() }}
+                onClick={() => {
+                  onSelect(selected);
+                  onClose();
+                }}
                 className="px-4 py-2 text-sm font-medium bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
               >
                 Select {selected.length}
@@ -153,14 +135,16 @@ export function AssetPickerModal({ spaceId, mode, onSelect, onClose }: AssetPick
             </button>
 
             <div className="border-t border-gray-200 dark:border-gray-700 my-2" />
-            <p className="px-2 text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Folders</p>
+            <p className="px-2 text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">
+              Folders
+            </p>
 
             <div className="relative mb-1">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
               <input
                 type="text"
                 value={folderSearch}
-                onChange={e => setFolderSearch(e.target.value)}
+                onChange={(e) => setFolderSearch(e.target.value)}
                 placeholder="Search folders..."
                 className="w-full pl-7 pr-3 py-1.5 text-xs border border-gray-200 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-teal-500"
               />
@@ -169,7 +153,7 @@ export function AssetPickerModal({ spaceId, mode, onSelect, onClose }: AssetPick
             <FolderTree
               folders={folders}
               selectedId={selectedFolder !== undefined ? selectedFolder : -1}
-              onSelect={id => setSelectedFolder(id ?? undefined)}
+              onSelect={(id) => setSelectedFolder(id ?? undefined)}
               search={folderSearch}
               onCreateFolder={() => {}}
               onRenameFolder={() => {}}
@@ -188,16 +172,20 @@ export function AssetPickerModal({ spaceId, mode, onSelect, onClose }: AssetPick
                   type="text"
                   placeholder="Search assets..."
                   value={search}
-                  onChange={e => setSearch(e.target.value)}
+                  onChange={(e) => setSearch(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500"
                 />
               </div>
               <select
                 value={sort}
-                onChange={e => setSort(e.target.value)}
+                onChange={(e) => setSort(e.target.value)}
                 className="text-sm border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:outline-none"
               >
-                {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                {SORT_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
               </select>
               <div className="flex items-center border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden shrink-0">
                 <button
@@ -234,15 +222,17 @@ export function AssetPickerModal({ spaceId, mode, onSelect, onClose }: AssetPick
                 </div>
               ) : viewMode === 'grid' ? (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                  {assets.map(asset => {
-                    const sel = isSelected(asset)
+                  {assets.map((asset) => {
+                    const sel = isSelected(asset);
                     return (
                       <div
                         key={asset.id}
                         className="flex flex-col gap-1.5 cursor-pointer"
                         onClick={() => toggleAsset(asset)}
                       >
-                        <div className={`relative aspect-[4/3] rounded-xl bg-gray-100 dark:bg-gray-800 overflow-hidden flex items-center justify-center p-2.5 transition-all ${sel ? 'ring-2 ring-teal-500' : 'hover:ring-2 hover:ring-teal-400'}`}>
+                        <div
+                          className={`relative aspect-[4/3] rounded-xl bg-gray-100 dark:bg-gray-800 overflow-hidden flex items-center justify-center p-2.5 transition-all ${sel ? 'ring-2 ring-teal-500' : 'hover:ring-2 hover:ring-teal-400'}`}
+                        >
                           <AssetThumb
                             filename={asset.filename}
                             contentType={asset.content_type}
@@ -265,13 +255,13 @@ export function AssetPickerModal({ spaceId, mode, onSelect, onClose }: AssetPick
                           .{asset.content_type.split('/')[1] ?? asset.content_type}
                         </p>
                       </div>
-                    )
+                    );
                   })}
                 </div>
               ) : (
                 <div className="flex flex-col">
-                  {assets.map(asset => {
-                    const sel = isSelected(asset)
+                  {assets.map((asset) => {
+                    const sel = isSelected(asset);
                     return (
                       <div
                         key={asset.id}
@@ -297,7 +287,7 @@ export function AssetPickerModal({ spaceId, mode, onSelect, onClose }: AssetPick
                         </div>
                         {sel && <Check className="w-4 h-4 text-teal-500 flex-shrink-0" />}
                       </div>
-                    )
+                    );
                   })}
                 </div>
               )}
@@ -309,11 +299,14 @@ export function AssetPickerModal({ spaceId, mode, onSelect, onClose }: AssetPick
               page={page}
               perPage={perPage}
               onPageChange={setPage}
-              onPerPageChange={n => { setPerPage(n); setPage(1) }}
+              onPerPageChange={(n) => {
+                setPerPage(n);
+                setPage(1);
+              }}
             />
           </div>
         </div>
       </div>
     </div>
-  )
+  );
 }

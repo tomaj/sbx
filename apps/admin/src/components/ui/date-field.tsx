@@ -1,89 +1,108 @@
-'use client'
+'use client';
 
-import { useState, useRef, useEffect } from 'react'
-import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { useState, useRef, useEffect } from 'react';
+import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface DateFieldProps {
-  value: string
-  onChange: (value: string) => void
-  placeholder?: string
-  className?: string
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  className?: string;
 }
 
 const MONTH_NAMES = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-]
-const DAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
+const DAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 
 function getDaysInMonth(year: number, month: number) {
-  return new Date(year, month + 1, 0).getDate()
+  return new Date(year, month + 1, 0).getDate();
 }
 
-export function DateField({ value, onChange, placeholder = 'YYYY-MM-DD', className }: DateFieldProps) {
-  const [open, setOpen] = useState(false)
-  const containerRef = useRef<HTMLDivElement>(null)
+export function DateField({
+  value,
+  onChange,
+  placeholder = 'YYYY-MM-DD',
+  className,
+}: DateFieldProps) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  const today = new Date()
-  const parsedDate = value ? new Date(value + 'T00:00:00') : null
+  const today = new Date();
+  const parsedDate = value ? new Date(`${value}T00:00:00`) : null;
 
-  const [viewYear, setViewYear] = useState(parsedDate?.getFullYear() ?? today.getFullYear())
-  const [viewMonth, setViewMonth] = useState(parsedDate?.getMonth() ?? today.getMonth())
+  const [viewYear, setViewYear] = useState(parsedDate?.getFullYear() ?? today.getFullYear());
+  const [viewMonth, setViewMonth] = useState(parsedDate?.getMonth() ?? today.getMonth());
 
   useEffect(() => {
-    if (!open) return
+    if (!open) return;
     function handleClickOutside(e: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false)
+        setOpen(false);
       }
     }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [open])
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [open]);
 
   function prevMonth() {
-    if (viewMonth === 0) { setViewMonth(11); setViewYear((y) => y - 1) }
-    else setViewMonth((m) => m - 1)
+    if (viewMonth === 0) {
+      setViewMonth(11);
+      setViewYear((y) => y - 1);
+    } else setViewMonth((m) => m - 1);
   }
 
   function nextMonth() {
-    if (viewMonth === 11) { setViewMonth(0); setViewYear((y) => y + 1) }
-    else setViewMonth((m) => m + 1)
+    if (viewMonth === 11) {
+      setViewMonth(0);
+      setViewYear((y) => y + 1);
+    } else setViewMonth((m) => m + 1);
   }
 
   function selectDay(day: number, month: number, year: number) {
-    const y = String(year).padStart(4, '0')
-    const m = String(month + 1).padStart(2, '0')
-    const d = String(day).padStart(2, '0')
-    onChange(`${y}-${m}-${d}`)
-    setOpen(false)
+    const y = String(year).padStart(4, '0');
+    const m = String(month + 1).padStart(2, '0');
+    const d = String(day).padStart(2, '0');
+    onChange(`${y}-${m}-${d}`);
+    setOpen(false);
   }
 
   // Build calendar cells: prev-month fillers + current days + next-month fillers
-  const firstDay = new Date(viewYear, viewMonth, 1).getDay()
-  const daysInMonth = getDaysInMonth(viewYear, viewMonth)
+  const firstDay = new Date(viewYear, viewMonth, 1).getDay();
+  const daysInMonth = getDaysInMonth(viewYear, viewMonth);
   const daysInPrevMonth = getDaysInMonth(
     viewMonth === 0 ? viewYear - 1 : viewYear,
     viewMonth === 0 ? 11 : viewMonth - 1,
-  )
-  const totalCells = Math.ceil((firstDay + daysInMonth) / 7) * 7
+  );
+  const totalCells = Math.ceil((firstDay + daysInMonth) / 7) * 7;
 
-  type Cell = { day: number; offset: -1 | 0 | 1 }
-  const cells: Cell[] = []
+  type Cell = { day: number; offset: -1 | 0 | 1 };
+  const cells: Cell[] = [];
   for (let i = 0; i < firstDay; i++) {
-    cells.push({ day: daysInPrevMonth - firstDay + i + 1, offset: -1 })
+    cells.push({ day: daysInPrevMonth - firstDay + i + 1, offset: -1 });
   }
   for (let d = 1; d <= daysInMonth; d++) {
-    cells.push({ day: d, offset: 0 })
+    cells.push({ day: d, offset: 0 });
   }
   for (let d = 1; d <= totalCells - cells.length; d++) {
-    cells.push({ day: d, offset: 1 })
+    cells.push({ day: d, offset: 1 });
   }
 
-  const selDay = parsedDate?.getDate()
-  const selMonth = parsedDate?.getMonth()
-  const selYear = parsedDate?.getFullYear()
+  const selDay = parsedDate?.getDate();
+  const selMonth = parsedDate?.getMonth();
+  const selYear = parsedDate?.getFullYear();
 
   return (
     <div ref={containerRef} className={cn('relative', className)}>
@@ -98,7 +117,12 @@ export function DateField({ value, onChange, placeholder = 'YYYY-MM-DD', classNa
         )}
       >
         <Calendar className="size-4 text-gray-400 shrink-0" />
-        <span className={cn('flex-1 text-left', value ? 'text-gray-900 dark:text-gray-100' : 'text-gray-400')}>
+        <span
+          className={cn(
+            'flex-1 text-left',
+            value ? 'text-gray-900 dark:text-gray-100' : 'text-gray-400',
+          )}
+        >
           {value || placeholder}
         </span>
       </button>
@@ -140,29 +164,36 @@ export function DateField({ value, onChange, placeholder = 'YYYY-MM-DD', classNa
           {/* Day cells */}
           <div className="grid grid-cols-7 gap-y-0.5">
             {cells.map((cell, i) => {
-              const isCur = cell.offset === 0
-              const cellYear = cell.offset === -1
-                ? (viewMonth === 0 ? viewYear - 1 : viewYear)
-                : cell.offset === 1
-                ? (viewMonth === 11 ? viewYear + 1 : viewYear)
-                : viewYear
-              const cellMonth = cell.offset === -1
-                ? (viewMonth === 0 ? 11 : viewMonth - 1)
-                : cell.offset === 1
-                ? (viewMonth === 11 ? 0 : viewMonth + 1)
-                : viewMonth
+              const isCur = cell.offset === 0;
+              const cellYear =
+                cell.offset === -1
+                  ? viewMonth === 0
+                    ? viewYear - 1
+                    : viewYear
+                  : cell.offset === 1
+                    ? viewMonth === 11
+                      ? viewYear + 1
+                      : viewYear
+                    : viewYear;
+              const cellMonth =
+                cell.offset === -1
+                  ? viewMonth === 0
+                    ? 11
+                    : viewMonth - 1
+                  : cell.offset === 1
+                    ? viewMonth === 11
+                      ? 0
+                      : viewMonth + 1
+                    : viewMonth;
 
               const isToday =
                 isCur &&
                 viewYear === today.getFullYear() &&
                 viewMonth === today.getMonth() &&
-                cell.day === today.getDate()
+                cell.day === today.getDate();
 
               const isSelected =
-                isCur &&
-                selYear === viewYear &&
-                selMonth === viewMonth &&
-                selDay === cell.day
+                isCur && selYear === viewYear && selMonth === viewMonth && selDay === cell.day;
 
               return (
                 <button
@@ -172,7 +203,9 @@ export function DateField({ value, onChange, placeholder = 'YYYY-MM-DD', classNa
                   className={cn(
                     'relative flex items-center justify-center h-8 w-8 mx-auto rounded-full text-sm transition-colors',
                     !isCur && 'text-gray-300 dark:text-gray-600',
-                    isCur && !isSelected && !isToday &&
+                    isCur &&
+                      !isSelected &&
+                      !isToday &&
                       'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800',
                     isToday && !isSelected && 'text-teal-600 font-semibold',
                     isSelected && 'bg-teal-600 text-white font-semibold',
@@ -183,11 +216,11 @@ export function DateField({ value, onChange, placeholder = 'YYYY-MM-DD', classNa
                     <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 size-1 rounded-full bg-teal-600" />
                   )}
                 </button>
-              )
+              );
             })}
           </div>
         </div>
       )}
     </div>
-  )
+  );
 }

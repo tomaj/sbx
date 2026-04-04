@@ -1,16 +1,19 @@
-'use client'
+'use client';
 
-import { useState, useEffect, use } from 'react'
-import { ArrowLeft, RotateCcw, ChevronRight } from 'lucide-react'
-import Link from 'next/link'
-import type { WebhookLog, WebhookLogDetail } from '@sbx/types'
-import { formatDateTime } from '@/lib/date'
+import { useState, use } from 'react';
+import { ArrowLeft, RotateCcw, ChevronRight } from 'lucide-react';
+import Link from 'next/link';
+import type { WebhookLog, WebhookLogDetail } from '@sbx/types';
+import { formatDateTime } from '@/lib/date';
+import { Badge } from '@/components/ui/badge';
+import { EmptyState } from '@/components/ui/empty-state';
+import { useApi } from '@/lib/swr';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface WebhookRef {
-  id: number
-  name: string
+  id: number;
+  name: string;
 }
 
 // ─── Log Detail Modal ─────────────────────────────────────────────────────────
@@ -20,29 +23,23 @@ function LogDetailModal({
   logId,
   onClose,
 }: {
-  spaceId: string
-  logId: number
-  onClose: () => void
+  spaceId: string;
+  logId: number;
+  onClose: () => void;
 }) {
-  const [log, setLog] = useState<WebhookLogDetail | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [retrying, setRetrying] = useState(false)
-  const [retried, setRetried] = useState(false)
+  const { data, isLoading: loading } = useApi<any>(
+    `/api/admin/spaces/${spaceId}/webhooks/logs/${logId}`,
+  );
+  const log: WebhookLogDetail | null = data?.log ?? null;
 
-  useEffect(() => {
-    fetch(`/api/admin/spaces/${spaceId}/webhooks/logs/${logId}`)
-      .then((r) => r.json())
-      .then((d) => {
-        setLog(d.log ?? null)
-        setLoading(false)
-      })
-  }, [spaceId, logId])
+  const [retrying, setRetrying] = useState(false);
+  const [retried, setRetried] = useState(false);
 
   async function handleRetry() {
-    setRetrying(true)
-    await fetch(`/api/admin/spaces/${spaceId}/webhooks/logs/${logId}`, { method: 'POST' })
-    setRetrying(false)
-    setRetried(true)
+    setRetrying(true);
+    await fetch(`/api/admin/spaces/${spaceId}/webhooks/logs/${logId}`, { method: 'POST' });
+    setRetrying(false);
+    setRetried(true);
   }
 
   return (
@@ -51,7 +48,7 @@ function LogDetailModal({
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-            {loading ? 'Loading...' : log?.action ?? 'Log Detail'}
+            {loading ? 'Loading...' : (log?.action ?? 'Log Detail')}
           </h2>
           <button
             onClick={onClose}
@@ -75,16 +72,10 @@ function LogDetailModal({
                   <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">
                     Status
                   </p>
-                  <span
-                    className={`inline-flex items-center px-2.5 py-0.5 rounded text-sm font-medium ${
-                      log.status === 'success'
-                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                        : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                    }`}
-                  >
+                  <Badge variant={log.status === 'success' ? 'success' : 'danger'}>
                     {log.status === 'success' ? 'Success' : 'Failed'}
                     {log.responseStatus ? ` (${log.responseStatus})` : ''}
-                  </span>
+                  </Badge>
                 </div>
                 <div>
                   <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">
@@ -119,9 +110,9 @@ function LogDetailModal({
                   {log.responseBody
                     ? (() => {
                         try {
-                          return JSON.stringify(JSON.parse(log.responseBody), null, 2)
+                          return JSON.stringify(JSON.parse(log.responseBody), null, 2);
                         } catch {
-                          return log.responseBody
+                          return log.responseBody;
                         }
                       })()
                     : '(no response body)'}
@@ -134,9 +125,7 @@ function LogDetailModal({
                   Payload
                 </p>
                 <pre className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 text-xs text-gray-800 dark:text-gray-200 overflow-x-auto whitespace-pre-wrap break-words">
-                  {log.requestBody
-                    ? JSON.stringify(log.requestBody, null, 2)
-                    : '(no payload)'}
+                  {log.requestBody ? JSON.stringify(log.requestBody, null, 2) : '(no payload)'}
                 </pre>
               </div>
             </div>
@@ -164,45 +153,40 @@ function LogDetailModal({
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function WebhookLogsPage({ params }: { params: Promise<{ spaceId: string }> }) {
-  const { spaceId } = use(params)
-  const [logs, setLogs] = useState<WebhookLog[]>([])
-  const [webhooks, setWebhooks] = useState<WebhookRef[]>([])
-  const [loading, setLoading] = useState(true)
-  const [filterWebhookId, setFilterWebhookId] = useState('')
-  const [fromDate, setFromDate] = useState('')
-  const [toDate, setToDate] = useState('')
-  const [selectedLogId, setSelectedLogId] = useState<number | null>(null)
+  const { spaceId } = use(params);
 
-  async function loadWebhooks() {
-    const res = await fetch(`/api/admin/spaces/${spaceId}/webhooks`)
-    const data = await res.json()
-    setWebhooks(data.webhook_endpoints ?? [])
+  const [filterWebhookId, setFilterWebhookId] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  const [selectedLogId, setSelectedLogId] = useState<number | null>(null);
+
+  // Applied filter state — only updated when Filter button is clicked
+  const [appliedFilter, setAppliedFilter] = useState({ webhookId: '', from: '', to: '' });
+
+  const { data: webhooksData } = useApi<any>(`/api/admin/spaces/${spaceId}/webhooks`);
+  const webhooks: WebhookRef[] = webhooksData?.webhook_endpoints ?? [];
+
+  const logsUrl = (() => {
+    const qs = new URLSearchParams();
+    if (appliedFilter.webhookId) qs.set('webhook_id', appliedFilter.webhookId);
+    if (appliedFilter.from) qs.set('from', new Date(appliedFilter.from).toISOString());
+    if (appliedFilter.to) qs.set('to', new Date(appliedFilter.to).toISOString());
+    const qsStr = qs.toString();
+    return `/api/admin/spaces/${spaceId}/webhooks/logs${qsStr ? `?${qsStr}` : ''}`;
+  })();
+
+  const { data: logsData, isLoading: loading } = useApi<any>(logsUrl);
+  const logs: WebhookLog[] = logsData?.logs ?? [];
+
+  function applyFilter() {
+    setAppliedFilter({ webhookId: filterWebhookId, from: fromDate, to: toDate });
   }
-
-  async function loadLogs() {
-    setLoading(true)
-    const qs = new URLSearchParams()
-    if (filterWebhookId) qs.set('webhook_id', filterWebhookId)
-    if (fromDate) qs.set('from', new Date(fromDate).toISOString())
-    if (toDate) qs.set('to', new Date(toDate).toISOString())
-    const res = await fetch(
-      `/api/admin/spaces/${spaceId}/webhooks/logs${qs.toString() ? `?${qs}` : ''}`,
-    )
-    const data = await res.json()
-    setLogs(data.logs ?? [])
-    setLoading(false)
-  }
-
-  useEffect(() => {
-    loadWebhooks()
-    loadLogs()
-  }, [spaceId])
 
   return (
     <div className="max-w-4xl px-10 py-8">
@@ -259,7 +243,7 @@ export default function WebhookLogsPage({ params }: { params: Promise<{ spaceId:
           />
         </div>
         <button
-          onClick={loadLogs}
+          onClick={applyFilter}
           className="px-4 py-2 text-sm font-medium text-white bg-teal-700 hover:bg-teal-800 rounded-lg transition-colors"
         >
           Filter
@@ -270,9 +254,7 @@ export default function WebhookLogsPage({ params }: { params: Promise<{ spaceId:
       {loading ? (
         <p className="text-sm text-gray-400">Loading...</p>
       ) : logs.length === 0 ? (
-        <div className="text-center py-16 border border-dashed border-gray-200 dark:border-gray-700 rounded-xl">
-          <p className="text-sm text-gray-400">No webhook logs found.</p>
-        </div>
+        <EmptyState message="No webhook logs found." />
       ) : (
         <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
           <table className="w-full text-sm">
@@ -303,20 +285,12 @@ export default function WebhookLogsPage({ params }: { params: Promise<{ spaceId:
                   <td className="px-4 py-3 text-gray-700 dark:text-gray-300 truncate max-w-[160px]">
                     {log.webhookName ?? `#${log.webhookEndpointId}`}
                   </td>
-                  <td className="px-4 py-3 text-gray-700 dark:text-gray-300">
-                    {log.action}
-                  </td>
+                  <td className="px-4 py-3 text-gray-700 dark:text-gray-300">{log.action}</td>
                   <td className="px-4 py-3">
-                    <span
-                      className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                        log.status === 'success'
-                          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                          : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                      }`}
-                    >
+                    <Badge variant={log.status === 'success' ? 'success' : 'danger'}>
                       {log.status === 'success' ? 'Success' : 'Failed'}
                       {log.responseStatus ? ` ${log.responseStatus}` : ''}
-                    </span>
+                    </Badge>
                   </td>
                   <td className="px-4 py-3 text-gray-500 dark:text-gray-400 whitespace-nowrap">
                     {formatDateTime(log.executedAt)}
@@ -339,5 +313,5 @@ export default function WebhookLogsPage({ params }: { params: Promise<{ spaceId:
         />
       )}
     </div>
-  )
+  );
 }

@@ -1,64 +1,85 @@
-'use client'
+'use client';
 
-import { useState, useRef, useEffect } from 'react'
-import { Folder, FolderOpen, ChevronRight, ChevronDown, LayoutTemplate, MoreHorizontal, Plus, Pencil, Trash2, Tag, Search } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react';
+import {
+  Folder,
+  FolderOpen,
+  ChevronRight,
+  ChevronDown,
+  LayoutTemplate,
+  MoreHorizontal,
+  Plus,
+  Pencil,
+  Trash2,
+  Tag,
+  Search,
+} from 'lucide-react';
 
 export interface ComponentGroup {
-  id: number
-  uuid: string
-  name: string
-  parent_id: number | null
-  parent_uuid: string | null
+  id: number;
+  uuid: string;
+  name: string;
+  parent_id: number | null;
+  parent_uuid: string | null;
 }
 
 interface GroupNode extends ComponentGroup {
-  children: GroupNode[]
+  children: GroupNode[];
 }
 
 function buildTree(groups: ComponentGroup[]): GroupNode[] {
-  const map = new Map<number, GroupNode>()
-  for (const g of groups) map.set(g.id, { ...g, children: [] })
-  const roots: GroupNode[] = []
+  const map = new Map<number, GroupNode>();
+  for (const g of groups) map.set(g.id, { ...g, children: [] });
+  const roots: GroupNode[] = [];
   for (const node of map.values()) {
     if (node.parent_id && map.has(node.parent_id)) {
-      map.get(node.parent_id)!.children.push(node)
+      map.get(node.parent_id)!.children.push(node);
     } else {
-      roots.push(node)
+      roots.push(node);
     }
   }
   function sortChildren(nodes: GroupNode[]) {
-    nodes.sort((a, b) => a.name.localeCompare(b.name))
-    nodes.forEach((n) => sortChildren(n.children))
+    nodes.sort((a, b) => a.name.localeCompare(b.name));
+    nodes.forEach((n) => sortChildren(n.children));
   }
-  sortChildren(roots)
-  return roots
+  sortChildren(roots);
+  return roots;
 }
 
 interface GroupRowProps {
-  node: GroupNode
-  depth: number
-  selectedUuid: string | null
-  onSelect: (uuid: string | null) => void
-  onCreateSubgroup: (parentUuid: string) => void
-  onRename: (group: ComponentGroup) => void
-  onDelete: (group: ComponentGroup) => void
-  counts?: Record<string, number>
+  node: GroupNode;
+  depth: number;
+  selectedUuid: string | null;
+  onSelect: (uuid: string | null) => void;
+  onCreateSubgroup: (parentUuid: string) => void;
+  onRename: (group: ComponentGroup) => void;
+  onDelete: (group: ComponentGroup) => void;
+  counts?: Record<string, number>;
 }
 
-function GroupRow({ node, depth, selectedUuid, onSelect, onCreateSubgroup, onRename, onDelete, counts }: GroupRowProps) {
-  const [expanded, setExpanded] = useState(false)
-  const [menuOpen, setMenuOpen] = useState(false)
-  const menuRef = useRef<HTMLDivElement>(null)
-  const isSelected = selectedUuid === node.uuid
-  const hasChildren = node.children.length > 0
+function GroupRow({
+  node,
+  depth,
+  selectedUuid,
+  onSelect,
+  onCreateSubgroup,
+  onRename,
+  onDelete,
+  counts,
+}: GroupRowProps) {
+  const [expanded, setExpanded] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const isSelected = selectedUuid === node.uuid;
+  const hasChildren = node.children.length > 0;
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false)
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
     }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [])
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
 
   return (
     <>
@@ -72,17 +93,26 @@ function GroupRow({ node, depth, selectedUuid, onSelect, onCreateSubgroup, onRen
         onClick={() => onSelect(node.uuid)}
       >
         <button
-          onClick={(e) => { e.stopPropagation(); setExpanded((v) => !v) }}
+          onClick={(e) => {
+            e.stopPropagation();
+            setExpanded((v) => !v);
+          }}
           className="w-4 h-4 flex items-center justify-center shrink-0 text-gray-400"
         >
           {hasChildren ? (
-            expanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />
+            expanded ? (
+              <ChevronDown className="w-3 h-3" />
+            ) : (
+              <ChevronRight className="w-3 h-3" />
+            )
           ) : null}
         </button>
 
-        {isSelected || expanded
-          ? <FolderOpen className="w-4 h-4 shrink-0 text-teal-500" />
-          : <Folder className="w-4 h-4 shrink-0 text-gray-400" />}
+        {isSelected || expanded ? (
+          <FolderOpen className="w-4 h-4 shrink-0 text-teal-500" />
+        ) : (
+          <Folder className="w-4 h-4 shrink-0 text-gray-400" />
+        )}
 
         <span className="text-sm truncate flex-1">{node.name}</span>
 
@@ -101,19 +131,28 @@ function GroupRow({ node, depth, selectedUuid, onSelect, onCreateSubgroup, onRen
             <div className="absolute right-0 top-full mt-0.5 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 w-44">
               <button
                 className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-2"
-                onClick={() => { setMenuOpen(false); onCreateSubgroup(node.uuid) }}
+                onClick={() => {
+                  setMenuOpen(false);
+                  onCreateSubgroup(node.uuid);
+                }}
               >
                 <Plus className="w-3.5 h-3.5" /> Create subgroup
               </button>
               <button
                 className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-2"
-                onClick={() => { setMenuOpen(false); onRename(node) }}
+                onClick={() => {
+                  setMenuOpen(false);
+                  onRename(node);
+                }}
               >
                 <Pencil className="w-3.5 h-3.5" /> Rename
               </button>
               <button
                 className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-2"
-                onClick={() => { setMenuOpen(false); onDelete(node) }}
+                onClick={() => {
+                  setMenuOpen(false);
+                  onDelete(node);
+                }}
               >
                 <Trash2 className="w-3.5 h-3.5" /> Delete
               </button>
@@ -140,20 +179,20 @@ function GroupRow({ node, depth, selectedUuid, onSelect, onCreateSubgroup, onRen
         </div>
       )}
     </>
-  )
+  );
 }
 
 interface GroupTreeProps {
-  groups: ComponentGroup[]
-  selectedUuid: string | null
-  onSelect: (uuid: string | null) => void
-  counts?: { total: number; by_group: Record<string, number> }
-  tagsCount?: number
-  isTagsView: boolean
-  onSelectTags: () => void
-  onCreateGroup: (parentUuid?: string) => void
-  onRenameGroup: (group: ComponentGroup) => void
-  onDeleteGroup: (group: ComponentGroup) => void
+  groups: ComponentGroup[];
+  selectedUuid: string | null;
+  onSelect: (uuid: string | null) => void;
+  counts?: { total: number; by_group: Record<string, number> };
+  tagsCount?: number;
+  isTagsView: boolean;
+  onSelectTags: () => void;
+  onCreateGroup: (parentUuid?: string) => void;
+  onRenameGroup: (group: ComponentGroup) => void;
+  onDeleteGroup: (group: ComponentGroup) => void;
 }
 
 export function GroupTree({
@@ -168,12 +207,12 @@ export function GroupTree({
   onRenameGroup,
   onDeleteGroup,
 }: GroupTreeProps) {
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState('');
   const filtered = search.trim()
     ? groups.filter((g) => g.name.toLowerCase().includes(search.toLowerCase()))
-    : groups
+    : groups;
 
-  const tree = search.trim() ? null : buildTree(filtered)
+  const tree = search.trim() ? null : buildTree(filtered);
 
   return (
     <div className="flex flex-col gap-0.5">
@@ -188,9 +227,7 @@ export function GroupTree({
       >
         <LayoutTemplate className="w-4 h-4 shrink-0 text-gray-400" />
         <span className="text-sm font-medium flex-1">All blocks</span>
-        {counts && (
-          <span className="text-xs text-gray-400">{counts.total}</span>
-        )}
+        {counts && <span className="text-xs text-gray-400">{counts.total}</span>}
       </div>
 
       {/* Tags */}
@@ -204,13 +241,13 @@ export function GroupTree({
       >
         <Tag className="w-4 h-4 shrink-0 text-gray-400" />
         <span className="text-sm font-medium flex-1">Tags</span>
-        {tagsCount !== undefined && (
-          <span className="text-xs text-gray-400">{tagsCount}</span>
-        )}
+        {tagsCount !== undefined && <span className="text-xs text-gray-400">{tagsCount}</span>}
       </div>
 
       {/* Block folders section */}
-      <p className="px-2 pt-3 pb-1 text-xs font-semibold text-gray-400 uppercase tracking-wide">Block folders</p>
+      <p className="px-2 pt-3 pb-1 text-xs font-semibold text-gray-400 uppercase tracking-wide">
+        Block folders
+      </p>
 
       {/* Group search */}
       <div className="relative mb-1">
@@ -256,5 +293,5 @@ export function GroupTree({
             </div>
           ))}
     </div>
-  )
+  );
 }

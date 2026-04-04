@@ -1,0 +1,91 @@
+'use client';
+
+import {
+  AtSign,
+  LayoutDashboard,
+  Server,
+  MousePointer2,
+  Box,
+  Columns2,
+  MessageSquare,
+  Copy,
+  DollarSign,
+  Mail,
+  ImageOff,
+  Keyboard,
+  Lock,
+  MapPin,
+  Smartphone,
+  Monitor,
+  Tv,
+  Tablet,
+  ExternalLink,
+  ShoppingCart,
+  Share2,
+  ShieldCheck,
+  Clock,
+  ClipboardCopy,
+  Building2,
+  Columns3,
+  LayoutPanelLeft,
+  Tag,
+  List,
+  LayoutGrid,
+  LayoutList,
+  BarChart3,
+  Printer,
+  Menu,
+  AlignJustify,
+  LockKeyhole,
+  ClipboardList,
+} from 'lucide-react';
+import type { LucideProps } from 'lucide-react';
+import type { ComponentType } from 'react';
+
+export const BLOCK_ICONS: { name: string; icon: ComponentType<LucideProps> }[] = [
+  { name: 'at-sign', icon: AtSign },
+  { name: 'layout-dashboard', icon: LayoutDashboard },
+  { name: 'server', icon: Server },
+  { name: 'mouse-pointer', icon: MousePointer2 },
+  { name: 'box', icon: Box },
+  { name: 'columns-2', icon: Columns2 },
+  { name: 'message-square', icon: MessageSquare },
+  { name: 'copy', icon: Copy },
+  { name: 'dollar-sign', icon: DollarSign },
+  { name: 'mail', icon: Mail },
+  { name: 'image-off', icon: ImageOff },
+  { name: 'keyboard', icon: Keyboard },
+  { name: 'lock', icon: Lock },
+  { name: 'map-pin', icon: MapPin },
+  { name: 'smartphone', icon: Smartphone },
+  { name: 'monitor', icon: Monitor },
+  { name: 'tv', icon: Tv },
+  { name: 'tablet', icon: Tablet },
+  { name: 'external-link', icon: ExternalLink },
+  { name: 'shopping-cart', icon: ShoppingCart },
+  { name: 'share-2', icon: Share2 },
+  { name: 'shield-check', icon: ShieldCheck },
+  { name: 'clock', icon: Clock },
+  { name: 'clipboard-copy', icon: ClipboardCopy },
+  { name: 'building', icon: Building2 },
+  { name: 'columns-3', icon: Columns3 },
+  { name: 'layout-panel-left', icon: LayoutPanelLeft },
+  { name: 'tag', icon: Tag },
+  { name: 'list', icon: List },
+  { name: 'layout-grid', icon: LayoutGrid },
+  { name: 'layout-list', icon: LayoutList },
+  { name: 'bar-chart', icon: BarChart3 },
+  { name: 'printer', icon: Printer },
+  { name: 'menu', icon: Menu },
+  { name: 'align-justify', icon: AlignJustify },
+  { name: 'lock-keyhole', icon: LockKeyhole },
+  { name: 'clipboard-list', icon: ClipboardList },
+];
+
+const ICON_MAP = new Map(BLOCK_ICONS.map((i) => [i.name, i.icon]));
+
+export function BlockIcon({ icon, className }: { icon: string; className?: string }) {
+  const Icon = ICON_MAP.get(icon);
+  if (!Icon) return null;
+  return <Icon className={className} />;
+}

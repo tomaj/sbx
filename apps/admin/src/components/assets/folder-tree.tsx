@@ -1,49 +1,59 @@
-'use client'
+'use client';
 
-import { useState, useRef, useEffect } from 'react'
-import { Folder, FolderOpen, ChevronRight, ChevronDown, Home, MoreHorizontal, Plus, Pencil, Move, Trash2 } from 'lucide-react'
-import { ConfirmModal } from '@/components/ui/confirm-modal'
+import { useState, useRef, useEffect } from 'react';
+import {
+  Folder,
+  FolderOpen,
+  ChevronRight,
+  ChevronDown,
+  Home,
+  MoreHorizontal,
+  Plus,
+  Pencil,
+  Move,
+  Trash2,
+} from 'lucide-react';
 
 export interface AssetFolder {
-  id: number
-  name: string
-  parent_id: number | null
-  uuid: string
+  id: number;
+  name: string;
+  parent_id: number | null;
+  uuid: string;
 }
 
 interface FolderNode extends AssetFolder {
-  children: FolderNode[]
+  children: FolderNode[];
 }
 
 function buildTree(folders: AssetFolder[]): FolderNode[] {
-  const map = new Map<number, FolderNode>()
-  for (const f of folders) map.set(f.id, { ...f, children: [] })
-  const roots: FolderNode[] = []
+  const map = new Map<number, FolderNode>();
+  for (const f of folders) map.set(f.id, { ...f, children: [] });
+  const roots: FolderNode[] = [];
   for (const node of map.values()) {
     if (node.parent_id && map.has(node.parent_id)) {
-      map.get(node.parent_id)!.children.push(node)
+      map.get(node.parent_id)!.children.push(node);
     } else {
-      roots.push(node)
+      roots.push(node);
     }
   }
   // Sort children alphabetically
   function sortChildren(nodes: FolderNode[]) {
-    nodes.sort((a, b) => a.name.localeCompare(b.name))
-    nodes.forEach(n => sortChildren(n.children))
+    nodes.sort((a, b) => a.name.localeCompare(b.name));
+    nodes.forEach((n) => sortChildren(n.children));
   }
-  sortChildren(roots)
-  return roots
+  sortChildren(roots);
+  return roots;
 }
 
 interface FolderRowProps {
-  node: FolderNode
-  depth: number
-  selectedId: number | null
-  onSelect: (id: number | null) => void
-  onCreateSubfolder: (parentId: number) => void
-  onRename: (folder: AssetFolder) => void
-  onMove: (folder: AssetFolder) => void
-  onDelete: (folder: AssetFolder) => void
+  node: FolderNode;
+  depth: number;
+  selectedId: number | null;
+  onSelect: (id: number | null) => void;
+  onCreateSubfolder: (parentId: number) => void;
+  onRename: (folder: AssetFolder) => void;
+  onMove: (folder: AssetFolder) => void;
+  onDelete: (folder: AssetFolder) => void;
 }
 
 function FolderRow({
@@ -56,19 +66,19 @@ function FolderRow({
   onMove,
   onDelete,
 }: FolderRowProps) {
-  const [expanded, setExpanded] = useState(false)
-  const [menuOpen, setMenuOpen] = useState(false)
-  const menuRef = useRef<HTMLDivElement>(null)
-  const isSelected = selectedId === node.id
-  const hasChildren = node.children.length > 0
+  const [expanded, setExpanded] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const isSelected = selectedId === node.id;
+  const hasChildren = node.children.length > 0;
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false)
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
     }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [])
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
 
   return (
     <>
@@ -83,28 +93,35 @@ function FolderRow({
       >
         {/* Expand toggle */}
         <button
-          onClick={e => { e.stopPropagation(); setExpanded(v => !v) }}
+          onClick={(e) => {
+            e.stopPropagation();
+            setExpanded((v) => !v);
+          }}
           className="w-4 h-4 flex items-center justify-center shrink-0 text-gray-400"
         >
-          {hasChildren
-            ? expanded
-              ? <ChevronDown className="w-3 h-3" />
-              : <ChevronRight className="w-3 h-3" />
-            : null}
+          {hasChildren ? (
+            expanded ? (
+              <ChevronDown className="w-3 h-3" />
+            ) : (
+              <ChevronRight className="w-3 h-3" />
+            )
+          ) : null}
         </button>
 
         {/* Folder icon */}
-        {isSelected || expanded
-          ? <FolderOpen className="w-4 h-4 shrink-0 text-teal-500" />
-          : <Folder className="w-4 h-4 shrink-0 text-gray-400" />}
+        {isSelected || expanded ? (
+          <FolderOpen className="w-4 h-4 shrink-0 text-teal-500" />
+        ) : (
+          <Folder className="w-4 h-4 shrink-0 text-gray-400" />
+        )}
 
         {/* Name */}
         <span className="text-sm truncate flex-1">{node.name}</span>
 
         {/* Context menu */}
-        <div className="relative" ref={menuRef} onClick={e => e.stopPropagation()}>
+        <div className="relative" ref={menuRef} onClick={(e) => e.stopPropagation()}>
           <button
-            onClick={() => setMenuOpen(v => !v)}
+            onClick={() => setMenuOpen((v) => !v)}
             className="opacity-0 group-hover:opacity-100 w-6 h-6 flex items-center justify-center rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500"
           >
             <MoreHorizontal className="w-3.5 h-3.5" />
@@ -113,25 +130,37 @@ function FolderRow({
             <div className="absolute right-0 top-full mt-0.5 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 w-44">
               <button
                 className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-2"
-                onClick={() => { setMenuOpen(false); onCreateSubfolder(node.id) }}
+                onClick={() => {
+                  setMenuOpen(false);
+                  onCreateSubfolder(node.id);
+                }}
               >
                 <Plus className="w-3.5 h-3.5" /> Create new folder
               </button>
               <button
                 className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-2"
-                onClick={() => { setMenuOpen(false); onRename(node) }}
+                onClick={() => {
+                  setMenuOpen(false);
+                  onRename(node);
+                }}
               >
                 <Pencil className="w-3.5 h-3.5" /> Rename
               </button>
               <button
                 className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-2"
-                onClick={() => { setMenuOpen(false); onMove(node) }}
+                onClick={() => {
+                  setMenuOpen(false);
+                  onMove(node);
+                }}
               >
                 <Move className="w-3.5 h-3.5" /> Move
               </button>
               <button
                 className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-2"
-                onClick={() => { setMenuOpen(false); onDelete(node) }}
+                onClick={() => {
+                  setMenuOpen(false);
+                  onDelete(node);
+                }}
               >
                 <Trash2 className="w-3.5 h-3.5" /> Delete
               </button>
@@ -143,7 +172,7 @@ function FolderRow({
       {/* Children */}
       {expanded && hasChildren && (
         <div>
-          {node.children.map(child => (
+          {node.children.map((child) => (
             <FolderRow
               key={child.id}
               node={child}
@@ -159,18 +188,18 @@ function FolderRow({
         </div>
       )}
     </>
-  )
+  );
 }
 
 interface FolderTreeProps {
-  folders: AssetFolder[]
-  selectedId: number | null
-  onSelect: (id: number | null) => void
-  search: string
-  onCreateFolder: (parentId: number | null) => void
-  onRenameFolder: (folder: AssetFolder) => void
-  onMoveFolder: (folder: AssetFolder) => void
-  onDeleteFolder: (folder: AssetFolder) => void
+  folders: AssetFolder[];
+  selectedId: number | null;
+  onSelect: (id: number | null) => void;
+  search: string;
+  onCreateFolder: (parentId: number | null) => void;
+  onRenameFolder: (folder: AssetFolder) => void;
+  onMoveFolder: (folder: AssetFolder) => void;
+  onDeleteFolder: (folder: AssetFolder) => void;
 }
 
 export function FolderTree({
@@ -185,11 +214,11 @@ export function FolderTree({
 }: FolderTreeProps) {
   // Filter folders by search
   const filtered = search.trim()
-    ? folders.filter(f => f.name.toLowerCase().includes(search.toLowerCase()))
-    : folders
+    ? folders.filter((f) => f.name.toLowerCase().includes(search.toLowerCase()))
+    : folders;
 
   // Build tree only when not searching (flat list when searching)
-  const tree = search.trim() ? null : buildTree(filtered)
+  const tree = search.trim() ? null : buildTree(filtered);
 
   return (
     <div className="flex flex-col gap-0.5">
@@ -208,7 +237,7 @@ export function FolderTree({
 
       {/* Folder list */}
       {tree
-        ? tree.map(node => (
+        ? tree.map((node) => (
             <FolderRow
               key={node.id}
               node={node}
@@ -221,7 +250,7 @@ export function FolderTree({
               onDelete={onDeleteFolder}
             />
           ))
-        : filtered.map(f => (
+        : filtered.map((f) => (
             <div
               key={f.id}
               className={`flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer select-none ${
@@ -236,5 +265,5 @@ export function FolderTree({
             </div>
           ))}
     </div>
-  )
+  );
 }

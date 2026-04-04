@@ -1,3 +1,4 @@
+import { AuthenticatedRequest } from '../auth/authenticated-request.interface';
 import {
   Body,
   Controller,
@@ -5,6 +6,7 @@ import {
   Get,
   HttpCode,
   Param,
+  ParseIntPipe,
   Post,
   Put,
   Query,
@@ -15,6 +17,7 @@ import { Auth } from '../auth/auth.decorator';
 import { WebhooksService } from './webhooks.service';
 import { ALL_WEBHOOK_ACTIONS } from './webhook-actions';
 import { ResultGuard } from '../shared/result-guard.util';
+import { QueryParserUtil } from '../shared/query-parser.util';
 
 @ApiTags('Webhooks - MAPI')
 @Controller('v1/spaces/:spaceId/webhook_endpoints')
@@ -24,7 +27,7 @@ export class WebhooksController {
 
   @Get('logs')
   listLogs(
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
     @Query('webhook_id') webhookId?: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
@@ -32,22 +35,22 @@ export class WebhooksController {
     @Query('per_page') perPage?: string,
   ) {
     return this.webhooksService.listLogs(req.space.id, {
-      webhookId: webhookId ? parseInt(webhookId) : undefined,
+      webhookId: QueryParserUtil.parseOptionalInt(webhookId),
       from: from ? new Date(from) : undefined,
       to: to ? new Date(to) : undefined,
-      page: page ? parseInt(page) : undefined,
-      perPage: perPage ? parseInt(perPage) : undefined,
+      page: QueryParserUtil.parseOptionalInt(page),
+      perPage: QueryParserUtil.parseOptionalInt(perPage),
     });
   }
 
   @Get('logs/:logId')
-  async getLog(@Req() req: any, @Param('logId') logId: string) {
-    return ResultGuard.throwIfNotFound(await this.webhooksService.getLog(req.space.id, parseInt(logId)));
+  async getLog(@Req() req: AuthenticatedRequest, @Param('logId', ParseIntPipe) logId: number) {
+    return ResultGuard.throwIfNotFound(await this.webhooksService.getLog(req.space.id, logId));
   }
 
   @Post('logs/:logId/retry')
-  async retryLog(@Req() req: any, @Param('logId') logId: string) {
-    return ResultGuard.throwIfNotFound(await this.webhooksService.retryLog(req.space.id, parseInt(logId)));
+  async retryLog(@Req() req: AuthenticatedRequest, @Param('logId', ParseIntPipe) logId: number) {
+    return ResultGuard.throwIfNotFound(await this.webhooksService.retryLog(req.space.id, logId));
   }
 
   @Get('actions')
@@ -56,19 +59,19 @@ export class WebhooksController {
   }
 
   @Get()
-  async getWebhooks(@Req() req: any) {
+  async getWebhooks(@Req() req: AuthenticatedRequest) {
     return this.webhooksService.findAll(req.space.id);
   }
 
   @Get(':id')
-  async getWebhook(@Req() req: any, @Param('id') id: string) {
-    return ResultGuard.throwIfNotFound(await this.webhooksService.findOne(req.space.id, parseInt(id)));
+  async getWebhook(@Req() req: AuthenticatedRequest, @Param('id', ParseIntPipe) id: number) {
+    return ResultGuard.throwIfNotFound(await this.webhooksService.findOne(req.space.id, id));
   }
 
   @Post()
   @HttpCode(201)
   async createWebhook(
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
     @Body()
     body: {
       webhook_endpoint: {
@@ -95,8 +98,8 @@ export class WebhooksController {
 
   @Put(':id')
   async updateWebhook(
-    @Req() req: any,
-    @Param('id') id: string,
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseIntPipe) id: number,
     @Body()
     body: {
       webhook_endpoint: {
@@ -109,14 +112,17 @@ export class WebhooksController {
       };
     },
   ) {
-    return { webhook_endpoint: ResultGuard.throwIfNotFound(
-      await this.webhooksService.adminUpdate(req.space.id, parseInt(id), body.webhook_endpoint),
-    ).webhook };
+    return {
+      webhook_endpoint: ResultGuard.throwIfNotFound(
+        await this.webhooksService.adminUpdate(req.space.id, id, body.webhook_endpoint),
+      ).webhook,
+    };
   }
 
   @Delete(':id')
-  @HttpCode(204)
-  async deleteWebhook(@Req() req: any, @Param('id') id: string) {
-    await this.webhooksService.adminDelete(req.space.id, parseInt(id));
+  @HttpCode(200)
+  async deleteWebhook(@Req() req: AuthenticatedRequest, @Param('id', ParseIntPipe) id: number) {
+    await this.webhooksService.adminDelete(req.space.id, id);
+    return {};
   }
 }

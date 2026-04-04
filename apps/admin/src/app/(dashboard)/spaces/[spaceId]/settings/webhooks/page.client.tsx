@@ -1,118 +1,133 @@
-'use client'
+'use client';
 
-import { useState, useEffect, use, useRef } from 'react'
-import { Plus, Trash2, History, Settings, ChevronRight } from 'lucide-react'
-import { ConfirmModal } from '@/components/ui/confirm-modal'
-import { RightSidebar } from '@/components/ui/right-sidebar'
-import { UnsavedChangesModal } from '@/components/ui/unsaved-changes-modal'
-import { useUnsavedChanges } from '@/hooks/use-unsaved-changes'
-import type { Webhook } from '@sbx/types'
+import { useState, use } from 'react';
+import { Plus, Trash2, History, Settings, ChevronRight } from 'lucide-react';
+import { z } from 'zod';
+import { Controller } from 'react-hook-form';
+import { CrudSidebarForm } from '@/components/ui/crud-sidebar-form';
+import { Toggle } from '@/components/ui/toggle';
+import { EmptyState } from '@/components/ui/empty-state';
+import { useDelete } from '@/hooks/use-delete';
+import { useCrudSidebar } from '@/hooks/use-crud-sidebar';
+import { useCrudForm } from '@/hooks/use-crud-form';
+import { useApi } from '@/lib/swr';
+import type { Webhook } from '@sbx/types';
+import { SkeletonText, SkeletonBlock } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
+import { FormField, inputCls } from '@/components/ui/form-field';
 
 // ─── Trigger definitions ──────────────────────────────────────────────────────
 
-interface TriggerDef { value: string; label: string }
-interface TriggerGroup { label: string; triggers: TriggerDef[] }
+interface TriggerDef {
+  value: string;
+  label: string;
+}
+interface TriggerGroup {
+  label: string;
+  triggers: TriggerDef[];
+}
 
 const TRIGGER_GROUPS: TriggerGroup[] = [
-  { label: 'Story', triggers: [
-    { value: 'story.published', label: 'Published' },
-    { value: 'story.unpublished', label: 'Unpublished' },
-    { value: 'story.deleted', label: 'Deleted' },
-    { value: 'story.moved', label: 'Moved' },
-  ]},
-  { label: 'Datasource', triggers: [
-    { value: 'datasource.entries_updated', label: 'Entries Updated' },
-  ]},
-  { label: 'Asset', triggers: [
-    { value: 'asset.created', label: 'Created' },
-    { value: 'asset.replaced', label: 'Replaced' },
-    { value: 'asset.deleted', label: 'Deleted' },
-    { value: 'asset.restored', label: 'Restored' },
-  ]},
-  { label: 'User management', triggers: [
-    { value: 'user.added', label: 'Added' },
-    { value: 'user.removed', label: 'Removed' },
-    { value: 'user.roles_updated', label: 'Roles Updated' },
-  ]},
+  {
+    label: 'Story',
+    triggers: [
+      { value: 'story.published', label: 'Published' },
+      { value: 'story.unpublished', label: 'Unpublished' },
+      { value: 'story.deleted', label: 'Deleted' },
+      { value: 'story.moved', label: 'Moved' },
+    ],
+  },
+  {
+    label: 'Datasource',
+    triggers: [{ value: 'datasource.entries_updated', label: 'Entries Updated' }],
+  },
+  {
+    label: 'Asset',
+    triggers: [
+      { value: 'asset.created', label: 'Created' },
+      { value: 'asset.replaced', label: 'Replaced' },
+      { value: 'asset.deleted', label: 'Deleted' },
+      { value: 'asset.restored', label: 'Restored' },
+    ],
+  },
+  {
+    label: 'User management',
+    triggers: [
+      { value: 'user.added', label: 'Added' },
+      { value: 'user.removed', label: 'Removed' },
+      { value: 'user.roles_updated', label: 'Roles Updated' },
+    ],
+  },
   { label: 'Workflow', triggers: [{ value: 'stage.changed', label: 'Stage Changed' }] },
   { label: 'Pipeline', triggers: [{ value: 'pipeline.deployed', label: 'Deployed' }] },
   { label: 'Release', triggers: [{ value: 'release.merged', label: 'Merged' }] },
-]
+];
 
-const ALL_TRIGGERS = TRIGGER_GROUPS.flatMap((g) => g.triggers.map((t) => t.value))
+const ALL_TRIGGERS = TRIGGER_GROUPS.flatMap((g) => g.triggers.map((t) => t.value));
 
-// ─── Toggle switch ────────────────────────────────────────────────────────────
+// ─── Zod schema ───────────────────────────────────────────────────────────────
 
-function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 ${
-        checked ? 'bg-teal-600' : 'bg-gray-200 dark:bg-gray-700'
-      }`}
-    >
-      <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ${
-        checked ? 'translate-x-6' : 'translate-x-1'
-      }`} />
-    </button>
-  )
-}
+const webhookSchema = z.object({
+  name: z.string().min(1, 'Name is required'),
+  endpoint: z.string().min(1, 'Endpoint is required'),
+  description: z.string().optional().default(''),
+  secret: z.string().optional().default(''),
+  actions: z.array(z.string()).default([]),
+  activated: z.boolean().default(true),
+});
+type WebhookFormValues = z.infer<typeof webhookSchema>;
 
 // ─── Events summary ───────────────────────────────────────────────────────────
 
 function eventsSummary(actions: string[]): string {
-  if (actions.length === 0) return '0 events'
-  const groups = TRIGGER_GROUPS.filter((g) => g.triggers.some((t) => actions.includes(t.value))).map((g) => g.label)
-  return `${actions.length} event${actions.length !== 1 ? 's' : ''} (${groups.join(', ')})`
+  if (actions.length === 0) return '0 events';
+  const groups = TRIGGER_GROUPS.filter((g) =>
+    g.triggers.some((t) => actions.includes(t.value)),
+  ).map((g) => g.label);
+  return `${actions.length} event${actions.length !== 1 ? 's' : ''} (${groups.join(', ')})`;
 }
 
 // ─── Webhook card ─────────────────────────────────────────────────────────────
 
 interface WebhookCardProps {
-  webhook: Webhook
-  spaceId: string
-  onEdit: () => void
-  onDelete: () => void
+  webhook: Webhook;
+  spaceId: string;
+  onEdit: () => void;
+  onDelete: () => void;
 }
 
 function WebhookCard({ webhook, spaceId, onEdit, onDelete }: WebhookCardProps) {
-  const [hovered, setHovered] = useState(false)
-  const [showLogsTooltip, setShowLogsTooltip] = useState(false)
+  const [hovered, setHovered] = useState(false);
+  const [showLogsTooltip, setShowLogsTooltip] = useState(false);
 
   return (
     <div
       className="relative flex items-start gap-4 p-4 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900"
       onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => { setHovered(false); setShowLogsTooltip(false) }}
+      onMouseLeave={() => {
+        setHovered(false);
+        setShowLogsTooltip(false);
+      }}
     >
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate mb-0.5">
           {webhook.name}
         </p>
-        <p className="text-xs text-gray-500 dark:text-gray-400 truncate mb-2">
-          {webhook.endpoint}
-        </p>
+        <p className="text-xs text-gray-500 dark:text-gray-400 truncate mb-2">{webhook.endpoint}</p>
         <div className="flex flex-wrap gap-1.5">
-          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-            webhook.activated
-              ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-              : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
-          }`}>
+          <Badge variant={webhook.activated ? 'success' : 'default'}>
             {webhook.activated ? 'Active' : 'Inactive'}
-          </span>
+          </Badge>
           {webhook.actions.length > 0 && (
-            <span className="text-xs px-2 py-0.5 rounded-full bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 font-medium">
-              {eventsSummary(webhook.actions)}
-            </span>
+            <Badge variant="success">{eventsSummary(webhook.actions)}</Badge>
           )}
         </div>
       </div>
 
       {/* Hover actions */}
-      <div className={`flex items-center gap-1 transition-opacity duration-150 ${hovered ? 'opacity-100' : 'opacity-0'}`}>
+      <div
+        className={`flex items-center gap-1 transition-opacity duration-150 ${hovered ? 'opacity-100' : 'opacity-0'}`}
+      >
         {/* View logs */}
         <div className="relative">
           {showLogsTooltip && (
@@ -131,7 +146,6 @@ function WebhookCard({ webhook, spaceId, onEdit, onDelete }: WebhookCardProps) {
           </a>
         </div>
 
-        {/* Edit */}
         <button
           onClick={onEdit}
           className="flex items-center justify-center w-8 h-8 rounded-lg text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
@@ -139,7 +153,6 @@ function WebhookCard({ webhook, spaceId, onEdit, onDelete }: WebhookCardProps) {
           <Settings className="w-4 h-4" />
         </button>
 
-        {/* Delete */}
         <button
           onClick={onDelete}
           className="flex items-center justify-center w-8 h-8 rounded-lg text-gray-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
@@ -148,322 +161,282 @@ function WebhookCard({ webhook, spaceId, onEdit, onDelete }: WebhookCardProps) {
         </button>
       </div>
     </div>
-  )
+  );
 }
 
-// ─── Webhook form (inside RightSidebar) ───────────────────────────────────────
+// ─── Webhook form (inside CrudSidebarForm) ────────────────────────────────────
 
 interface WebhookFormProps {
-  spaceId: string
-  webhook: Webhook | null
-  open: boolean
-  onClose: () => void
-  onSaved: () => void
+  spaceId: string;
+  webhook: Webhook | null;
+  open: boolean;
+  onClose: () => void;
+  onSaved: () => void;
 }
 
 function WebhookForm({ spaceId, webhook, open, onClose, onSaved }: WebhookFormProps) {
-  const [name, setName] = useState('')
-  const [endpoint, setEndpoint] = useState('')
-  const [description, setDescription] = useState('')
-  const [secret, setSecret] = useState('')
-  const [actions, setActions] = useState<string[]>([])
-  const [activated, setActivated] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
-  const [confirmDelete, setConfirmDelete] = useState(false)
-  const [isDirty, setIsDirty] = useState(false)
-  const { showModal: showUnsavedModal, handleConfirm: confirmUnsaved, handleCancel: cancelUnsaved } = useUnsavedChanges(isDirty)
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
-  // Reset form when webhook changes
-  useEffect(() => {
-    setName(webhook?.name ?? '')
-    setEndpoint(webhook?.endpoint ?? '')
-    setDescription(webhook?.description ?? '')
-    setSecret(webhook?.secret ?? '')
-    setActions(webhook?.actions ?? [])
-    setActivated(webhook?.activated ?? true)
-    setError(null)
-    setExpandedGroups(new Set())
-    setIsDirty(false)
-  }, [webhook, open])
-
-  function toggleTrigger(value: string) {
-    setActions((prev) => prev.includes(value) ? prev.filter((a) => a !== value) : [...prev, value])
-    setIsDirty(true)
-  }
-
-  function toggleGroup(group: TriggerGroup) {
-    const vals = group.triggers.map((t) => t.value)
-    const allSel = vals.every((v) => actions.includes(v))
-    setActions((prev) => allSel ? prev.filter((a) => !vals.includes(a)) : [...new Set([...prev, ...vals])])
-    setIsDirty(true)
-  }
+  const { form, onSubmit } = useCrudForm<Webhook, WebhookFormValues>({
+    schema: webhookSchema,
+    defaultValues: {
+      name: '',
+      endpoint: '',
+      description: '',
+      secret: '',
+      actions: [],
+      activated: true,
+    },
+    mode: webhook ? 'edit' : 'create',
+    item: webhook,
+    open,
+    getInitialValues: (w) => ({
+      name: w.name,
+      endpoint: w.endpoint,
+      description: w.description ?? '',
+      secret: w.secret ?? '',
+      actions: w.actions ?? [],
+      activated: w.activated ?? true,
+    }),
+    buildRequest: (values, mode, item) => {
+      const url = item
+        ? `/api/admin/spaces/${spaceId}/webhooks/${item.id}`
+        : `/api/admin/spaces/${spaceId}/webhooks`;
+      return fetch(url, {
+        method: item ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: values.name.trim(),
+          endpoint: values.endpoint.trim(),
+          description: values.description?.trim() || null,
+          secret: values.secret?.trim() || null,
+          actions: values.actions,
+          activated: values.activated,
+        }),
+      });
+    },
+    onSuccess: onSaved,
+  });
 
   function toggleExpandGroup(label: string) {
     setExpandedGroups((prev) => {
-      const next = new Set(prev)
-      next.has(label) ? next.delete(label) : next.add(label)
-      return next
-    })
-  }
-
-  async function handleSave() {
-    if (!name.trim() || !endpoint.trim()) { setError('Name and endpoint are required'); return }
-    setSaving(true); setError(null)
-    try {
-      const url = webhook ? `/api/admin/spaces/${spaceId}/webhooks/${webhook.id}` : `/api/admin/spaces/${spaceId}/webhooks`
-      const res = await fetch(url, {
-        method: webhook ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), endpoint: endpoint.trim(), description: description.trim() || null, secret: secret.trim() || null, actions, activated }),
-      })
-      if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.message ?? 'Failed to save') }
-      onSaved()
-    } catch (e: any) { setError(e.message) }
-    finally { setSaving(false) }
+      const next = new Set(prev);
+      next.has(label) ? next.delete(label) : next.add(label);
+      return next;
+    });
   }
 
   async function handleDelete() {
-    if (!webhook) return
-    await fetch(`/api/admin/spaces/${spaceId}/webhooks/${webhook.id}`, { method: 'DELETE' })
-    onSaved()
+    if (!webhook) return;
+    await fetch(`/api/admin/spaces/${spaceId}/webhooks/${webhook.id}`, { method: 'DELETE' });
+    onSaved();
   }
 
+  const {
+    formState: { errors, isSubmitting, isDirty },
+  } = form;
+
   return (
-    <>
-      <RightSidebar
-        open={open}
-        onClose={onClose}
-        width="w-[480px]"
-        header={
-          <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
-            {webhook ? 'Edit Webhook' : 'New Webhook'}
-          </h2>
-        }
-        footer={
-          <div className="flex items-center justify-between w-full">
-            <div>
-              {webhook && (
+    <CrudSidebarForm
+      open={open}
+      onClose={onClose}
+      title={webhook ? 'Edit Webhook' : 'New Webhook'}
+      isSubmitting={isSubmitting}
+      isDirty={isDirty}
+      onSubmit={onSubmit}
+      onDelete={webhook ? handleDelete : undefined}
+      deleteTitle="Delete Webhook"
+      deleteMessage={`Are you sure you want to delete "${webhook?.name ?? ''}"?`}
+      width="w-[480px]"
+    >
+      {errors.root?.message && (
+        <p className="text-sm text-red-600 dark:text-red-400">{errors.root.message}</p>
+      )}
+
+      <FormField label="Name" required>
+        <input
+          type="text"
+          placeholder="My Webhook"
+          className={inputCls}
+          {...form.register('name')}
+        />
+      </FormField>
+
+      <div className="flex items-center justify-between mb-5">
+        <label className="text-sm font-semibold text-gray-900 dark:text-gray-100">Active</label>
+        <Controller
+          name="activated"
+          control={form.control}
+          render={({ field }) => <Toggle checked={field.value} onChange={field.onChange} />}
+        />
+      </div>
+
+      <FormField label="Description">
+        <input
+          type="text"
+          placeholder="Optional"
+          className={inputCls}
+          {...form.register('description')}
+        />
+      </FormField>
+
+      <FormField label="Endpoint URL" required>
+        <input
+          type="url"
+          placeholder="https://example.com/webhook"
+          className={inputCls}
+          {...form.register('endpoint')}
+        />
+      </FormField>
+
+      <FormField label="Webhook secret">
+        <input
+          type="text"
+          placeholder="Sent as Webhook-Secret header"
+          className={inputCls}
+          {...form.register('secret')}
+        />
+      </FormField>
+
+      <Controller
+        name="actions"
+        control={form.control}
+        render={({ field }) => (
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                Triggers <span className="text-red-500">*</span>
+              </label>
+              <div className="flex gap-3">
                 <button
                   type="button"
-                  onClick={() => setConfirmDelete(true)}
-                  className="flex items-center gap-1.5 text-sm text-red-500 hover:text-red-600 dark:text-red-400"
+                  onClick={() => setExpandedGroups(new Set(TRIGGER_GROUPS.map((g) => g.label)))}
+                  className="text-xs text-teal-600 dark:text-teal-400 hover:underline"
                 >
-                  <Trash2 className="w-4 h-4" />
-                  Delete
+                  Expand All
                 </button>
-              )}
+                <button
+                  type="button"
+                  onClick={() => field.onChange([...ALL_TRIGGERS])}
+                  className="text-xs text-teal-600 dark:text-teal-400 hover:underline"
+                >
+                  Select All Events
+                </button>
+              </div>
             </div>
-            <div className="flex items-center gap-3">
-              <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100">
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={saving}
-                className="px-4 py-2 text-sm font-medium text-white bg-teal-700 hover:bg-teal-800 disabled:opacity-50 rounded-lg transition-colors"
-              >
-                {saving ? 'Saving...' : 'Save'}
-              </button>
-            </div>
-          </div>
-        }
-      >
-        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+              Choose at least one event that should trigger your webhook.
+            </p>
 
-        {/* Name */}
-        <div>
-          <label className="block text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">
-            Name <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => { setName(e.target.value); setIsDirty(true) }}
-            placeholder="My Webhook"
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-teal-500"
-          />
-        </div>
+            <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+              {TRIGGER_GROUPS.map((group, gi) => {
+                const vals = group.triggers.map((t) => t.value);
+                const selectedCount = vals.filter((v) => field.value.includes(v)).length;
+                const allSelected = selectedCount === vals.length;
+                const expanded = expandedGroups.has(group.label);
 
-        {/* Active toggle */}
-        <div className="flex items-center justify-between">
-          <label className="text-sm font-semibold text-gray-900 dark:text-gray-100">Active</label>
-          <Toggle checked={activated} onChange={(v) => { setActivated(v); setIsDirty(true) }} />
-        </div>
-
-        {/* Description */}
-        <div>
-          <label className="block text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">Description</label>
-          <input
-            type="text"
-            value={description}
-            onChange={(e) => { setDescription(e.target.value); setIsDirty(true) }}
-            placeholder="Optional"
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-teal-500"
-          />
-        </div>
-
-        {/* Endpoint URL */}
-        <div>
-          <label className="block text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">
-            Endpoint URL <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="url"
-            value={endpoint}
-            onChange={(e) => { setEndpoint(e.target.value); setIsDirty(true) }}
-            placeholder="https://example.com/webhook"
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-teal-500"
-          />
-        </div>
-
-        {/* Webhook secret */}
-        <div>
-          <label className="block text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">Webhook secret</label>
-          <input
-            type="text"
-            value={secret}
-            onChange={(e) => { setSecret(e.target.value); setIsDirty(true) }}
-            placeholder="Sent as Webhook-Secret header"
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-teal-500"
-          />
-        </div>
-
-        {/* Triggers */}
-        <div>
-          <div className="flex items-center justify-between mb-1">
-            <label className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-              Triggers <span className="text-red-500">*</span>
-            </label>
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => setExpandedGroups(new Set(TRIGGER_GROUPS.map((g) => g.label)))}
-                className="text-xs text-teal-600 dark:text-teal-400 hover:underline"
-              >
-                Expand All
-              </button>
-              <button
-                type="button"
-                onClick={() => setActions([...ALL_TRIGGERS])}
-                className="text-xs text-teal-600 dark:text-teal-400 hover:underline"
-              >
-                Select All Events
-              </button>
-            </div>
-          </div>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-            Choose at least one event that should trigger your webhook.
-          </p>
-
-          <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-            {TRIGGER_GROUPS.map((group, gi) => {
-              const vals = group.triggers.map((t) => t.value)
-              const selectedCount = vals.filter((v) => actions.includes(v)).length
-              const allSelected = selectedCount === vals.length
-              const expanded = expandedGroups.has(group.label)
-
-              return (
-                <div key={group.label} className={gi > 0 ? 'border-t border-gray-200 dark:border-gray-700' : ''}>
-                  <div className="flex items-center gap-2 px-4 py-2.5">
-                    <input
-                      type="checkbox"
-                      checked={allSelected}
-                      ref={(el) => { if (el) el.indeterminate = selectedCount > 0 && !allSelected }}
-                      onChange={() => toggleGroup(group)}
-                      className="w-4 h-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500 shrink-0"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => toggleExpandGroup(group.label)}
-                      className="flex-1 flex items-center justify-between text-sm text-gray-700 dark:text-gray-300"
-                    >
-                      <span className="flex items-center gap-1.5">
-                        <ChevronRight className={`w-3.5 h-3.5 text-gray-400 transition-transform ${expanded ? 'rotate-90' : ''}`} />
-                        {group.label}
-                      </span>
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                        selectedCount > 0
-                          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                          : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
-                      }`}>
-                        {selectedCount} of {vals.length} event{vals.length !== 1 ? 's' : ''}
-                      </span>
-                    </button>
-                  </div>
-                  {expanded && (
-                    <div className="px-10 pb-2.5 grid grid-cols-2 gap-y-1">
-                      {group.triggers.map((t) => (
-                        <label key={t.value} className="flex items-center gap-2 py-0.5 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={actions.includes(t.value)}
-                            onChange={() => toggleTrigger(t.value)}
-                            className="w-4 h-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                return (
+                  <div
+                    key={group.label}
+                    className={gi > 0 ? 'border-t border-gray-200 dark:border-gray-700' : ''}
+                  >
+                    <div className="flex items-center gap-2 px-4 py-2.5">
+                      <input
+                        type="checkbox"
+                        checked={allSelected}
+                        ref={(el) => {
+                          if (el) el.indeterminate = selectedCount > 0 && !allSelected;
+                        }}
+                        onChange={() => {
+                          const allSel = vals.every((v) => field.value.includes(v));
+                          field.onChange(
+                            allSel
+                              ? field.value.filter((a) => !vals.includes(a))
+                              : [...new Set([...field.value, ...vals])],
+                          );
+                        }}
+                        className="w-4 h-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500 shrink-0"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => toggleExpandGroup(group.label)}
+                        className="flex-1 flex items-center justify-between text-sm text-gray-700 dark:text-gray-300"
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <ChevronRight
+                            className={`w-3.5 h-3.5 text-gray-400 transition-transform ${expanded ? 'rotate-90' : ''}`}
                           />
-                          <span className="text-sm text-gray-700 dark:text-gray-300">{t.label}</span>
-                        </label>
-                      ))}
+                          {group.label}
+                        </span>
+                        <Badge variant={selectedCount > 0 ? 'success' : 'default'}>
+                          {selectedCount} of {vals.length} event{vals.length !== 1 ? 's' : ''}
+                        </Badge>
+                      </button>
                     </div>
-                  )}
-                </div>
-              )
-            })}
+                    {expanded && (
+                      <div className="px-10 pb-2.5 grid grid-cols-2 gap-y-1">
+                        {group.triggers.map((t) => (
+                          <label
+                            key={t.value}
+                            className="flex items-center gap-2 py-0.5 cursor-pointer"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={field.value.includes(t.value)}
+                              onChange={() => {
+                                field.onChange(
+                                  field.value.includes(t.value)
+                                    ? field.value.filter((a) => a !== t.value)
+                                    : [...field.value, t.value],
+                                );
+                              }}
+                              className="w-4 h-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                            />
+                            <span className="text-sm text-gray-700 dark:text-gray-300">
+                              {t.label}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      </RightSidebar>
-
-      <ConfirmModal
-        open={confirmDelete}
-        title="Delete Webhook"
-        message={`Are you sure you want to delete "${webhook?.name ?? ''}"?`}
-        confirmLabel="Delete"
-        dangerous
-        onConfirm={handleDelete}
-        onCancel={() => setConfirmDelete(false)}
+        )}
       />
-
-      <UnsavedChangesModal
-        open={showUnsavedModal}
-        onConfirm={confirmUnsaved}
-        onCancel={cancelUnsaved}
-      />
-    </>
-  )
+    </CrudSidebarForm>
+  );
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function WebhooksPage({ params }: { params: Promise<{ spaceId: string }> }) {
-  const { spaceId } = use(params)
-  const [webhooks, setWebhooks] = useState<Webhook[]>([])
-  const [loading, setLoading] = useState(true)
-  const [selectedWebhook, setSelectedWebhook] = useState<Webhook | null>(null)
-  const [panelOpen, setPanelOpen] = useState(false)
-  const [deleteTarget, setDeleteTarget] = useState<Webhook | null>(null)
+  const { spaceId } = use(params);
+  const { data, isLoading, mutate } = useApi<{ webhook_endpoints: Webhook[] }>(
+    `/api/admin/spaces/${spaceId}/webhooks`,
+  );
 
-  async function load() {
-    setLoading(true)
-    const res = await fetch(`/api/admin/spaces/${spaceId}/webhooks`)
-    const data = await res.json()
-    setWebhooks(data.webhook_endpoints ?? [])
-    setLoading(false)
+  const {
+    open: panelOpen,
+    selected: selectedWebhook,
+    openCreate,
+    openEdit,
+    close,
+  } = useCrudSidebar<Webhook>();
+
+  const webhookDelete = useDelete<Webhook>({
+    getUrl: (w) => `/api/admin/spaces/${spaceId}/webhooks/${w.id}`,
+    onSuccess: () => mutate(),
+    title: 'Delete Webhook',
+    getMessage: (w) => `Are you sure you want to delete "${w.name}"?`,
+  });
+
+  function handleSaved() {
+    close();
+    mutate();
   }
-
-  useEffect(() => { load() }, [spaceId])
-
-  function openNew() { setSelectedWebhook(null); setPanelOpen(true) }
-  function openEdit(w: Webhook) { setSelectedWebhook(w); setPanelOpen(true) }
-
-  async function handleDelete(w: Webhook) {
-    await fetch(`/api/admin/spaces/${spaceId}/webhooks/${w.id}`, { method: 'DELETE' })
-    setDeleteTarget(null)
-    load()
-  }
-
-  function handleSaved() { setPanelOpen(false); load() }
 
   return (
     <div className="max-w-3xl px-10 py-8">
@@ -475,7 +448,7 @@ export default function WebhooksPage({ params }: { params: Promise<{ spaceId: st
           </p>
         </div>
         <button
-          onClick={openNew}
+          onClick={openCreate}
           className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-teal-700 hover:bg-teal-800 rounded-lg transition-colors"
         >
           <Plus className="w-4 h-4" />
@@ -483,42 +456,50 @@ export default function WebhooksPage({ params }: { params: Promise<{ spaceId: st
         </button>
       </div>
 
-      {loading ? (
+      {isLoading ? (
         <div className="space-y-3">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="flex items-start gap-4 p-4 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900">
+            <div
+              key={i}
+              className="flex items-start gap-4 p-4 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900"
+            >
               <div className="flex-1 min-w-0 space-y-2">
                 <div className="flex items-center gap-2">
-                  <div className="h-4 w-36 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
-                  <div className="h-4 w-12 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
+                  <SkeletonText width="w-36" />
+                  <SkeletonText width="w-12" />
                 </div>
-                <div className="h-3 w-64 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
+                <SkeletonText width="w-64" height="h-3" />
                 <div className="flex gap-1">
-                  <div className="h-4 w-24 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
-                  <div className="h-4 w-20 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
-                  <div className="h-4 w-28 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
+                  <SkeletonText width="w-24" />
+                  <SkeletonText width="w-20" />
+                  <SkeletonText width="w-28" />
                 </div>
               </div>
-              <div className="w-7 h-7 bg-gray-100 dark:bg-gray-800 rounded animate-pulse shrink-0" />
+              <SkeletonBlock height="h-7" width="w-7" className="shrink-0" />
             </div>
           ))}
         </div>
-      ) : webhooks.length === 0 ? (
-        <div className="text-center py-16 border border-dashed border-gray-200 dark:border-gray-700 rounded-xl">
-          <p className="text-sm text-gray-400 mb-3">No webhooks configured yet.</p>
-          <button onClick={openNew} className="text-sm text-teal-600 dark:text-teal-400 hover:underline">
-            Add your first webhook
-          </button>
-        </div>
+      ) : (data?.webhook_endpoints ?? []).length === 0 ? (
+        <EmptyState
+          message="No webhooks configured yet."
+          action={
+            <button
+              onClick={openCreate}
+              className="text-sm text-teal-600 dark:text-teal-400 hover:underline"
+            >
+              Add your first webhook
+            </button>
+          }
+        />
       ) : (
         <div className="space-y-3">
-          {webhooks.map((w) => (
+          {(data?.webhook_endpoints ?? []).map((w) => (
             <WebhookCard
               key={w.id}
               webhook={w}
               spaceId={spaceId}
               onEdit={() => openEdit(w)}
-              onDelete={() => setDeleteTarget(w)}
+              onDelete={() => webhookDelete.confirm(w)}
             />
           ))}
         </div>
@@ -528,19 +509,11 @@ export default function WebhooksPage({ params }: { params: Promise<{ spaceId: st
         spaceId={spaceId}
         webhook={selectedWebhook}
         open={panelOpen}
-        onClose={() => setPanelOpen(false)}
+        onClose={close}
         onSaved={handleSaved}
       />
 
-      <ConfirmModal
-        open={!!deleteTarget}
-        title="Delete Webhook"
-        message={`Are you sure you want to delete "${deleteTarget?.name ?? ''}"?`}
-        confirmLabel="Delete"
-        dangerous
-        onConfirm={() => deleteTarget && handleDelete(deleteTarget)}
-        onCancel={() => setDeleteTarget(null)}
-      />
+      {webhookDelete.modal}
     </div>
-  )
+  );
 }

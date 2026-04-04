@@ -1,34 +1,44 @@
-'use client'
+'use client';
 
-import { use, useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
-import dynamic from 'next/dynamic'
-import { ChevronDown, ChevronRight, ArrowLeft, Trash2, ExternalLink } from 'lucide-react'
-import { ConfirmModal } from '@/components/ui/confirm-modal'
-import { UnsavedChangesModal } from '@/components/ui/unsaved-changes-modal'
-import { useUnsavedChanges } from '@/hooks/use-unsaved-changes'
+import { use, useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
+import { ChevronDown, ChevronRight, ArrowLeft, Trash2, ExternalLink } from 'lucide-react';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
+import { UnsavedChangesModal } from '@/components/ui/unsaved-changes-modal';
+import { useUnsavedChanges } from '@/hooks/use-unsaved-changes';
+import { SkeletonText, SkeletonBlock } from '@/components/ui/skeleton';
+import { useApi } from '@/lib/swr';
 
-const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false })
+const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
 
 interface FieldType {
-  id: number
-  name: string
-  body: string
-  compiled_body: string
-  space_ids: number[]
-  options: { name: string; value: string }[]
-  belongs_to_org: boolean
-  approved_version: number | null
-  user: { email?: string; firstname?: string; lastname?: string } | null
+  id: number;
+  name: string;
+  body: string;
+  compiled_body: string;
+  space_ids: number[];
+  options: { name: string; value: string }[];
+  belongs_to_org: boolean;
+  approved_version: number | null;
+  user: { email?: string; firstname?: string; lastname?: string } | null;
 }
 
 interface Space {
-  id: number
-  name: string
+  id: number;
+  name: string;
 }
 
-function SidebarSection({ title, children, defaultOpen = true }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) {
-  const [open, setOpen] = useState(defaultOpen)
+function SidebarSection({
+  title,
+  children,
+  defaultOpen = true,
+}: {
+  title: string;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
   return (
     <div className="border-b border-gray-200 dark:border-gray-700">
       <button
@@ -37,84 +47,100 @@ function SidebarSection({ title, children, defaultOpen = true }: { title: string
         className="flex items-center justify-between w-full px-4 py-3 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
       >
         {title}
-        {open ? <ChevronDown className="w-4 h-4 text-gray-400" /> : <ChevronRight className="w-4 h-4 text-gray-400" />}
+        {open ? (
+          <ChevronDown className="w-4 h-4 text-gray-400" />
+        ) : (
+          <ChevronRight className="w-4 h-4 text-gray-400" />
+        )}
       </button>
       {open && <div className="px-4 pb-4">{children}</div>}
     </div>
-  )
+  );
 }
 
-export default function FieldTypeEditPage({ params }: { params: Promise<{ fieldTypeId: string }> }) {
-  const { fieldTypeId } = use(params)
-  const router = useRouter()
+export default function FieldTypeEditPage({
+  params,
+}: {
+  params: Promise<{ fieldTypeId: string }>;
+}) {
+  const { fieldTypeId } = use(params);
+  const router = useRouter();
 
-  const [fieldType, setFieldType] = useState<FieldType | null>(null)
-  const [spaces, setSpaces] = useState<Space[]>([])
-  const [body, setBody] = useState('')
-  const [isDirty, setIsDirty] = useState(false)
-  const { showModal: showUnsavedModal, handleConfirm: confirmUnsaved, handleCancel: cancelUnsaved, guardNavigate } = useUnsavedChanges(isDirty)
-  const [isSaving, setIsSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [showDelete, setShowDelete] = useState(false)
-  const [localDevMode, setLocalDevMode] = useState(false)
+  const [body, setBody] = useState('');
+  const [bodyInitialized, setBodyInitialized] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
+  const {
+    showModal: showUnsavedModal,
+    handleConfirm: confirmUnsaved,
+    handleCancel: cancelUnsaved,
+    guardNavigate,
+  } = useUnsavedChanges(isDirty);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showDelete, setShowDelete] = useState(false);
+  const [localDevMode, setLocalDevMode] = useState(false);
+  const [fieldType, setFieldType] = useState<FieldType | null>(null);
 
+  const { data: ftData } = useApi<{ field_type: FieldType }>(
+    `/api/admin/field-types/${fieldTypeId}`,
+  );
+  const { data: spacesData } = useApi<{ spaces: Space[] }>('/api/admin/spaces');
+
+  const spaces = spacesData?.spaces ?? [];
+
+  // Initialize local field type and body from fetched data (once)
   useEffect(() => {
-    Promise.all([
-      fetch(`/api/admin/field-types/${fieldTypeId}`).then((r) => r.json()),
-      fetch('/api/admin/spaces').then((r) => r.json()),
-    ]).then(([ftData, spacesData]) => {
-      const ft = ftData.field_type
-      setFieldType(ft)
-      setBody(ft?.body ?? '')
-      setSpaces(spacesData.spaces ?? [])
-    })
-  }, [fieldTypeId])
+    if (!ftData?.field_type || bodyInitialized) return;
+    setFieldType(ftData.field_type);
+    setBody(ftData.field_type.body ?? '');
+    setBodyInitialized(true);
+  }, [ftData, bodyInitialized]);
 
   const handleBodyChange = useCallback((value: string | undefined) => {
-    setBody(value ?? '')
-    setIsDirty(true)
-  }, [])
+    setBody(value ?? '');
+    setIsDirty(true);
+  }, []);
 
   async function save() {
-    if (!fieldType) return
-    setIsSaving(true)
-    setError(null)
+    if (!fieldType) return;
+    setIsSaving(true);
+    setError(null);
     try {
       const res = await fetch(`/api/admin/field-types/${fieldTypeId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ field_type: { body } }),
-      })
-      if (!res.ok) throw new Error('Save failed')
-      const data = await res.json()
-      setFieldType(data.field_type)
-      setBody(data.field_type.body)
-      setIsDirty(false)
+      });
+      if (!res.ok) throw new Error('Save failed');
+      const data = await res.json();
+      setFieldType(data.field_type);
+      setBody(data.field_type.body);
+      setIsDirty(false);
     } catch {
-      setError('Failed to save')
+      setError('Failed to save');
     } finally {
-      setIsSaving(false)
+      setIsSaving(false);
     }
   }
 
   async function toggleSpace(spaceId: number) {
-    if (!fieldType) return
-    const current = fieldType.space_ids ?? []
+    if (!fieldType) return;
+    const current = fieldType.space_ids ?? [];
     const next = current.includes(spaceId)
       ? current.filter((id) => id !== spaceId)
-      : [...current, spaceId]
+      : [...current, spaceId];
     const res = await fetch(`/api/admin/field-types/${fieldTypeId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ field_type: { space_ids: next } }),
-    })
-    const data = await res.json()
-    if (res.ok) setFieldType(data.field_type)
+    });
+    const data = await res.json();
+    if (res.ok) setFieldType(data.field_type);
   }
 
   async function handleDelete() {
-    await fetch(`/api/admin/field-types/${fieldTypeId}`, { method: 'DELETE' })
-    router.push('/organization/field-types')
+    await fetch(`/api/admin/field-types/${fieldTypeId}`, { method: 'DELETE' });
+    router.push('/organization/field-types');
   }
 
   if (!fieldType) {
@@ -122,23 +148,25 @@ export default function FieldTypeEditPage({ params }: { params: Promise<{ fieldT
       <div className="flex-1 flex flex-col min-h-0">
         {/* Skeleton header */}
         <div className="flex items-center gap-4 px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 flex-shrink-0">
-          <div className="h-5 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+          <SkeletonText className="w-32 h-5" />
           <div className="ml-auto flex gap-2">
-            <div className="h-8 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-            <div className="h-8 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+            <SkeletonBlock className="h-8 w-16" />
+            <SkeletonBlock className="h-8 w-20" />
           </div>
         </div>
         <div className="flex flex-1 overflow-hidden">
-          <div className="flex-1 bg-gray-50 dark:bg-gray-950 animate-pulse" />
+          <SkeletonBlock className="flex-1 h-full" />
           <div className="w-72 border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900" />
         </div>
       </div>
-    )
+    );
   }
 
   const authorName = fieldType.user
-    ? [fieldType.user.firstname, fieldType.user.lastname].filter(Boolean).join(' ') || fieldType.user.email || ''
-    : ''
+    ? [fieldType.user.firstname, fieldType.user.lastname].filter(Boolean).join(' ') ||
+      fieldType.user.email ||
+      ''
+    : '';
 
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
@@ -152,7 +180,9 @@ export default function FieldTypeEditPage({ params }: { params: Promise<{ fieldT
           <ArrowLeft className="w-4 h-4 text-gray-500 dark:text-gray-400" />
         </button>
 
-        <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">{fieldType.name}</span>
+        <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+          {fieldType.name}
+        </span>
         <span className="text-xs text-gray-400 px-2 py-0.5 border border-gray-200 dark:border-gray-700 rounded hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors">
           Versions
         </span>
@@ -203,7 +233,9 @@ export default function FieldTypeEditPage({ params }: { params: Promise<{ fieldT
         {/* Right sidebar */}
         <div className="w-72 flex-shrink-0 border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-y-auto">
           <SidebarSection title="Input" defaultOpen={false}>
-            <p className="text-xs text-gray-400">Configure the input that will be shown in the schema editor.</p>
+            <p className="text-xs text-gray-400">
+              Configure the input that will be shown in the schema editor.
+            </p>
           </SidebarSection>
 
           <SidebarSection title="Field-type Preview">
@@ -214,18 +246,24 @@ export default function FieldTypeEditPage({ params }: { params: Promise<{ fieldT
                 onChange={(e) => setLocalDevMode(e.target.checked)}
                 className="w-4 h-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500"
               />
-              <span className="text-sm text-gray-700 dark:text-gray-300">Enable local development mode</span>
+              <span className="text-sm text-gray-700 dark:text-gray-300">
+                Enable local development mode
+              </span>
             </label>
           </SidebarSection>
 
           <SidebarSection title="Output" defaultOpen={false}>
-            <p className="text-xs text-gray-400">The output of your field-type plugin will be shown here during preview.</p>
+            <p className="text-xs text-gray-400">
+              The output of your field-type plugin will be shown here during preview.
+            </p>
           </SidebarSection>
 
           <SidebarSection title="Settings & Details">
             {authorName && (
               <div className="mb-4">
-                <div className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-medium">Author</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-medium">
+                  Author
+                </div>
                 <div className="text-sm text-gray-900 dark:text-gray-100">{authorName}</div>
               </div>
             )}
@@ -237,7 +275,7 @@ export default function FieldTypeEditPage({ params }: { params: Promise<{ fieldT
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {spaces.map((sp) => {
-                  const assigned = (fieldType.space_ids ?? []).includes(sp.id)
+                  const assigned = (fieldType.space_ids ?? []).includes(sp.id);
                   return (
                     <button
                       key={sp.id}
@@ -252,7 +290,7 @@ export default function FieldTypeEditPage({ params }: { params: Promise<{ fieldT
                       {sp.name} ({sp.id})
                       {assigned && <span className="ml-0.5 text-teal-500">×</span>}
                     </button>
-                  )
+                  );
                 })}
                 {spaces.length === 0 && <span className="text-xs text-gray-400">No spaces</span>}
               </div>
@@ -268,7 +306,8 @@ export default function FieldTypeEditPage({ params }: { params: Promise<{ fieldT
                 Delete Field-type
               </button>
               <p className="text-xs text-gray-400 mt-2">
-                Attention: All spaces using this field-type will not be able to use it any longer if you click delete.
+                Attention: All spaces using this field-type will not be able to use it any longer if
+                you click delete.
               </p>
             </div>
           </SidebarSection>
@@ -282,10 +321,19 @@ export default function FieldTypeEditPage({ params }: { params: Promise<{ fieldT
             </div>
             <div className="space-y-2">
               {[
-                { label: 'Documentation', href: 'https://www.storyblok.com/docs/plugins/field-plugins/introduction' },
-                { label: 'Documentation (Legacy)', href: 'https://www.storyblok.com/docs/plugins/custom-field-types' },
+                {
+                  label: 'Documentation',
+                  href: 'https://www.storyblok.com/docs/plugins/field-plugins/introduction',
+                },
+                {
+                  label: 'Documentation (Legacy)',
+                  href: 'https://www.storyblok.com/docs/plugins/custom-field-types',
+                },
                 { label: 'Sandbox', href: 'https://field-plugin.storyblok.com/' },
-                { label: 'Open-source examples', href: 'https://github.com/storyblok/field-plugin-examples' },
+                {
+                  label: 'Open-source examples',
+                  href: 'https://github.com/storyblok/field-plugin-examples',
+                },
               ].map((link) => (
                 <a
                   key={link.label}
@@ -313,7 +361,11 @@ export default function FieldTypeEditPage({ params }: { params: Promise<{ fieldT
         onCancel={() => setShowDelete(false)}
       />
 
-      <UnsavedChangesModal open={showUnsavedModal} onConfirm={confirmUnsaved} onCancel={cancelUnsaved} />
+      <UnsavedChangesModal
+        open={showUnsavedModal}
+        onConfirm={confirmUnsaved}
+        onCancel={cancelUnsaved}
+      />
     </div>
-  )
+  );
 }

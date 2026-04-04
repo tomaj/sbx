@@ -1,8 +1,8 @@
-'use client'
+'use client';
 
-import type React from 'react'
-import { useState } from 'react'
-import { cn, avatarUrl } from '@/lib/utils'
+import type React from 'react';
+import { useState } from 'react';
+import { cn, avatarUrl } from '@/lib/utils';
 
 const COLORS = [
   'bg-green-400 text-white',
@@ -17,22 +17,22 @@ const COLORS = [
   'bg-emerald-400 text-white',
   'bg-purple-400 text-white',
   'bg-yellow-400 text-gray-800',
-]
+];
 
 function getInitials(name: string): string {
-  const parts = name.trim().split(' ').filter(Boolean)
-  if (parts.length === 0) return '?'
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+  const parts = name.trim().split(' ').filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
 function getColor(name: string | undefined | null): string {
-  if (!name) return COLORS[0]
-  let hash = 0
+  if (!name) return COLORS[0];
+  let hash = 0;
   for (let i = 0; i < name.length; i++) {
-    hash = (hash * 31 + name.charCodeAt(i)) % COLORS.length
+    hash = (hash * 31 + name.charCodeAt(i)) % COLORS.length;
   }
-  return COLORS[Math.abs(hash)]
+  return COLORS[Math.abs(hash)];
 }
 
 const sizes = {
@@ -41,20 +41,26 @@ const sizes = {
   md: 'size-9 text-sm',
   lg: 'size-12 text-base',
   xl: 'size-16 text-xl',
-}
+};
 
 interface UserAvatarProps {
-  name: string | undefined | null
-  src?: string | null
-  size?: keyof typeof sizes
-  className?: string
-  style?: React.CSSProperties
+  name: string | undefined | null;
+  src?: string | null;
+  size?: keyof typeof sizes;
+  className?: string;
+  style?: React.CSSProperties;
 }
 
-export function UserAvatar({ name: nameProp, src, size = 'md', className, style }: UserAvatarProps) {
-  const name = nameProp || '?'
-  const [imgError, setImgError] = useState(false)
-  const resolvedSrc = avatarUrl(src)
+export function UserAvatar({
+  name: nameProp,
+  src,
+  size = 'md',
+  className,
+  style,
+}: UserAvatarProps) {
+  const name = nameProp || '?';
+  const [imgError, setImgError] = useState(false);
+  const resolvedSrc = avatarUrl(src);
 
   if (resolvedSrc && !imgError) {
     return (
@@ -66,7 +72,7 @@ export function UserAvatar({ name: nameProp, src, size = 'md', className, style 
         className={cn(sizes[size], 'rounded-full object-cover shrink-0', className)}
         onError={() => setImgError(true)}
       />
-    )
+    );
   }
 
   return (
@@ -81,5 +87,5 @@ export function UserAvatar({ name: nameProp, src, size = 'md', className, style 
     >
       {getInitials(name)}
     </div>
-  )
+  );
 }

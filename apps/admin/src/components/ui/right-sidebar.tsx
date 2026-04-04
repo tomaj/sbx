@@ -1,28 +1,35 @@
-'use client'
+'use client';
 
-import { useEffect } from 'react'
-import { X } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { useEffect } from 'react';
+import { X } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface RightSidebarProps {
-  open: boolean
-  onClose: () => void
-  header: React.ReactNode
-  footer: React.ReactNode
-  children: React.ReactNode
-  width?: string
+  open: boolean;
+  onClose: () => void;
+  header: React.ReactNode;
+  footer: React.ReactNode;
+  children: React.ReactNode;
+  width?: string;
 }
 
-export function RightSidebar({ open, onClose, header, footer, children, width = 'w-[420px]' }: RightSidebarProps) {
+export function RightSidebar({
+  open,
+  onClose,
+  header,
+  footer,
+  children,
+  width = 'w-[420px]',
+}: RightSidebarProps) {
   // Close on Escape
   useEffect(() => {
-    if (!open) return
+    if (!open) return;
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') onClose();
     }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [open, onClose])
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
 
   return (
     <>
@@ -45,9 +52,7 @@ export function RightSidebar({ open, onClose, header, footer, children, width = 
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-800">
-          <div className="flex items-center gap-3 min-w-0">
-            {header}
-          </div>
+          <div className="flex items-center gap-3 min-w-0">{header}</div>
           <button
             onClick={onClose}
             className="ml-4 shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
@@ -57,9 +62,7 @@ export function RightSidebar({ open, onClose, header, footer, children, width = 
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
-          {children}
-        </div>
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">{children}</div>
 
         {/* Footer */}
         <div className="px-6 py-4 border-t border-gray-100 dark:border-gray-800 flex items-center">
@@ -67,5 +70,5 @@ export function RightSidebar({ open, onClose, header, footer, children, width = 
         </div>
       </div>
     </>
-  )
+  );
 }

@@ -1,3 +1,4 @@
+import { AuthenticatedRequest } from '../auth/authenticated-request.interface';
 import {
   Body,
   Controller,
@@ -5,6 +6,7 @@ import {
   Get,
   HttpCode,
   Param,
+  ParseIntPipe,
   Post,
   Put,
   Query,
@@ -14,6 +16,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { Auth } from '../auth/auth.decorator';
 import { DiscussionsService } from './discussions.service';
 import { ResultGuard } from '../shared/result-guard.util';
+import { QueryParserUtil } from '../shared/query-parser.util';
 
 /**
  * Story-scoped discussion routes:
@@ -28,17 +31,21 @@ export class StoryDiscussionsController {
 
   @Get()
   async list(
-    @Req() req: any,
-    @Param('storyId') storyId: string,
+    @Req() req: AuthenticatedRequest,
+    @Param('storyId', ParseIntPipe) storyId: number,
     @Query('per_page') perPage: string,
     @Query('page') page: string,
     @Query('by_status') byStatus: string,
   ) {
+    const { page: parsedPage, perPage: parsedPerPage } = QueryParserUtil.parsePagination(
+      page,
+      perPage,
+    );
     return this.discussionsService.listByStory(
       req.space.id,
-      parseInt(storyId),
-      page ? parseInt(page) : 1,
-      perPage ? parseInt(perPage) : 25,
+      storyId,
+      parsedPage,
+      parsedPerPage,
       byStatus,
     );
   }
@@ -46,8 +53,8 @@ export class StoryDiscussionsController {
   @Post()
   @HttpCode(201)
   async create(
-    @Req() req: any,
-    @Param('storyId') storyId: string,
+    @Req() req: AuthenticatedRequest,
+    @Param('storyId', ParseIntPipe) storyId: number,
     @Body()
     body: {
       discussion?: {
@@ -60,12 +67,11 @@ export class StoryDiscussionsController {
       };
     },
   ) {
-    return this.discussionsService.createDiscussion(
-      req.space.id,
-      parseInt(storyId),
-      body.discussion ?? {},
-      req.adminUser,
-    );
+    return this.discussionsService.createDiscussion(req.space.id, storyId, body.discussion ?? {}, {
+      id: req.adminUser?.sbxUserId ?? undefined,
+      email: req.adminUser?.email,
+      name: req.adminUser?.name,
+    });
   }
 }
 
@@ -83,39 +89,41 @@ export class DiscussionsController {
 
   @Get(':discussionId')
   async getOne(
-    @Req() req: any,
-    @Param('discussionId') discussionId: string,
+    @Req() req: AuthenticatedRequest,
+    @Param('discussionId', ParseIntPipe) discussionId: number,
   ) {
-    return { discussion: ResultGuard.throwIfNotFound(
-      await this.discussionsService.getDiscussion(req.space.id, parseInt(discussionId)),
-    ) };
+    return {
+      discussion: ResultGuard.throwIfNotFound(
+        await this.discussionsService.getDiscussion(req.space.id, discussionId),
+      ),
+    };
   }
 
   @Put(':discussionId')
   async update(
-    @Req() req: any,
-    @Param('discussionId') discussionId: string,
+    @Req() req: AuthenticatedRequest,
+    @Param('discussionId', ParseIntPipe) discussionId: number,
     @Body() body: { discussion?: { solved_at?: string | null } },
   ) {
-    return { discussion: ResultGuard.throwIfNotFound(
-      await this.discussionsService.updateDiscussion(
-        req.space.id,
-        parseInt(discussionId),
-        body.discussion ?? {},
+    return {
+      discussion: ResultGuard.throwIfNotFound(
+        await this.discussionsService.updateDiscussion(
+          req.space.id,
+          discussionId,
+          body.discussion ?? {},
+        ),
       ),
-    ) };
+    };
   }
 
   @Delete(':discussionId')
-  @HttpCode(204)
+  @HttpCode(200)
   async remove(
-    @Req() req: any,
-    @Param('discussionId') discussionId: string,
+    @Req() req: AuthenticatedRequest,
+    @Param('discussionId', ParseIntPipe) discussionId: number,
   ) {
-    await this.discussionsService.deleteDiscussion(
-      req.space.id,
-      parseInt(discussionId),
-    );
+    await this.discussionsService.deleteDiscussion(req.space.id, discussionId);
+    return {};
   }
 
   /**
@@ -130,7 +138,7 @@ export class DiscussionsController {
    */
   @Get(':discussionId/comments')
   async listComments(
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
     @Param('discussionId') discussionId: string,
   ) {
     return this.discussionsService.listComments(req.space.id, discussionId);
@@ -139,50 +147,43 @@ export class DiscussionsController {
   @Post(':discussionId/comments')
   @HttpCode(201)
   async createComment(
-    @Req() req: any,
-    @Param('discussionId') discussionId: string,
+    @Req() req: AuthenticatedRequest,
+    @Param('discussionId', ParseIntPipe) discussionId: number,
     @Body() body: { comment?: { message?: string; message_json?: any[] } },
   ) {
-    return this.discussionsService.createComment(
-      req.space.id,
-      parseInt(discussionId),
-      {
-        ...body.comment,
-        user_email: req.adminUser?.email,
-        user_name: req.adminUser?.name,
-      },
-    );
+    return this.discussionsService.createComment(req.space.id, discussionId, {
+      ...body.comment,
+      user_email: req.adminUser?.email,
+      user_name: req.adminUser?.name,
+    });
   }
 
   @Put(':discussionId/comments/:commentId')
   async updateComment(
-    @Req() req: any,
-    @Param('discussionId') discussionId: string,
-    @Param('commentId') commentId: string,
+    @Req() req: AuthenticatedRequest,
+    @Param('discussionId', ParseIntPipe) discussionId: number,
+    @Param('commentId', ParseIntPipe) commentId: number,
     @Body() body: { comment?: { message?: string; message_json?: any[] } },
   ) {
     return ResultGuard.throwIfNotFound(
       await this.discussionsService.updateComment(
         req.space.id,
-        parseInt(discussionId),
-        parseInt(commentId),
+        discussionId,
+        commentId,
         body.comment ?? {},
       ),
     );
   }
 
   @Delete(':discussionId/comments/:commentId')
-  @HttpCode(204)
+  @HttpCode(200)
   async deleteComment(
-    @Req() req: any,
-    @Param('discussionId') discussionId: string,
-    @Param('commentId') commentId: string,
+    @Req() req: AuthenticatedRequest,
+    @Param('discussionId', ParseIntPipe) discussionId: number,
+    @Param('commentId', ParseIntPipe) commentId: number,
   ) {
-    await this.discussionsService.deleteComment(
-      req.space.id,
-      parseInt(discussionId),
-      parseInt(commentId),
-    );
+    await this.discussionsService.deleteComment(req.space.id, discussionId, commentId);
+    return {};
   }
 }
 
@@ -198,18 +199,22 @@ export class MentionedDiscussionsController {
 
   @Get('me')
   async findMentioned(
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
     @Query('per_page') perPage: string,
     @Query('page') page: string,
     @Query('by_status') byStatus: string,
   ) {
-    const userId = req.adminUser?.id;
+    const userId = req.adminUser?.sbxUserId;
     if (!userId) return { discussions: [] };
+    const { page: parsedPage, perPage: parsedPerPage } = QueryParserUtil.parsePagination(
+      page,
+      perPage,
+    );
     return this.discussionsService.findMentionedDiscussions(
       req.space.id,
       userId,
-      page ? parseInt(page) : 1,
-      perPage ? parseInt(perPage) : 25,
+      parsedPage,
+      parsedPerPage,
       byStatus,
     );
   }

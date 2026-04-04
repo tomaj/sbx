@@ -1,3 +1,4 @@
+import { AuthenticatedRequest } from '../auth/authenticated-request.interface';
 import {
   Controller,
   Get,
@@ -13,11 +14,12 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import type { Response } from 'express';
+import { Response } from 'express';
 import { randomBytes } from 'crypto';
 import { extname } from 'path';
 import { Auth } from '../auth/auth.decorator';
 import { UsersService } from './users.service';
+import { ResultGuard } from '../shared/result-guard.util';
 import { StorageService } from '../storage/storage.service';
 import { UpdateMeDto } from './dto/update-me.dto';
 
@@ -53,9 +55,11 @@ export class UsersController {
 
   @Get('v1/user/me')
   @Auth('session')
-  async getMe(@Req() req: any) {
-    const user = await this.usersService.getMe(req.adminUser.email);
-    if (!user) throw new NotFoundException('User not found');
+  async getMe(@Req() req: AuthenticatedRequest) {
+    const user = ResultGuard.throwIfNotFound(
+      await this.usersService.getMe(req.adminUser.email),
+      'User not found',
+    );
     return { user };
   }
 
@@ -63,9 +67,11 @@ export class UsersController {
 
   @Patch('v1/user/me')
   @Auth('session')
-  async updateMe(@Req() req: any, @Body() body: UpdateMeDto) {
-    const me = await this.usersService.getMe(req.adminUser.email);
-    if (!me) throw new NotFoundException('User not found');
+  async updateMe(@Req() req: AuthenticatedRequest, @Body() body: UpdateMeDto) {
+    const me = ResultGuard.throwIfNotFound(
+      await this.usersService.getMe(req.adminUser.email),
+      'User not found',
+    );
     const updated = await this.usersService.updateUser(me.id, {
       firstname: body.firstname,
       lastname: body.lastname,
@@ -79,7 +85,7 @@ export class UsersController {
   @Post('v1/user/me/avatar')
   @Auth('session')
   @UseInterceptors(FileInterceptor('file'))
-  async uploadAvatar(@Req() req: any, @UploadedFile() file: Express.Multer.File) {
+  async uploadAvatar(@Req() req: AuthenticatedRequest, @UploadedFile() file: Express.Multer.File) {
     if (!file) throw new BadRequestException('No file provided');
     if (!ALLOWED_MIME.includes(file.mimetype)) {
       throw new BadRequestException('Only JPEG, PNG, WebP or GIF allowed');
@@ -88,8 +94,10 @@ export class UsersController {
       throw new BadRequestException('File too large (max 5 MB)');
     }
 
-    const me = await this.usersService.getMe(req.adminUser.email);
-    if (!me) throw new NotFoundException('User not found');
+    const me = ResultGuard.throwIfNotFound(
+      await this.usersService.getMe(req.adminUser.email),
+      'User not found',
+    );
 
     const hash = randomBytes(5).toString('hex');
     const ext = extname(file.originalname).toLowerCase() || '.jpg';

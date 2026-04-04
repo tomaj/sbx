@@ -2,6 +2,8 @@ import { Global, Module, Logger } from '@nestjs/common';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import * as schema from './schema';
+import { ENV } from '../config/config.module';
+import { Env } from '../config/env.schema';
 
 export const DB = Symbol('DB');
 export type DbType = ReturnType<typeof drizzle<typeof schema>>;
@@ -11,12 +13,11 @@ export type DbType = ReturnType<typeof drizzle<typeof schema>>;
   providers: [
     {
       provide: DB,
-      useFactory: () => {
+      inject: [ENV],
+      useFactory: (env: Env) => {
         const logger = new Logger('DbModule');
         const pool = new Pool({
-          connectionString:
-            process.env.DATABASE_URL ??
-            'postgresql://tomaj@localhost:5432/sbx',
+          connectionString: env.DATABASE_URL,
           max: 20,
           idleTimeoutMillis: 30000,
           connectionTimeoutMillis: 5000,

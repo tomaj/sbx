@@ -3,7 +3,7 @@ import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
 import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import type { AiConfigurationRecord, AiBrandingRule } from './ai.types';
+import { AiConfigurationRecord, AiBrandingRule } from './ai.types';
 import { AiLogsService } from './ai-logs.service';
 
 interface AiResult {
@@ -59,37 +59,50 @@ export class AiService {
       }
 
       const durationMs = Date.now() - startedAt;
-      this.logger.log({ msg: 'Alt text generated', provider: config.provider_name, altText: result.text.slice(0, 100), durationMs });
+      this.logger.log({
+        msg: 'Alt text generated',
+        provider: config.provider_name,
+        altText: result.text.slice(0, 100),
+        durationMs,
+      });
 
       if (spaceId) {
-        this.aiLogs.log({
-          spaceId,
-          operation: 'asset_alt_text',
-          providerName: config.provider_name,
-          modelIdentifier: config.model_identifier,
-          inputTokens: result.inputTokens,
-          outputTokens: result.outputTokens,
-          totalTokens: result.totalTokens,
-          status: 'success',
-          durationMs,
-        }).catch(() => {});
+        this.aiLogs
+          .log({
+            spaceId,
+            operation: 'asset_alt_text',
+            providerName: config.provider_name,
+            modelIdentifier: config.model_identifier,
+            inputTokens: result.inputTokens,
+            outputTokens: result.outputTokens,
+            totalTokens: result.totalTokens,
+            status: 'success',
+            durationMs,
+          })
+          .catch(() => {});
       }
 
       return result.text;
     } catch (err: any) {
       const durationMs = Date.now() - startedAt;
-      this.logger.error({ msg: 'Alt text generation failed', provider: config.provider_name, error: err.message });
+      this.logger.error({
+        msg: 'Alt text generation failed',
+        provider: config.provider_name,
+        error: err.message,
+      });
 
       if (spaceId) {
-        this.aiLogs.log({
-          spaceId,
-          operation: 'asset_alt_text',
-          providerName: config.provider_name,
-          modelIdentifier: config.model_identifier,
-          status: 'error',
-          errorMessage: err.message,
-          durationMs,
-        }).catch(() => {});
+        this.aiLogs
+          .log({
+            spaceId,
+            operation: 'asset_alt_text',
+            providerName: config.provider_name,
+            modelIdentifier: config.model_identifier,
+            status: 'error',
+            errorMessage: err.message,
+            durationMs,
+          })
+          .catch(() => {});
       }
 
       throw err;
@@ -105,12 +118,14 @@ export class AiService {
     if (branding) {
       const contextParts: string[] = [];
       if (branding.industry_niche) contextParts.push(`Industry: ${branding.industry_niche}`);
-      if (branding.target_audience) contextParts.push(`Target audience: ${branding.target_audience}`);
+      if (branding.target_audience)
+        contextParts.push(`Target audience: ${branding.target_audience}`);
       if (branding.tone_guidelines) contextParts.push(`Tone: ${branding.tone_guidelines}`);
       if (branding.writing_style) contextParts.push(`Writing style: ${branding.writing_style}`);
       if (branding.avoid_use) contextParts.push(`Avoid using: ${branding.avoid_use}`);
       if (branding.never_use) contextParts.push(`Never use: ${branding.never_use}`);
-      if (branding.additional_guidelines) contextParts.push(`Additional context:\n${branding.additional_guidelines}`);
+      if (branding.additional_guidelines)
+        contextParts.push(`Additional context:\n${branding.additional_guidelines}`);
 
       if (contextParts.length > 0) {
         lines.push('\nBrand context:');

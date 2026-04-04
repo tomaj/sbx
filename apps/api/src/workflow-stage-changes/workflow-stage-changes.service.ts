@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, desc, eq } from 'drizzle-orm';
 import { DB } from '../db/db.module';
-import type { DbType } from '../db/db.module';
+import { DbType } from '../db/db.module';
 import { workflowStageChanges, workflowStages } from '../db/schema';
 
 @Injectable()
@@ -26,7 +26,7 @@ export class WorkflowStageChangesService {
   async create(
     spaceId: number,
     data: { workflow_stage_id: number; story_id: number; user_id?: number },
-    opts?: {
+    _opts?: {
       releaseId?: number;
       notify?: boolean;
       comment?: { message: string };

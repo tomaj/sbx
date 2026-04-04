@@ -1,17 +1,17 @@
-'use client'
+'use client';
 
-import { useState, useRef, useCallback, useEffect } from 'react'
-import { Monitor, Smartphone, Maximize2, Settings, ExternalLink } from 'lucide-react'
+import { useState, useRef, useCallback } from 'react';
+import { Monitor, Smartphone, Maximize2, Settings } from 'lucide-react';
 
-type ViewMode = 'desktop' | 'mobile' | 'fullwidth'
+type ViewMode = 'desktop' | 'mobile' | 'fullwidth';
 
 interface PreviewFrameProps {
-  url: string | undefined
-  className?: string
-  previewUrls?: Array<{ name: string; location: string }>
-  spaceId?: string
-  onUrlChange?: (url: string) => void
-  iframeRef?: React.RefObject<HTMLIFrameElement | null>
+  url: string | undefined;
+  className?: string;
+  previewUrls?: Array<{ name: string; location: string }>;
+  spaceId?: string;
+  onUrlChange?: (url: string) => void;
+  iframeRef?: React.RefObject<HTMLIFrameElement | null>;
 }
 
 export function PreviewFrame({
@@ -22,28 +22,30 @@ export function PreviewFrame({
   onUrlChange,
   iframeRef: externalIframeRef,
 }: PreviewFrameProps) {
-  const [viewMode, setViewMode] = useState<ViewMode>('desktop')
-  const [mobileViewWidth, setMobileViewWidth] = useState(360)
-  const [showPreviewMenu, setShowPreviewMenu] = useState(false)
-  const internalIframeRef = useRef<HTMLIFrameElement>(null)
-  const iframeRef = externalIframeRef ?? internalIframeRef
+  const [viewMode, setViewMode] = useState<ViewMode>('desktop');
+  const [mobileViewWidth, setMobileViewWidth] = useState(360);
+  const [showPreviewMenu, setShowPreviewMenu] = useState(false);
+  const internalIframeRef = useRef<HTMLIFrameElement>(null);
+  const iframeRef = externalIframeRef ?? internalIframeRef;
 
-  const startResize = useCallback((side: 'left' | 'right', startX: number) => {
-    const startWidth = mobileViewWidth
-    function onMouseMove(e: MouseEvent) {
-      const delta = e.clientX - startX
-      const newWidth = side === 'left'
-        ? Math.max(240, startWidth - delta)
-        : Math.max(240, startWidth + delta)
-      setMobileViewWidth(Math.round(newWidth))
-    }
-    function onMouseUp() {
-      window.removeEventListener('mousemove', onMouseMove)
-      window.removeEventListener('mouseup', onMouseUp)
-    }
-    window.addEventListener('mousemove', onMouseMove)
-    window.addEventListener('mouseup', onMouseUp)
-  }, [mobileViewWidth])
+  const startResize = useCallback(
+    (side: 'left' | 'right', startX: number) => {
+      const startWidth = mobileViewWidth;
+      function onMouseMove(e: MouseEvent) {
+        const delta = e.clientX - startX;
+        const newWidth =
+          side === 'left' ? Math.max(240, startWidth - delta) : Math.max(240, startWidth + delta);
+        setMobileViewWidth(Math.round(newWidth));
+      }
+      function onMouseUp() {
+        window.removeEventListener('mousemove', onMouseMove);
+        window.removeEventListener('mouseup', onMouseUp);
+      }
+      window.addEventListener('mousemove', onMouseMove);
+      window.addEventListener('mouseup', onMouseUp);
+    },
+    [mobileViewWidth],
+  );
 
   return (
     <div className={`flex-1 flex flex-col overflow-hidden ${className ?? ''}`}>
@@ -84,7 +86,7 @@ export function PreviewFrame({
           <div className="relative flex-shrink-0">
             <button
               type="button"
-              onClick={() => setShowPreviewMenu(p => !p)}
+              onClick={() => setShowPreviewMenu((p) => !p)}
               title="Preview URL settings"
               className={`p-1.5 rounded transition-colors ${showPreviewMenu ? 'bg-gray-100 dark:bg-gray-800 text-gray-700' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'}`}
             >
@@ -96,7 +98,9 @@ export function PreviewFrame({
                 <div className="fixed inset-0 z-10" onClick={() => setShowPreviewMenu(false)} />
                 <div className="absolute right-0 top-full mt-1 z-20 w-80 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg p-3">
                   <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">Preview URLs</span>
+                    <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+                      Preview URLs
+                    </span>
                   </div>
                   <div className="space-y-1.5">
                     {previewUrls.map((pu, i) => (
@@ -104,12 +108,14 @@ export function PreviewFrame({
                         key={i}
                         type="button"
                         onClick={() => {
-                          onUrlChange?.(pu.location)
-                          setShowPreviewMenu(false)
+                          onUrlChange?.(pu.location);
+                          setShowPreviewMenu(false);
                         }}
                         className={`w-full text-left px-3 py-2.5 rounded-lg border transition-colors ${url === pu.location ? 'border-teal-500 bg-teal-50 dark:bg-teal-900/20' : 'border-transparent hover:bg-gray-50 dark:hover:bg-gray-700'}`}
                       >
-                        <div className="text-xs text-gray-800 dark:text-gray-200 truncate">{pu.location}</div>
+                        <div className="text-xs text-gray-800 dark:text-gray-200 truncate">
+                          {pu.location}
+                        </div>
                         <div className="text-xs text-gray-400">- {pu.name}</div>
                       </button>
                     ))}
@@ -142,7 +148,10 @@ export function PreviewFrame({
             </div>
             <div
               className="flex items-center justify-center w-4 flex-shrink-0 cursor-ew-resize group select-none"
-              onMouseDown={(e) => { e.preventDefault(); startResize('left', e.clientX) }}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                startResize('left', e.clientX);
+              }}
             >
               <div className="w-1 h-10 bg-gray-300 dark:bg-gray-600 rounded-full group-hover:bg-gray-400 dark:group-hover:bg-gray-500 transition-colors" />
             </div>
@@ -162,20 +171,18 @@ export function PreviewFrame({
             </div>
             <div
               className="flex items-center justify-center w-4 flex-shrink-0 cursor-ew-resize group select-none"
-              onMouseDown={(e) => { e.preventDefault(); startResize('right', e.clientX) }}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                startResize('right', e.clientX);
+              }}
             >
               <div className="w-1 h-10 bg-gray-300 dark:bg-gray-600 rounded-full group-hover:bg-gray-400 dark:group-hover:bg-gray-500 transition-colors" />
             </div>
           </div>
         ) : (
-          <iframe
-            ref={iframeRef}
-            src={url}
-            className="w-full h-full border-0"
-            title="Preview"
-          />
+          <iframe ref={iframeRef} src={url} className="w-full h-full border-0" title="Preview" />
         )}
       </div>
     </div>
-  )
+  );
 }

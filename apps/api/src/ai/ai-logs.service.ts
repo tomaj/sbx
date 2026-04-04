@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { Inject } from '@nestjs/common';
-import { and, count, desc, eq, gte, lte, sql, sum } from 'drizzle-orm';
+import { and, count, eq, gte, lte, sql, sum } from 'drizzle-orm';
 import { DB } from '../db/db.module';
-import type { DbType } from '../db/db.module';
+import { DbType } from '../db/db.module';
 import { aiLogs } from '../db/schema';
 
 export interface AiLogEntry {
@@ -76,16 +76,16 @@ export class AiLogsService {
         from = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
         periodLabel = 'this month';
         break;
-      case 'last_14_days':
       default:
         from = new Date(now.getTime() - 13 * 86400000).toISOString().slice(0, 10);
         periodLabel = 'last 14 days';
         break;
     }
 
-    const bucketExpr = groupBy === 'day'
-      ? sql<string>`to_char(${aiLogs.createdAt}, 'YYYY-MM-DD')`
-      : sql<string>`to_char(${aiLogs.createdAt}, 'YYYY-MM')`;
+    const bucketExpr =
+      groupBy === 'day'
+        ? sql<string>`to_char(${aiLogs.createdAt}, 'YYYY-MM-DD')`
+        : sql<string>`to_char(${aiLogs.createdAt}, 'YYYY-MM')`;
 
     const rows = await this.db
       .select({
@@ -98,7 +98,7 @@ export class AiLogsService {
         and(
           eq(aiLogs.spaceId, spaceId),
           gte(aiLogs.createdAt, new Date(from)),
-          lte(aiLogs.createdAt, new Date(to + 'T23:59:59')),
+          lte(aiLogs.createdAt, new Date(`${to}T23:59:59`)),
         ),
       )
       .groupBy(sql`1`)
@@ -108,8 +108,8 @@ export class AiLogsService {
     const tokenMap = new Map(rows.map((r) => [r.bucket, Number(r.tokens ?? 0)]));
 
     const data: { date: string; count: number; tokens: number }[] = [];
-    const end = new Date(to + 'T12:00:00');
-    const cur = new Date(from + 'T12:00:00');
+    const end = new Date(`${to}T12:00:00`);
+    const cur = new Date(`${from}T12:00:00`);
     while (cur <= end) {
       const key =
         groupBy === 'day'
@@ -126,8 +126,8 @@ export class AiLogsService {
     const totalTokens = data.reduce((s, r) => s + r.tokens, 0);
 
     // Previous period
-    const span = new Date(to + 'T12:00:00').getTime() - new Date(from + 'T12:00:00').getTime();
-    const prevTo = new Date(new Date(from + 'T12:00:00').getTime() - 86400000);
+    const span = new Date(`${to}T12:00:00`).getTime() - new Date(`${from}T12:00:00`).getTime();
+    const prevTo = new Date(new Date(`${from}T12:00:00`).getTime() - 86400000);
     const prevFrom = new Date(prevTo.getTime() - span);
     const [prevResult] = await this.db
       .select({ cnt: count() })
@@ -141,6 +141,13 @@ export class AiLogsService {
       );
     const previousTotal = Number(prevResult?.cnt ?? 0);
 
-    return { total, previous_total: previousTotal, total_tokens: totalTokens, period_label: periodLabel, group_by: groupBy, data };
+    return {
+      total,
+      previous_total: previousTotal,
+      total_tokens: totalTokens,
+      period_label: periodLabel,
+      group_by: groupBy,
+      data,
+    };
   }
 }

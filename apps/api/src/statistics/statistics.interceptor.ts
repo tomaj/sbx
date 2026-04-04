@@ -1,8 +1,8 @@
 import {
-  CallHandler,
-  ExecutionContext,
+  type CallHandler,
+  type ExecutionContext,
   Injectable,
-  NestInterceptor,
+  type NestInterceptor,
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
@@ -33,7 +33,7 @@ export class StatisticsInterceptor implements NestInterceptor {
     if (!rawId) return next.handle();
 
     const spaceId = parseInt(rawId, 10);
-    if (isNaN(spaceId)) return next.handle();
+    if (Number.isNaN(spaceId)) return next.handle();
 
     const startedAt = Date.now();
     const method = req.method ?? 'GET';

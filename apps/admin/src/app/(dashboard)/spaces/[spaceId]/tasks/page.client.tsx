@@ -1,20 +1,19 @@
-'use client'
+'use client';
 
-import { useState, useEffect, use } from 'react'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
-import { Play, Settings2, Trash2, Plus, Loader2 } from 'lucide-react'
-import { formatDateTime } from '@/lib/date'
-import { DataTable, type Column, type SortState } from '@/components/ui/data-table'
-import { SearchBar } from '@/components/ui/search-bar'
-import { RightSidebar } from '@/components/ui/right-sidebar'
-import { ConfirmModal } from '@/components/ui/confirm-modal'
-import { SelectDropdown } from '@/components/ui/select-dropdown'
-import { PageLayout } from '@/components/ui/page-layout'
-import { useApi } from '@/lib/swr'
-import { useCrudSidebar } from '@/hooks/use-crud-sidebar'
-import type { Task } from '@sbx/types'
+import { useState, useEffect, use } from 'react';
+import { z } from 'zod';
+import { Play, Settings2, Trash2, Plus, Loader2 } from 'lucide-react';
+import { formatDateTime } from '@/lib/date';
+import { DataTable, type Column, type SortState } from '@/components/ui/data-table';
+import { SearchBar } from '@/components/ui/search-bar';
+import { CrudSidebarForm } from '@/components/ui/crud-sidebar-form';
+import { SelectDropdown } from '@/components/ui/select-dropdown';
+import { PageLayout } from '@/components/ui/page-layout';
+import { useApi } from '@/lib/swr';
+import { useCrudSidebar } from '@/hooks/use-crud-sidebar';
+import { useDelete } from '@/hooks/use-delete';
+import { useCrudForm } from '@/hooks/use-crud-form';
+import type { Task } from '@sbx/types';
 
 const taskSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -22,69 +21,69 @@ const taskSchema = z.object({
   webhook_url: z.string().optional(),
   user_dialog: z.string().superRefine((val, ctx) => {
     try {
-      JSON.parse(val)
+      JSON.parse(val);
     } catch {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Invalid JSON' })
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Invalid JSON' });
     }
   }),
-})
-type TaskFormValues = z.infer<typeof taskSchema>
+});
+type TaskFormValues = z.infer<typeof taskSchema>;
 
 // ─── Execute dialog ───────────────────────────────────────────────────────────
 
 interface ExecuteDialogProps {
-  open: boolean
-  task: Task | null
-  spaceId: string
-  onClose: () => void
-  onExecuted: (task: Task) => void
+  open: boolean;
+  task: Task | null;
+  spaceId: string;
+  onClose: () => void;
+  onExecuted: (task: Task) => void;
 }
 
 function ExecuteDialog({ open, task, spaceId, onClose, onExecuted }: ExecuteDialogProps) {
-  const [values, setValues] = useState<Record<string, string>>({})
-  const [running, setRunning] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [running, setRunning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const fields = task ? (Object.entries(task.user_dialog ?? {}) as [string, any][]) : []
-
-  useEffect(() => {
-    if (!open || !task) return
-    const initial: Record<string, string> = {}
-    for (const [key] of fields) initial[key] = ''
-    setValues(initial)
-    setError(null)
-    setRunning(false)
-  }, [open, task])
+  const fields = task ? (Object.entries(task.user_dialog ?? {}) as [string, any][]) : [];
 
   useEffect(() => {
-    if (!open) return
+    if (!open || !task) return;
+    const initial: Record<string, string> = {};
+    for (const [key] of fields) initial[key] = '';
+    setValues(initial);
+    setError(null);
+    setRunning(false);
+  }, [open, task, fields]);
+
+  useEffect(() => {
+    if (!open) return;
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') onClose();
     }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [open, onClose])
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
 
   async function handleExecute() {
-    if (!task) return
-    setRunning(true)
-    setError(null)
+    if (!task) return;
+    setRunning(true);
+    setError(null);
     try {
       const res = await fetch(`/api/admin/spaces/${spaceId}/tasks/${task.id}/execute`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dialog_values: values }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.message ?? 'Execution failed')
-      onExecuted(data.task)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message ?? 'Execution failed');
+      onExecuted(data.task);
     } catch (e: any) {
-      setError(e.message ?? 'Execution failed')
-      setRunning(false)
+      setError(e.message ?? 'Execution failed');
+      setRunning(false);
     }
   }
 
-  if (!open || !task) return null
+  if (!open || !task) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -114,7 +113,10 @@ function ExecuteDialog({ open, task, spaceId, onClose, onExecuted }: ExecuteDial
                 <SelectDropdown
                   value={values[key] ?? null}
                   onChange={(v) => setValues((prev) => ({ ...prev, [key]: v ?? '' }))}
-                  options={(def.options ?? []).map((opt: any) => ({ value: opt.value, label: opt.name }))}
+                  options={(def.options ?? []).map((opt: any) => ({
+                    value: opt.value,
+                    label: opt.name,
+                  }))}
                   placeholder="Select..."
                 />
               ) : (
@@ -148,128 +150,101 @@ function ExecuteDialog({ open, task, spaceId, onClose, onExecuted }: ExecuteDial
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function TasksPage({ params }: { params: Promise<{ spaceId: string }> }) {
-  const { spaceId } = use(params)
+  const { spaceId } = use(params);
 
-  const [search, setSearch] = useState('')
-  const [sort, setSort] = useState<SortState>({ field: 'name', direction: 'asc' })
+  const [search, setSearch] = useState('');
+  const [sort, setSort] = useState<SortState>({ field: 'name', direction: 'asc' });
 
-  const { data, isLoading, mutate } = useApi<{ tasks: Task[] }>(`/api/admin/spaces/${spaceId}/tasks`)
+  const { data, isLoading, mutate } = useApi<{ tasks: Task[] }>(
+    `/api/admin/spaces/${spaceId}/tasks`,
+  );
 
-  const allTasks = data?.tasks ?? []
+  const allTasks = data?.tasks ?? [];
 
-  // Client-side search + sort (tasks lists are small)
-  let tasks = allTasks
+  let tasks = allTasks;
   if (search) {
-    const q = search.toLowerCase()
+    const q = search.toLowerCase();
     tasks = tasks.filter(
-      (t) =>
-        t.name.toLowerCase().includes(q) ||
-        (t.description ?? '').toLowerCase().includes(q),
-    )
+      (t) => t.name.toLowerCase().includes(q) || (t.description ?? '').toLowerCase().includes(q),
+    );
   }
   tasks = [...tasks].sort((a, b) => {
-    const av = String(a[sort.field] ?? '')
-    const bv = String(b[sort.field] ?? '')
-    return sort.direction === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av)
-  })
-  const total = tasks.length
+    const av = String(a[sort.field] ?? '');
+    const bv = String(b[sort.field] ?? '');
+    return sort.direction === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+  });
+  const total = tasks.length;
 
-  // Sidebar (create / edit)
-  const { open: sidebarOpen, mode: sidebarMode, selected: selectedTask, openCreate: openCreateRaw, openEdit: openEditRaw, close: closeSidebarRaw } = useCrudSidebar<Task>()
+  const {
+    open: sidebarOpen,
+    mode: sidebarMode,
+    selected: selectedTask,
+    openCreate,
+    openEdit,
+    close: closeSidebar,
+  } = useCrudSidebar<Task>();
 
-  const { register, handleSubmit, reset, formState: { errors, isSubmitting }, setError } = useForm<TaskFormValues>({
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-expect-error — zod v4 minor version literal mismatch with @hookform/resolvers types
-    resolver: zodResolver(taskSchema),
+  // ─── Delete ─────────────────────────────────────────────────────────────
+  const taskDelete = useDelete<Task>({
+    getUrl: (t) => `/api/admin/spaces/${spaceId}/tasks/${t.id}`,
+    onSuccess: () => mutate(),
+    title: 'Delete task',
+    getMessage: (t) => `Are you sure you want to delete "${t.name}"? This action cannot be undone.`,
+  });
+
+  // ─── Form ────────────────────────────────────────────────────────────────
+  const { form, onSubmit } = useCrudForm<Task, TaskFormValues>({
+    schema: taskSchema,
     defaultValues: { name: '', description: '', webhook_url: '', user_dialog: '{}' },
-  })
-
-  useEffect(() => {
-    if (sidebarMode === 'edit' && selectedTask) {
-      reset({
-        name: selectedTask.name,
-        description: selectedTask.description ?? '',
-        webhook_url: selectedTask.webhook_url ?? '',
-        user_dialog: JSON.stringify(selectedTask.user_dialog ?? {}, null, 2),
-      })
-    } else {
-      reset({ name: '', description: '', webhook_url: '', user_dialog: '{}' })
-    }
-  }, [sidebarOpen, selectedTask, sidebarMode, reset])
-
-  // Execute dialog
-  const [executeOpen, setExecuteOpen] = useState(false)
-  const [executingTask, setExecutingTask] = useState<Task | null>(null)
-
-  // Delete confirm
-  const [deleteOpen, setDeleteOpen] = useState(false)
-  const [deletingTask, setDeletingTask] = useState<Task | null>(null)
-  const [deleting, setDeleting] = useState(false)
-
-  // ─── Sidebar helpers ─────────────────────────────────────────────────────
-
-  function openCreate() {
-    openCreateRaw()
-  }
-
-  function openEdit(task: Task) {
-    openEditRaw(task)
-  }
-
-  function closeSidebar() {
-    closeSidebarRaw()
-  }
-
-  async function onSubmit(values: TaskFormValues) {
-    const url =
-      sidebarMode === 'create'
-        ? `/api/admin/spaces/${spaceId}/tasks`
-        : `/api/admin/spaces/${spaceId}/tasks/${selectedTask!.id}`
-    const res = await fetch(url, {
-      method: sidebarMode === 'create' ? 'POST' : 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: values.name.trim(),
-        description: values.description?.trim() || null,
-        task_type: 'webhook',
-        webhook_url: values.webhook_url?.trim() || null,
-        user_dialog: JSON.parse(values.user_dialog),
-      }),
-    })
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}))
-      setError('root', { message: err?.message ?? 'Failed to save' })
-      return
-    }
-    closeSidebar()
-    mutate()
-  }
-
-  // ─── Delete ──────────────────────────────────────────────────────────────
-
-  async function handleDelete() {
-    if (!deletingTask) return
-    setDeleting(true)
-    try {
-      await fetch(`/api/admin/spaces/${spaceId}/tasks/${deletingTask.id}`, { method: 'DELETE' })
-      setDeleteOpen(false)
-      mutate()
-    } finally {
-      setDeleting(false)
-    }
-  }
+    mode: sidebarMode,
+    item: selectedTask,
+    open: sidebarOpen,
+    getInitialValues: (t) => ({
+      name: t.name,
+      description: t.description ?? '',
+      webhook_url: t.webhook_url ?? '',
+      user_dialog: JSON.stringify(t.user_dialog ?? {}, null, 2),
+    }),
+    onSuccess: () => {
+      closeSidebar();
+      mutate();
+    },
+    buildRequest: (values, mode, item) => {
+      const url =
+        mode === 'create'
+          ? `/api/admin/spaces/${spaceId}/tasks`
+          : `/api/admin/spaces/${spaceId}/tasks/${item!.id}`;
+      return fetch(url, {
+        method: mode === 'create' ? 'POST' : 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: values.name.trim(),
+          description: values.description?.trim() || null,
+          task_type: 'webhook',
+          webhook_url: values.webhook_url?.trim() || null,
+          user_dialog: JSON.parse(values.user_dialog),
+        }),
+      });
+    },
+  });
+  const {
+    register,
+    formState: { errors, isSubmitting },
+  } = form;
 
   // ─── Execute ─────────────────────────────────────────────────────────────
+  const [executeOpen, setExecuteOpen] = useState(false);
+  const [executingTask, setExecutingTask] = useState<Task | null>(null);
 
-  function handleExecuted(task: Task) {
-    mutate()
-    setExecuteOpen(false)
+  function handleExecuted() {
+    mutate();
+    setExecuteOpen(false);
   }
 
   // ─── Columns ─────────────────────────────────────────────────────────────
@@ -281,8 +256,18 @@ export default function TasksPage({ params }: { params: Promise<{ spaceId: strin
       sortable: true,
       render: (row) => (
         <div className="flex items-center gap-3">
-          <svg className="w-4 h-4 text-gray-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
+          <svg
+            className="w-4 h-4 text-gray-400 flex-shrink-0"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"
+            />
           </svg>
           <div>
             <p className="font-medium text-gray-900 dark:text-gray-100">{row.name}</p>
@@ -323,7 +308,10 @@ export default function TasksPage({ params }: { params: Promise<{ spaceId: strin
           <button
             title="Execute task"
             disabled={!!row.running}
-            onClick={() => { setExecutingTask(row); setExecuteOpen(true) }}
+            onClick={() => {
+              setExecutingTask(row);
+              setExecuteOpen(true);
+            }}
             className="p-1.5 text-gray-400 hover:text-teal-600 disabled:opacity-30 transition-colors rounded"
           >
             <Play className="w-4 h-4" />
@@ -337,7 +325,7 @@ export default function TasksPage({ params }: { params: Promise<{ spaceId: strin
           </button>
           <button
             title="Delete task"
-            onClick={() => { setDeletingTask(row); setDeleteOpen(true) }}
+            onClick={() => taskDelete.confirm(row)}
             className="p-1.5 text-gray-400 hover:text-red-500 transition-colors rounded"
           >
             <Trash2 className="w-4 h-4" />
@@ -345,7 +333,7 @@ export default function TasksPage({ params }: { params: Promise<{ spaceId: strin
         </div>
       ),
     },
-  ]
+  ];
 
   return (
     <PageLayout
@@ -361,12 +349,10 @@ export default function TasksPage({ params }: { params: Promise<{ spaceId: strin
         </button>
       }
     >
-      {/* Search */}
       <div className="mb-6">
         <SearchBar value={search} onChange={setSearch} placeholder="Search tasks…" />
       </div>
 
-      {/* Table — add group/row class so hover actions work */}
       <div className="[&_tbody_tr]:group/row">
         <DataTable
           columns={COLUMNS}
@@ -381,123 +367,98 @@ export default function TasksPage({ params }: { params: Promise<{ spaceId: strin
       </div>
 
       {!isLoading && total > 0 && (
-        <p className="mt-3 text-xs text-gray-400">{total} task{total !== 1 ? 's' : ''} total</p>
+        <p className="mt-3 text-xs text-gray-400">
+          {total} task{total !== 1 ? 's' : ''} total
+        </p>
       )}
 
-      {/* Create / Edit sidebar */}
-      <RightSidebar
+      <CrudSidebarForm
         open={sidebarOpen}
         onClose={closeSidebar}
+        title={sidebarMode === 'create' ? 'New Task' : 'Edit Task'}
+        isSubmitting={isSubmitting}
+        isDirty={form.formState.isDirty}
+        onSubmit={onSubmit}
         width="w-[480px]"
-        header={
-          <span className="font-semibold text-gray-900 dark:text-gray-100">
-            {sidebarMode === 'create' ? 'New Task' : 'Edit Task'}
-          </span>
-        }
-        footer={
-          <div className="flex items-center gap-3 w-full justify-end">
-            <button
-              type="button"
-              onClick={closeSidebar}
-              className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              form="task-form"
-              disabled={isSubmitting}
-              className="px-4 py-2 text-sm font-medium bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white rounded-lg transition-colors"
-            >
-              {isSubmitting ? 'Saving…' : 'Save'}
-            </button>
-          </div>
-        }
       >
-        <form id="task-form" onSubmit={handleSubmit(onSubmit)}>
-          <div className="space-y-5">
-            {/* Name */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                Name <span className="text-red-500">*</span>
-              </label>
-              <input
-                autoFocus
-                type="text"
-                {...register('name')}
-                placeholder="e.g. Sync job"
-                className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500"
-              />
-              {errors.name && <p className="mt-1 text-xs text-red-500">{errors.name.message}</p>}
-            </div>
-
-            {/* Description */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                Description
-              </label>
-              <textarea
-                {...register('description')}
-                placeholder="e.g. Trigger a sync of all published content"
-                rows={3}
-                className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
-              />
-            </div>
-
-            {/* Task type */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Task type
-              </label>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded-full bg-teal-600 flex items-center justify-center">
-                  <div className="w-2 h-2 rounded-full bg-white" />
-                </div>
-                <span className="text-sm text-gray-700 dark:text-gray-300">Webhook</span>
-              </div>
-            </div>
-
-            {/* Webhook URL */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                Webhook
-              </label>
-              <input
-                type="url"
-                {...register('webhook_url')}
-                placeholder="https://mydomain.com/my-post-endpoint"
-                className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500"
-              />
-              <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-                Provide the endpoint where you want to send a POST request. The payload contains
-                the task and space id. E.g.: {`{"task": {"id": 1, "name": "Sync job"}, "space_id": 12345}`}
-              </p>
-            </div>
-
-            {/* User dialog */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                User dialog
-              </label>
-              <textarea
-                {...register('user_dialog')}
-                rows={8}
-                className={`w-full px-3 py-2 border rounded-lg text-xs font-mono bg-white dark:bg-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none ${
-                  errors.user_dialog ? 'border-red-400' : 'border-gray-200 dark:border-gray-700'
-                }`}
-              />
-              {errors.user_dialog && <p className="mt-1 text-xs text-red-500">{errors.user_dialog.message}</p>}
-              <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-                User dialog is a dialog which pops up when the user wants to execute the task.
-              </p>
-            </div>
-
-            {errors.root && <p className="text-sm text-red-500">{errors.root.message}</p>}
+        <div className="space-y-5">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+              Name <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              {...register('name')}
+              placeholder="e.g. Sync job"
+              className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500"
+            />
+            {errors.name && <p className="mt-1 text-xs text-red-500">{errors.name.message}</p>}
           </div>
-        </form>
-      </RightSidebar>
 
-      {/* Execute dialog */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+              Description
+            </label>
+            <textarea
+              {...register('description')}
+              placeholder="e.g. Trigger a sync of all published content"
+              rows={3}
+              className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Task type
+            </label>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded-full bg-teal-600 flex items-center justify-center">
+                <div className="w-2 h-2 rounded-full bg-white" />
+              </div>
+              <span className="text-sm text-gray-700 dark:text-gray-300">Webhook</span>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+              Webhook
+            </label>
+            <input
+              type="url"
+              {...register('webhook_url')}
+              placeholder="https://mydomain.com/my-post-endpoint"
+              className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500"
+            />
+            <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+              Provide the endpoint where you want to send a POST request. The payload contains the
+              task and space id. E.g.:{' '}
+              {`{"task": {"id": 1, "name": "Sync job"}, "space_id": 12345}`}
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+              User dialog
+            </label>
+            <textarea
+              {...register('user_dialog')}
+              rows={8}
+              className={`w-full px-3 py-2 border rounded-lg text-xs font-mono bg-white dark:bg-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none ${
+                errors.user_dialog ? 'border-red-400' : 'border-gray-200 dark:border-gray-700'
+              }`}
+            />
+            {errors.user_dialog && (
+              <p className="mt-1 text-xs text-red-500">{errors.user_dialog.message}</p>
+            )}
+            <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+              User dialog is a dialog which pops up when the user wants to execute the task.
+            </p>
+          </div>
+
+          {errors.root && <p className="text-sm text-red-500">{errors.root.message}</p>}
+        </div>
+      </CrudSidebarForm>
+
       <ExecuteDialog
         open={executeOpen}
         task={executingTask}
@@ -506,16 +467,7 @@ export default function TasksPage({ params }: { params: Promise<{ spaceId: strin
         onExecuted={handleExecuted}
       />
 
-      {/* Delete confirm */}
-      <ConfirmModal
-        open={deleteOpen}
-        title="Delete task"
-        message={`Are you sure you want to delete "${deletingTask?.name}"? This action cannot be undone.`}
-        confirmLabel="Delete"
-        dangerous
-        onConfirm={handleDelete}
-        onCancel={() => setDeleteOpen(false)}
-      />
+      {taskDelete.modal}
     </PageLayout>
-  )
+  );
 }

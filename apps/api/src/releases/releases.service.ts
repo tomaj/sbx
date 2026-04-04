@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, desc, eq, sql } from 'drizzle-orm';
 import { DB } from '../db/db.module';
-import type { DbType } from '../db/db.module';
+import { DbType } from '../db/db.module';
 import { releases, storyReleases, stories } from '../db/schema';
 
 @Injectable()
@@ -24,17 +24,21 @@ export class ReleasesService {
   }
 
   async findOne(spaceId: number, id: number) {
-    const [row] = await this.db
-      .select()
-      .from(releases)
-      .where(eq(releases.id, id))
-      .limit(1);
+    const [row] = await this.db.select().from(releases).where(eq(releases.id, id)).limit(1);
 
     if (!row || row.spaceId !== spaceId) return null;
     return { release: this.format(row) };
   }
 
-  async create(spaceId: number, data: { name: string; release_at?: string | null; timezone?: string; branches_to_deploy?: number[] }) {
+  async create(
+    spaceId: number,
+    data: {
+      name: string;
+      release_at?: string | null;
+      timezone?: string;
+      branches_to_deploy?: number[];
+    },
+  ) {
     const id = Number(Date.now()) * 1000 + Math.floor(Math.random() * 1000);
     const uuid = crypto.randomUUID();
 
@@ -57,7 +61,13 @@ export class ReleasesService {
   async update(
     spaceId: number,
     id: number,
-    data: { name?: string; release_at?: string | null; timezone?: string; branches_to_deploy?: number[]; do_release?: boolean },
+    data: {
+      name?: string;
+      release_at?: string | null;
+      timezone?: string;
+      branches_to_deploy?: number[];
+      do_release?: boolean;
+    },
   ) {
     if (data.do_release) {
       return this.publishRelease(spaceId, id);
@@ -67,7 +77,9 @@ export class ReleasesService {
       .update(releases)
       .set({
         ...(data.name !== undefined && { name: data.name }),
-        ...(data.release_at !== undefined && { releaseAt: data.release_at ? new Date(data.release_at) : null }),
+        ...(data.release_at !== undefined && {
+          releaseAt: data.release_at ? new Date(data.release_at) : null,
+        }),
         ...(data.timezone !== undefined && { timezone: data.timezone }),
         ...(data.branches_to_deploy !== undefined && { branchesToDeploy: data.branches_to_deploy }),
         updatedAt: new Date(),
@@ -89,7 +101,7 @@ export class ReleasesService {
     return { release: this.format(deleted) };
   }
 
-  async conflictCheck(spaceId: number, releaseId: number) {
+  async conflictCheck(_spaceId: number, releaseId: number) {
     // A conflict exists when a story in this release is also in another release
     const rows = await this.db
       .select({ storyId: storyReleases.storyId, releaseIds: stories.releaseIds })
@@ -125,9 +137,13 @@ export class ReleasesService {
       for (const snapshot of snapshots) {
         const storyIdBig = BigInt(snapshot.storyId);
         const d = snapshot.content as {
-          name?: string; slug?: string; full_slug?: string;
-          content?: Record<string, any>; tag_list?: any;
-          path?: string | null; is_startpage?: boolean;
+          name?: string;
+          slug?: string;
+          full_slug?: string;
+          content?: Record<string, any>;
+          tag_list?: any;
+          path?: string | null;
+          is_startpage?: boolean;
         };
 
         const [current] = await tx
@@ -138,7 +154,9 @@ export class ReleasesService {
 
         if (!current) continue;
 
-        const updatedReleaseIds = ((current.releaseIds as number[]) ?? []).filter((id) => id !== releaseId);
+        const updatedReleaseIds = ((current.releaseIds as number[]) ?? []).filter(
+          (id) => id !== releaseId,
+        );
 
         await tx
           .update(stories)

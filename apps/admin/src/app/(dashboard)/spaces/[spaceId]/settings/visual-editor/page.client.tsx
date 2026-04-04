@@ -1,84 +1,78 @@
-'use client'
+'use client';
 
-import { useState, useEffect, use } from 'react'
-import { Check, Trash2, Plus, Minus } from 'lucide-react'
-import { useUnsavedChanges } from '@/hooks/use-unsaved-changes'
-import { UnsavedChangesModal } from '@/components/ui/unsaved-changes-modal'
+import { useState, useEffect, use } from 'react';
+import { Check, Trash2, Plus, Minus } from 'lucide-react';
+import { useUnsavedChanges } from '@/hooks/use-unsaved-changes';
+import { UnsavedChangesModal } from '@/components/ui/unsaved-changes-modal';
+import { SettingsSection } from '@/components/ui/settings-section';
+import { FormField, inputCls } from '@/components/ui/form-field';
+import { useApi } from '@/lib/swr';
 
 interface PreviewUrl {
-  name: string
-  location: string
+  name: string;
+  location: string;
 }
 
 interface VisualEditorSettings {
-  domain: string
-  previewUrls: PreviewUrl[]
-  encodeUrl: boolean
-  mobileWidth: number
-  visualEditorDisabled: boolean
+  domain: string;
+  previewUrls: PreviewUrl[];
+  encodeUrl: boolean;
+  mobileWidth: number;
+  visualEditorDisabled: boolean;
 }
 
-function SettingsSection({ title, description, children }: {
-  title: string
-  description?: string
-  children: React.ReactNode
-}) {
-  return (
-    <div className="border-b border-gray-200 dark:border-gray-700 pb-8 mb-8">
-      <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1">{title}</h2>
-      {description && (
-        <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">{description}</p>
-      )}
-      {!description && <div className="mb-5" />}
-      {children}
-    </div>
-  )
-}
+const DEFAULT_SETTINGS: VisualEditorSettings = {
+  domain: '',
+  previewUrls: [],
+  encodeUrl: false,
+  mobileWidth: 360,
+  visualEditorDisabled: false,
+};
 
 export default function VisualEditorPage({ params }: { params: Promise<{ spaceId: string }> }) {
-  const { spaceId } = use(params)
+  const { spaceId } = use(params);
 
-  const [settings, setSettings] = useState<VisualEditorSettings>({
-    domain: '',
-    previewUrls: [],
-    encodeUrl: false,
-    mobileWidth: 360,
-    visualEditorDisabled: false,
-  })
+  const { data: spaceData, mutate: mutateSpace } = useApi<any>(
+    `/api/admin/spaces/${spaceId}/space`,
+  );
 
-  const [newPreview, setNewPreview] = useState({ name: '', location: '' })
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [isDirty, setIsDirty] = useState(false)
-  const { showModal: showUnsavedModal, handleConfirm: confirmUnsaved, handleCancel: cancelUnsaved } = useUnsavedChanges(isDirty)
-
-  function updateSettings(updater: (s: VisualEditorSettings) => VisualEditorSettings) {
-    setSettings(updater)
-    setIsDirty(true)
-  }
+  const [settings, setSettings] = useState<VisualEditorSettings>(DEFAULT_SETTINGS);
+  const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
-    fetch(`/api/admin/spaces/${spaceId}/space`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.space) {
-          const s = data.space
-          setSettings({
-            domain: s.domain ?? '',
-            previewUrls: s.preview_urls ?? [],
-            encodeUrl: s.encode_url ?? false,
-            mobileWidth: s.mobile_width ?? 360,
-            visualEditorDisabled: s.visual_editor_disabled ?? false,
-          })
-        }
-      })
-  }, [spaceId])
+    if (spaceData?.space && !initialized) {
+      const s = spaceData.space;
+      setSettings({
+        domain: s.domain ?? '',
+        previewUrls: s.preview_urls ?? [],
+        encodeUrl: s.encode_url ?? false,
+        mobileWidth: s.mobile_width ?? 360,
+        visualEditorDisabled: s.visual_editor_disabled ?? false,
+      });
+      setInitialized(true);
+    }
+  }, [spaceData, initialized]);
+
+  const [newPreview, setNewPreview] = useState({ name: '', location: '' });
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isDirty, setIsDirty] = useState(false);
+  const {
+    showModal: showUnsavedModal,
+    handleConfirm: confirmUnsaved,
+    handleCancel: cancelUnsaved,
+  } = useUnsavedChanges(isDirty);
+
+  function updateSettings(updater: (s: VisualEditorSettings) => VisualEditorSettings) {
+    setSettings(updater);
+    setIsDirty(true);
+  }
 
   async function handleSave() {
-    setSaving(true)
-    setError(null)
-    setSaved(false)
+    setSaving(true);
+    setError(null);
+    setSaved(false);
     try {
       const res = await fetch(`/api/admin/spaces/${spaceId}/space`, {
         method: 'PATCH',
@@ -90,47 +84,54 @@ export default function VisualEditorPage({ params }: { params: Promise<{ spaceId
           mobile_width: settings.mobileWidth,
           visual_editor_disabled: settings.visualEditorDisabled,
         }),
-      })
+      });
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data.message ?? 'Failed to save')
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message ?? 'Failed to save');
       }
-      const data = await res.json()
+      const data = await res.json();
       if (data.space) {
-        const s = data.space
+        const s = data.space;
         setSettings({
           domain: s.domain ?? '',
           previewUrls: s.preview_urls ?? [],
           encodeUrl: s.encode_url ?? false,
           mobileWidth: s.mobile_width ?? 360,
           visualEditorDisabled: s.visual_editor_disabled ?? false,
-        })
+        });
       }
-      setIsDirty(false)
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2000)
+      await mutateSpace();
+      setIsDirty(false);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
     } catch (e: any) {
-      setError(e.message)
+      setError(e.message);
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
   }
 
   function addPreviewUrl() {
-    if (!newPreview.name.trim() || !newPreview.location.trim()) return
-    updateSettings((s) => ({ ...s, previewUrls: [...s.previewUrls, { name: newPreview.name.trim(), location: newPreview.location.trim() }] }))
-    setNewPreview({ name: '', location: '' })
+    if (!newPreview.name.trim() || !newPreview.location.trim()) return;
+    updateSettings((s) => ({
+      ...s,
+      previewUrls: [
+        ...s.previewUrls,
+        { name: newPreview.name.trim(), location: newPreview.location.trim() },
+      ],
+    }));
+    setNewPreview({ name: '', location: '' });
   }
 
   function removePreviewUrl(index: number) {
-    updateSettings((s) => ({ ...s, previewUrls: s.previewUrls.filter((_, i) => i !== index) }))
+    updateSettings((s) => ({ ...s, previewUrls: s.previewUrls.filter((_, i) => i !== index) }));
   }
 
   function updatePreviewUrl(index: number, field: 'name' | 'location', value: string) {
     updateSettings((s) => ({
       ...s,
-      previewUrls: s.previewUrls.map((p, i) => i === index ? { ...p, [field]: value } : p),
-    }))
+      previewUrls: s.previewUrls.map((p, i) => (i === index ? { ...p, [field]: value } : p)),
+    }));
   }
 
   return (
@@ -148,27 +149,23 @@ export default function VisualEditorPage({ params }: { params: Promise<{ spaceId
         </button>
       </div>
 
-      {error && (
-        <p className="mb-5 text-sm text-red-600 dark:text-red-400">{error}</p>
-      )}
+      {error && <p className="mb-5 text-sm text-red-600 dark:text-red-400">{error}</p>}
 
       {/* Location */}
       <SettingsSection title="">
-        <div>
-          <label className="block text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">
-            Location (default environment) <span className="text-red-500">*</span>
-          </label>
+        <FormField
+          label="Location (default environment)"
+          required
+          description="This is the page that the frontend editor opens. Insert your domain/location including the protocol. Example: http://www.example.com"
+        >
           <input
             type="url"
             value={settings.domain}
             onChange={(e) => updateSettings((s) => ({ ...s, domain: e.target.value }))}
             placeholder="https://example.com"
-            className="w-full px-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-teal-500"
+            className={inputCls}
           />
-          <p className="mt-2 text-xs text-gray-400">
-            This is the page that the frontend editor opens. Insert your domain/location including the protocol. Example: http://www.example.com
-          </p>
-        </div>
+        </FormField>
       </SettingsSection>
 
       {/* Preview URLs */}
@@ -178,9 +175,12 @@ export default function VisualEditorPage({ params }: { params: Promise<{ spaceId
       >
         {/* Encode URL */}
         <div className="mb-5">
-          <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">Encode Preview URLs</p>
+          <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">
+            Encode Preview URLs
+          </p>
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-            With this configuration, the URL sent to the iframe will be encoded, meaning that attributes such as [ and ] will be changed to %5B and %5D.
+            With this configuration, the URL sent to the iframe will be encoded, meaning that
+            attributes such as [ and ] will be changed to %5B and %5D.
           </p>
           <label className="flex items-center gap-2 cursor-pointer">
             <input
@@ -250,10 +250,14 @@ export default function VisualEditorPage({ params }: { params: Promise<{ spaceId
         description="Change default mobile and tablet responsive size of your Visual Editor"
       >
         <div>
-          <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">Mobile width in px</p>
+          <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">
+            Mobile width in px
+          </p>
           <div className="flex items-center gap-0 w-40">
             <button
-              onClick={() => updateSettings((s) => ({ ...s, mobileWidth: Math.max(240, s.mobileWidth - 10) }))}
+              onClick={() =>
+                updateSettings((s) => ({ ...s, mobileWidth: Math.max(240, s.mobileWidth - 10) }))
+              }
               className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-l-lg text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
             >
               <Minus className="w-4 h-4" />
@@ -261,11 +265,18 @@ export default function VisualEditorPage({ params }: { params: Promise<{ spaceId
             <input
               type="number"
               value={settings.mobileWidth}
-              onChange={(e) => updateSettings((s) => ({ ...s, mobileWidth: Math.max(240, parseInt(e.target.value) || 360) }))}
+              onChange={(e) =>
+                updateSettings((s) => ({
+                  ...s,
+                  mobileWidth: Math.max(240, parseInt(e.target.value, 10) || 360),
+                }))
+              }
               className="flex-1 px-3 py-2 border-y border-gray-300 dark:border-gray-600 text-sm text-center text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-teal-500 w-16"
             />
             <button
-              onClick={() => updateSettings((s) => ({ ...s, mobileWidth: Math.min(1920, s.mobileWidth + 10) }))}
+              onClick={() =>
+                updateSettings((s) => ({ ...s, mobileWidth: Math.min(1920, s.mobileWidth + 10) }))
+              }
               className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-r-lg text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
             >
               <Plus className="w-4 h-4" />
@@ -276,7 +287,9 @@ export default function VisualEditorPage({ params }: { params: Promise<{ spaceId
 
       {/* Visual Editor Mode */}
       <div className="pb-8">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1">Visual Editor Mode</h2>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1">
+          Visual Editor Mode
+        </h2>
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
           Disable Visual Editor for this project and users will only be able to use form-only mode
         </p>
@@ -284,14 +297,20 @@ export default function VisualEditorPage({ params }: { params: Promise<{ spaceId
           <input
             type="checkbox"
             checked={settings.visualEditorDisabled}
-            onChange={(e) => updateSettings((s) => ({ ...s, visualEditorDisabled: e.target.checked }))}
+            onChange={(e) =>
+              updateSettings((s) => ({ ...s, visualEditorDisabled: e.target.checked }))
+            }
             className="w-4 h-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500 cursor-pointer"
           />
           <span className="text-sm text-gray-700 dark:text-gray-300">Disable Visual Editor</span>
         </label>
       </div>
 
-      <UnsavedChangesModal open={showUnsavedModal} onConfirm={confirmUnsaved} onCancel={cancelUnsaved} />
+      <UnsavedChangesModal
+        open={showUnsavedModal}
+        onConfirm={confirmUnsaved}
+        onCancel={cancelUnsaved}
+      />
     </div>
-  )
+  );
 }

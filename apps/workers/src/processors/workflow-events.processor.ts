@@ -2,11 +2,11 @@ import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Inject, Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { and, eq } from 'drizzle-orm';
-import { WORKFLOW_EVENTS_QUEUE, JobsClient } from '@sbx/jobs';
-import type { WorkflowEventJobData } from '@sbx/jobs';
+import { WORKFLOW_EVENTS_QUEUE, type JobsClient } from '@sbx/jobs';
+import { WorkflowEventJobData } from '@sbx/jobs';
 import { DB } from '../db/db.module.js';
-import type { DbType } from '../db/db.module.js';
-import { users, stories, workflowStages, approvals } from '../db/schema.js';
+import { DbType } from '../db/db.module.js';
+import { users, stories, workflowStages } from '../db/schema.js';
 import { JOBS_CLIENT } from '../jobs.provider.js';
 
 @Processor(WORKFLOW_EVENTS_QUEUE, { concurrency: 5 })
@@ -39,7 +39,9 @@ export class WorkflowEventsProcessor extends WorkerHost {
     }
   }
 
-  private async handleStageChanged(data: Extract<WorkflowEventJobData, { event: 'stage-changed' }>) {
+  private async handleStageChanged(
+    data: Extract<WorkflowEventJobData, { event: 'stage-changed' }>,
+  ) {
     const { storyId, spaceId, toStageId, actorId } = data;
 
     const [stage] = await this.db
@@ -58,24 +60,18 @@ export class WorkflowEventsProcessor extends WorkerHost {
 
     if (!story) return;
 
-    const [actor] = await this.db
-      .select()
-      .from(users)
-      .where(eq(users.id, actorId))
-      .limit(1);
+    const [actor] = await this.db.select().from(users).where(eq(users.id, actorId)).limit(1);
 
-    const actorName = actor ? `${actor.firstname} ${actor.lastname}`.trim() || actor.email : 'System';
+    const actorName = actor
+      ? `${actor.firstname} ${actor.lastname}`.trim() || actor.email
+      : 'System';
 
     // Notify users assigned to this stage
     const stageUserIds = stage.userIds as number[];
     for (const userId of stageUserIds) {
       if (userId === actorId) continue; // don't notify the actor
 
-      const [user] = await this.db
-        .select()
-        .from(users)
-        .where(eq(users.id, userId))
-        .limit(1);
+      const [user] = await this.db.select().from(users).where(eq(users.id, userId)).limit(1);
 
       if (user) {
         await this.jobs.emails.send({
@@ -92,12 +88,16 @@ export class WorkflowEventsProcessor extends WorkerHost {
     this.logger.log(`Workflow event stage-changed: story=${storyId} → stage=${stage.name}`);
   }
 
-  private async handleStoryPublished(data: Extract<WorkflowEventJobData, { event: 'story-published' }>) {
+  private async handleStoryPublished(
+    data: Extract<WorkflowEventJobData, { event: 'story-published' }>,
+  ) {
     // Future: trigger post-publish webhooks, CDN purge, etc.
     this.logger.log(`Workflow event story-published: story=${data.storyId}`);
   }
 
-  private async handleApprovalRequested(data: Extract<WorkflowEventJobData, { event: 'approval-requested' }>) {
+  private async handleApprovalRequested(
+    data: Extract<WorkflowEventJobData, { event: 'approval-requested' }>,
+  ) {
     const { storyId, spaceId, approverId, requesterId } = data;
 
     const [story] = await this.db
@@ -106,11 +106,7 @@ export class WorkflowEventsProcessor extends WorkerHost {
       .where(and(eq(stories.id, BigInt(storyId)), eq(stories.spaceId, spaceId)))
       .limit(1);
 
-    const [approver] = await this.db
-      .select()
-      .from(users)
-      .where(eq(users.id, approverId))
-      .limit(1);
+    const [approver] = await this.db.select().from(users).where(eq(users.id, approverId)).limit(1);
 
     const [requester] = await this.db
       .select()
@@ -119,7 +115,8 @@ export class WorkflowEventsProcessor extends WorkerHost {
       .limit(1);
 
     if (approver && story && requester) {
-      const requesterName = `${requester.firstname} ${requester.lastname}`.trim() || requester.email;
+      const requesterName =
+        `${requester.firstname} ${requester.lastname}`.trim() || requester.email;
 
       await this.jobs.emails.send({
         type: 'approval-request',
@@ -133,7 +130,9 @@ export class WorkflowEventsProcessor extends WorkerHost {
     this.logger.log(`Workflow event approval-requested: story=${storyId} approver=${approverId}`);
   }
 
-  private async handleApprovalResolved(data: Extract<WorkflowEventJobData, { event: 'approval-resolved' }>) {
+  private async handleApprovalResolved(
+    data: Extract<WorkflowEventJobData, { event: 'approval-resolved' }>,
+  ) {
     const { storyId, spaceId, approverId, requesterId, status } = data;
 
     const [story] = await this.db
@@ -142,11 +141,7 @@ export class WorkflowEventsProcessor extends WorkerHost {
       .where(and(eq(stories.id, BigInt(storyId)), eq(stories.spaceId, spaceId)))
       .limit(1);
 
-    const [approver] = await this.db
-      .select()
-      .from(users)
-      .where(eq(users.id, approverId))
-      .limit(1);
+    const [approver] = await this.db.select().from(users).where(eq(users.id, approverId)).limit(1);
 
     const [requester] = await this.db
       .select()

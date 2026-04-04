@@ -3,7 +3,7 @@ import { Cron } from '@nestjs/schedule';
 import { and, eq, isNull, isNotNull, lte } from 'drizzle-orm';
 import { JobsClient } from '@sbx/jobs';
 import { DB } from '../db/db.module.js';
-import type { DbType } from '../db/db.module.js';
+import { DbType } from '../db/db.module.js';
 import { stories, releases } from '../db/schema.js';
 import { JOBS_CLIENT } from '../jobs.provider.js';
 

@@ -173,7 +173,11 @@ describe('parseOperations — filters', () => {
   it('parses round_corner without ellipsis', () => {
     const ops = parseOperations('0x0/filters:round_corner(20,255,255,255,0)');
     expect(ops.roundCorner).toEqual({
-      radius: 20, r: 255, g: 255, b: 255, transparent: false,
+      radius: 20,
+      r: 255,
+      g: 255,
+      b: 255,
+      transparent: false,
     });
   });
 

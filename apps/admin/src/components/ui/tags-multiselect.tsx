@@ -1,17 +1,18 @@
-'use client'
+'use client';
 
-import { useState, useRef, useEffect, useMemo } from 'react'
-import { ChevronDown, X, Plus } from 'lucide-react'
-import { cn } from '@/lib/utils'
-import type { Tag } from '@sbx/types'
+import { useState, useRef, useEffect, useMemo } from 'react';
+import { useApi } from '@/lib/swr';
+import { ChevronDown, X, Plus } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import type { Tag } from '@sbx/types';
 
 interface TagsMultiselectProps {
-  spaceId: string
-  objectType?: 'component' | 'asset'
-  value: Tag[]
-  onChange: (value: Tag[]) => void
-  placeholder?: string
-  className?: string
+  spaceId: string;
+  objectType?: 'component' | 'asset';
+  value: Tag[];
+  onChange: (value: Tag[]) => void;
+  placeholder?: string;
+  className?: string;
 }
 
 export function TagsMultiselect({
@@ -22,90 +23,89 @@ export function TagsMultiselect({
   placeholder = 'Choose existing or add new',
   className,
 }: TagsMultiselectProps) {
-  const [open, setOpen] = useState(false)
-  const [input, setInput] = useState('')
-  const [tags, setTags] = useState<Tag[]>([])
-  const [creating, setCreating] = useState(false)
-  const containerRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const [open, setOpen] = useState(false);
+  const [input, setInput] = useState('');
+  const [creating, setCreating] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const { data: tagsData, mutate: mutateTags } = useApi<{ internal_tags: Tag[] }>(
+    `/api/admin/spaces/${spaceId}/internal_tags?by_object_type=${objectType}`,
+  );
+  const tags = tagsData?.internal_tags ?? [];
 
   useEffect(() => {
-    fetch(`/api/admin/spaces/${spaceId}/internal_tags?by_object_type=${objectType}`)
-      .then((r) => r.json())
-      .then((data) => setTags(data.internal_tags ?? []))
-      .catch(() => {})
-  }, [spaceId, objectType])
-
-  useEffect(() => {
-    if (!open) return
-    setTimeout(() => inputRef.current?.focus(), 0)
+    if (!open) return;
+    setTimeout(() => inputRef.current?.focus(), 0);
     function handleClickOutside(e: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false)
-        setInput('')
+        setOpen(false);
+        setInput('');
       }
     }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [open])
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [open]);
 
   const filtered = useMemo(() => {
-    const q = input.trim().toLowerCase()
-    return q ? tags.filter((t) => t.name.toLowerCase().includes(q)) : tags
-  }, [tags, input])
+    const q = input.trim().toLowerCase();
+    return q ? tags.filter((t) => t.name.toLowerCase().includes(q)) : tags;
+  }, [tags, input]);
 
-  const selectedIds = new Set(value.map((t) => t.id))
-  const canCreate = input.trim().length > 0 && !tags.some((t) => t.name.toLowerCase() === input.trim().toLowerCase())
+  const selectedIds = new Set(value.map((t) => t.id));
+  const canCreate =
+    input.trim().length > 0 &&
+    !tags.some((t) => t.name.toLowerCase() === input.trim().toLowerCase());
 
   function toggle(tag: Tag) {
     if (selectedIds.has(tag.id)) {
-      onChange(value.filter((t) => t.id !== tag.id))
+      onChange(value.filter((t) => t.id !== tag.id));
     } else {
-      onChange([...value, tag])
+      onChange([...value, tag]);
     }
   }
 
   function removeTag(id: number, e: React.MouseEvent) {
-    e.stopPropagation()
-    onChange(value.filter((t) => t.id !== id))
+    e.stopPropagation();
+    onChange(value.filter((t) => t.id !== id));
   }
 
   async function createAndAdd() {
-    const name = input.trim()
-    if (!name || creating) return
-    setCreating(true)
+    const name = input.trim();
+    if (!name || creating) return;
+    setCreating(true);
     try {
       const res = await fetch(`/api/admin/spaces/${spaceId}/internal_tags`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, object_type: objectType }),
-      })
-      const data = await res.json()
-      const newTag: Tag = data.internal_tag ?? { id: Date.now(), name }
-      setTags((prev) => [...prev, newTag])
+      });
+      const data = await res.json();
+      const newTag: Tag = data.internal_tag ?? { id: Date.now(), name };
+      await mutateTags();
       if (!selectedIds.has(newTag.id)) {
-        onChange([...value, newTag])
+        onChange([...value, newTag]);
       }
-      setInput('')
+      setInput('');
     } catch {
-      setInput('')
+      setInput('');
     } finally {
-      setCreating(false)
+      setCreating(false);
     }
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Enter') {
-      e.preventDefault()
+      e.preventDefault();
       if (canCreate) {
-        createAndAdd()
+        createAndAdd();
       } else if (filtered.length === 1) {
-        toggle(filtered[0])
-        setInput('')
+        toggle(filtered[0]);
+        setInput('');
       }
     } else if (e.key === 'Escape') {
-      setOpen(false)
-      setInput('')
+      setOpen(false);
+      setInput('');
     }
   }
 
@@ -142,7 +142,12 @@ export function TagsMultiselect({
             ))
           )}
         </span>
-        <ChevronDown className={cn('w-4 h-4 text-gray-400 shrink-0 ml-1 transition-transform', open && 'rotate-180')} />
+        <ChevronDown
+          className={cn(
+            'w-4 h-4 text-gray-400 shrink-0 ml-1 transition-transform',
+            open && 'rotate-180',
+          )}
+        />
       </button>
 
       {open && (
@@ -152,7 +157,7 @@ export function TagsMultiselect({
               <p className="text-center text-sm text-gray-400 py-4">No tags yet</p>
             ) : (
               filtered.map((tag) => {
-                const checked = selectedIds.has(tag.id)
+                const checked = selectedIds.has(tag.id);
                 return (
                   <button
                     key={tag.id}
@@ -163,20 +168,33 @@ export function TagsMultiselect({
                     <div
                       className={cn(
                         'size-4 shrink-0 rounded border flex items-center justify-center transition-colors',
-                        checked ? 'bg-teal-600 border-teal-600' : 'border-gray-300 dark:border-gray-600',
+                        checked
+                          ? 'bg-teal-600 border-teal-600'
+                          : 'border-gray-300 dark:border-gray-600',
                       )}
                     >
                       {checked && (
-                        <svg viewBox="0 0 12 12" className="w-3 h-3 text-white fill-none stroke-white" strokeWidth={2}>
+                        <svg
+                          viewBox="0 0 12 12"
+                          className="w-3 h-3 text-white fill-none stroke-white"
+                          strokeWidth={2}
+                        >
                           <polyline points="2,6 5,9 10,3" />
                         </svg>
                       )}
                     </div>
-                    <span className={cn('text-sm', checked ? 'text-teal-600 dark:text-teal-400 font-medium' : 'text-gray-800 dark:text-gray-200')}>
+                    <span
+                      className={cn(
+                        'text-sm',
+                        checked
+                          ? 'text-teal-600 dark:text-teal-400 font-medium'
+                          : 'text-gray-800 dark:text-gray-200',
+                      )}
+                    >
                       {tag.name}
                     </span>
                   </button>
-                )
+                );
               })
             )}
           </div>
@@ -206,5 +224,5 @@ export function TagsMultiselect({
         </div>
       )}
     </div>
-  )
+  );
 }

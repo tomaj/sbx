@@ -1,92 +1,82 @@
-'use client'
+'use client';
 
-import { useState, useEffect, useCallback } from 'react'
-import { Eye, RotateCcw } from 'lucide-react'
-import { UserAvatar } from '@/components/ui/user-avatar'
-import { formatDateTime } from '@/lib/date'
+import { useState } from 'react';
+import { useApi } from '@/lib/swr';
+import { Eye, RotateCcw } from 'lucide-react';
+import { UserAvatar } from '@/components/ui/user-avatar';
+import { formatDateTime } from '@/lib/date';
 
 export interface ComponentVersionDetail {
-  id: number
-  component_id: number
-  schema: Record<string, any>
-  name: string
-  display_name: string | null
-  created_at: string
+  id: number;
+  component_id: number;
+  schema: Record<string, any>;
+  name: string;
+  display_name: string | null;
+  created_at: string;
 }
 
 interface ComponentVersion {
-  id: number
-  event: string
-  created_at: string
-  author_id: string | null
-  author: string | null
-  author_avatar: string | null
-  item_id: number
-  is_draft: boolean
+  id: number;
+  event: string;
+  created_at: string;
+  author_id: string | null;
+  author: string | null;
+  author_avatar: string | null;
+  item_id: number;
+  is_draft: boolean;
 }
 
 interface VersionsTabProps {
-  spaceId: string
-  blockId: string
-  onPreview: (version: ComponentVersionDetail) => void
-  onRestored: () => void
+  spaceId: string;
+  blockId: string;
+  onPreview: (version: ComponentVersionDetail) => void;
+  onRestored: () => void;
 }
 
 export function VersionsTab({ spaceId, blockId, onPreview, onRestored }: VersionsTabProps) {
-  const [versions, setVersions] = useState<ComponentVersion[]>([])
-  const [loading, setLoading] = useState(true)
-  const [previewLoadingId, setPreviewLoadingId] = useState<number | null>(null)
-  const [restoringId, setRestoringId] = useState<number | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [previewLoadingId, setPreviewLoadingId] = useState<number | null>(null);
+  const [restoringId, setRestoringId] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const fetchVersions = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const res = await fetch(
-        `/api/admin/spaces/${spaceId}/components/${blockId}/component_versions?page=1&per_page=50`,
-      )
-      const data = await res.json()
-      setVersions(data.versions ?? [])
-    } catch {
-      setError('Failed to load versions')
-    } finally {
-      setLoading(false)
-    }
-  }, [spaceId, blockId])
-
-  useEffect(() => { fetchVersions() }, [fetchVersions])
+  const {
+    data: versionsData,
+    isLoading: loading,
+    mutate: mutateVersions,
+  } = useApi<{
+    versions: ComponentVersion[];
+  }>(`/api/admin/spaces/${spaceId}/components/${blockId}/component_versions?page=1&per_page=50`);
+  const versions = versionsData?.versions ?? [];
 
   async function handlePreview(version: ComponentVersion) {
-    setPreviewLoadingId(version.id)
+    setPreviewLoadingId(version.id);
     try {
       const res = await fetch(
         `/api/admin/spaces/${spaceId}/components/${blockId}/component_versions/${version.id}`,
-      )
-      const data = await res.json()
-      onPreview(data.component_version)
+      );
+      const data = await res.json();
+      onPreview(data.component_version);
     } catch {
-      setError('Failed to load version')
+      setError('Failed to load version');
     } finally {
-      setPreviewLoadingId(null)
+      setPreviewLoadingId(null);
     }
   }
 
   async function handleRestore(versionId: number) {
-    setRestoringId(versionId)
-    setError(null)
+    setRestoringId(versionId);
+    setError(null);
     try {
       const res = await fetch(
         `/api/admin/spaces/${spaceId}/components/${blockId}/versions/${versionId}/restore`,
         { method: 'PUT' },
-      )
-      if (!res.ok) throw new Error()
-      onRestored()
-      await fetchVersions()
+      );
+      if (!res.ok) throw new Error();
+      onRestored();
+      await mutateVersions();
     } catch {
-      setError('Failed to restore version')
+      setError('Failed to restore version');
     } finally {
-      setRestoringId(null)
+      setRestoringId(null);
     }
   }
 
@@ -99,7 +89,10 @@ export function VersionsTab({ spaceId, blockId, onPreview, onRestored }: Version
       {loading ? (
         <div className="space-y-2">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-[72px] bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse" />
+            <div
+              key={i}
+              className="h-[72px] bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse"
+            />
           ))}
         </div>
       ) : versions.length === 0 ? (
@@ -149,5 +142,5 @@ export function VersionsTab({ spaceId, blockId, onPreview, onRestored }: Version
 
       {error && <p className="text-xs text-red-500 mt-4">{error}</p>}
     </div>
-  )
+  );
 }

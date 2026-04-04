@@ -1,10 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { asc, desc, eq, and, gte, lte, isNull, sql } from 'drizzle-orm';
 import { DB } from '../db/db.module';
-import type { DbType } from '../db/db.module';
+import { DbType } from '../db/db.module';
 import { webhookEndpoints, webhookLogs } from '../db/schema';
 import { JobsClient } from '@sbx/jobs';
 import { JOBS_CLIENT } from '../jobs/jobs.module';
+import { validateExternalUrl } from '../shared/url-validation.util';
 
 @Injectable()
 export class WebhooksService {
@@ -49,9 +50,11 @@ export class WebhooksService {
       activated?: boolean;
     },
   ) {
-    const [{ nextId }] = await this.db.execute<{ nextId: number }>(
-      sql`SELECT nextval('webhook_endpoints_id_seq')::int AS "nextId"`,
-    ).then(r => r.rows as any[]);
+    validateExternalUrl(data.endpoint);
+
+    const [{ nextId }] = await this.db
+      .execute<{ nextId: number }>(sql`SELECT nextval('webhook_endpoints_id_seq')::int AS "nextId"`)
+      .then((r) => r.rows as any[]);
 
     const [created] = await this.db
       .insert(webhookEndpoints)
@@ -82,6 +85,10 @@ export class WebhooksService {
       activated?: boolean;
     },
   ) {
+    if (data.endpoint !== undefined) {
+      validateExternalUrl(data.endpoint);
+    }
+
     const [updated] = await this.db
       .update(webhookEndpoints)
       .set({
@@ -184,7 +191,9 @@ export class WebhooksService {
     const [endpoint] = await this.db
       .select()
       .from(webhookEndpoints)
-      .where(and(eq(webhookEndpoints.id, log.webhookEndpointId), eq(webhookEndpoints.spaceId, spaceId)))
+      .where(
+        and(eq(webhookEndpoints.id, log.webhookEndpointId), eq(webhookEndpoints.spaceId, spaceId)),
+      )
       .limit(1);
 
     if (!endpoint) return null;

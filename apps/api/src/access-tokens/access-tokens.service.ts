@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, eq, sql } from 'drizzle-orm';
 import { randomBytes } from 'crypto';
 import { DB } from '../db/db.module';
-import type { DbType } from '../db/db.module';
+import { DbType } from '../db/db.module';
 import { apiTokens } from '../db/schema';
 
 @Injectable()
@@ -43,13 +43,18 @@ export class AccessTokensService {
 
   async adminCreate(
     spaceId: number,
-    data: { name?: string; access: 'public' | 'private'; branchId?: number | null; minCache?: number },
+    data: {
+      name?: string;
+      access: 'public' | 'private';
+      branchId?: number | null;
+      minCache?: number;
+    },
   ) {
-    const [{ nextId }] = await this.db.execute<{ nextId: number }>(
-      sql`SELECT nextval('api_tokens_id_seq')::int AS "nextId"`,
-    ).then(r => r.rows as any[]);
+    const [{ nextId }] = await this.db
+      .execute<{ nextId: number }>(sql`SELECT nextval('api_tokens_id_seq')::int AS "nextId"`)
+      .then((r) => r.rows as any[]);
 
-    const token = randomBytes(18).toString('base64url').slice(0, 24);
+    const token = randomBytes(32).toString('base64url');
     const [created] = await this.db
       .insert(apiTokens)
       .values({
@@ -62,13 +67,19 @@ export class AccessTokensService {
         minCache: data.minCache ?? 0,
       })
       .returning();
-    return { api_key: this.format(created) };
+    // Return full token only on creation — subsequent reads return masked version
+    return { api_key: this.formatFull(created) };
   }
 
   async adminUpdate(
     spaceId: number,
     id: number,
-    data: { name?: string; access?: 'public' | 'private'; branchId?: number | null; minCache?: number },
+    data: {
+      name?: string;
+      access?: 'public' | 'private';
+      branchId?: number | null;
+      minCache?: number;
+    },
   ) {
     const [updated] = await this.db
       .update(apiTokens)
@@ -93,7 +104,24 @@ export class AccessTokensService {
     return { api_key: this.format(deleted) };
   }
 
+  /** Masked format — safe for list/get responses. Full token visible only at creation. */
   private format(t: typeof apiTokens.$inferSelect) {
+    const masked = t.token ? `••••••••${t.token.slice(-4)}` : null;
+    return {
+      id: Number(t.id),
+      access: t.tokenType,
+      branch_id: t.branchId != null ? Number(t.branchId) : null,
+      name: t.name,
+      space_id: t.spaceId,
+      token: masked,
+      story_ids: t.storyIds ?? [],
+      min_cache: t.minCache,
+      release_ids: t.releaseIds ?? [],
+    };
+  }
+
+  /** Full format — only used immediately after token creation. */
+  private formatFull(t: typeof apiTokens.$inferSelect) {
     return {
       id: Number(t.id),
       access: t.tokenType,

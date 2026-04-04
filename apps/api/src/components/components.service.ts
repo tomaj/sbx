@@ -1,7 +1,9 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { SQL, and, asc, count, desc, eq, ilike, inArray, isNull, or, sql } from 'drizzle-orm';
+import { Inject, Injectable } from '@nestjs/common';
+import { ResultGuard } from '../shared/result-guard.util';
+import { type SQL, and, asc, count, desc, eq, ilike, inArray, isNull, or } from 'drizzle-orm';
+import { escapeLike } from '../shared/query-parser.util';
 import { DB } from '../db/db.module';
-import type { DbType } from '../db/db.module';
+import { DbType } from '../db/db.module';
 import { componentGroups, components } from '../db/schema';
 import { ComponentVersionsService } from './component-versions.service';
 
@@ -27,12 +29,14 @@ export class ComponentsService {
     const conditions: (SQL | undefined)[] = [eq(components.spaceId, spaceId)];
 
     if (opts.search?.trim()) {
-      const term = `%${opts.search.trim()}%`;
+      const term = `%${escapeLike(opts.search.trim())}%`;
       conditions.push(or(ilike(components.name, term), ilike(components.displayName, term)));
     }
     if (opts.in_group !== undefined) {
       conditions.push(
-        opts.in_group === '' ? isNull(components.componentGroupUuid) : eq(components.componentGroupUuid, opts.in_group),
+        opts.in_group === ''
+          ? isNull(components.componentGroupUuid)
+          : eq(components.componentGroupUuid, opts.in_group),
       );
     }
     if (opts.is_root !== undefined) {
@@ -41,6 +45,7 @@ export class ComponentsService {
     if (opts.by_ids) {
       const ids = opts.by_ids
         .split(',')
+        .slice(0, 1000)
         .map((s) => s.trim())
         .filter(Boolean)
         .map((s) => BigInt(s));
@@ -69,7 +74,11 @@ export class ComponentsService {
         .from(components)
         .where(and(...conditions))
         .orderBy(order),
-      this.db.select().from(componentGroups).where(eq(componentGroups.spaceId, spaceId)).orderBy(asc(componentGroups.name)),
+      this.db
+        .select()
+        .from(componentGroups)
+        .where(eq(componentGroups.spaceId, spaceId))
+        .orderBy(asc(componentGroups.name)),
     ]);
 
     return {
@@ -92,11 +101,15 @@ export class ComponentsService {
   async findAllComponentGroups(spaceId: number, opts?: { search?: string; withParent?: string }) {
     const conditions: (SQL | undefined)[] = [eq(componentGroups.spaceId, spaceId)];
     if (opts?.search?.trim()) {
-      conditions.push(ilike(componentGroups.name, `%${opts.search.trim()}%`));
+      conditions.push(ilike(componentGroups.name, `%${escapeLike(opts.search.trim())}%`));
     }
     if (opts?.withParent !== undefined) {
-      const parentId = parseInt(opts.withParent);
-      conditions.push(isNaN(parentId) ? isNull(componentGroups.parentId) : eq(componentGroups.parentId, BigInt(parentId)));
+      const parentId = parseInt(opts.withParent, 10);
+      conditions.push(
+        Number.isNaN(parentId)
+          ? isNull(componentGroups.parentId)
+          : eq(componentGroups.parentId, BigInt(parentId)),
+      );
     }
 
     const rows = await this.db
@@ -138,7 +151,7 @@ export class ComponentsService {
 
     const conditions: (SQL | undefined)[] = [
       eq(components.spaceId, spaceId),
-      search?.trim() ? ilike(components.name, `%${search.trim()}%`) : undefined,
+      search?.trim() ? ilike(components.name, `%${escapeLike(search.trim())}%`) : undefined,
       groupUuid !== undefined
         ? groupUuid === null
           ? isNull(components.componentGroupUuid)
@@ -148,10 +161,7 @@ export class ComponentsService {
 
     const where = and(...conditions);
 
-    const [{ total }] = await this.db
-      .select({ total: count() })
-      .from(components)
-      .where(where);
+    const [{ total }] = await this.db.select({ total: count() }).from(components).where(where);
 
     const orderCol =
       sortField === 'created_at'
@@ -271,7 +281,7 @@ export class ComponentsService {
       .set(set)
       .where(and(eq(components.id, BigInt(id)), eq(components.spaceId, spaceId)))
       .returning();
-    if (!row) throw new NotFoundException('Component not found');
+    ResultGuard.throwIfNotFound(row, 'Component not found');
 
     this.componentVersionsService.saveVersion({
       componentId: id,
@@ -287,8 +297,17 @@ export class ComponentsService {
     return { component: this.formatComponent(row) };
   }
 
-  async restoreComponentVersion(spaceId: number, componentId: number, versionId: number, userId?: number | null) {
-    const version = await this.componentVersionsService.getVersionForRestore(spaceId, componentId, versionId);
+  async restoreComponentVersion(
+    spaceId: number,
+    componentId: number,
+    versionId: number,
+    userId?: number | null,
+  ) {
+    const version = await this.componentVersionsService.getVersionForRestore(
+      spaceId,
+      componentId,
+      versionId,
+    );
 
     const [row] = await this.db
       .update(components)
@@ -298,7 +317,7 @@ export class ComponentsService {
       })
       .where(and(eq(components.id, BigInt(componentId)), eq(components.spaceId, spaceId)))
       .returning();
-    if (!row) throw new NotFoundException('Component not found');
+    ResultGuard.throwIfNotFound(row, 'Component not found');
 
     this.componentVersionsService.saveVersion({
       componentId,
@@ -318,7 +337,7 @@ export class ComponentsService {
       .delete(components)
       .where(and(eq(components.id, BigInt(id)), eq(components.spaceId, spaceId)))
       .returning();
-    if (!row) throw new NotFoundException('Component not found');
+    ResultGuard.throwIfNotFound(row, 'Component not found');
     return { component: this.formatComponent(row) };
   }
 
@@ -328,7 +347,7 @@ export class ComponentsService {
       .from(components)
       .where(and(eq(components.id, BigInt(id)), eq(components.spaceId, spaceId)))
       .limit(1);
-    if (!orig) throw new NotFoundException('Component not found');
+    ResultGuard.throwIfNotFound(orig, 'Component not found');
 
     const newId = BigInt(Date.now() * 1000 + Math.floor(Math.random() * 1000));
     const [row] = await this.db
@@ -353,7 +372,10 @@ export class ComponentsService {
 
   // ─── Admin: component group CRUD ────────────────────────────────────────────
 
-  async createComponentGroup(spaceId: number, data: { name: string; parent_id?: number | null; parent_uuid?: string | null }) {
+  async createComponentGroup(
+    spaceId: number,
+    data: { name: string; parent_id?: number | null; parent_uuid?: string | null },
+  ) {
     const id = BigInt(Date.now() * 1000 + Math.floor(Math.random() * 1000));
     const uuid = crypto.randomUUID();
 
@@ -373,7 +395,9 @@ export class ComponentsService {
       const [parent] = await this.db
         .select({ id: componentGroups.id })
         .from(componentGroups)
-        .where(and(eq(componentGroups.uuid, data.parent_uuid), eq(componentGroups.spaceId, spaceId)))
+        .where(
+          and(eq(componentGroups.uuid, data.parent_uuid), eq(componentGroups.spaceId, spaceId)),
+        )
         .limit(1);
       if (parent) parentId = parent.id;
     }
@@ -392,7 +416,11 @@ export class ComponentsService {
     return this.formatGroup(row);
   }
 
-  async updateComponentGroup(spaceId: number, id: number, data: { name?: string; parent_id?: number | null }) {
+  async updateComponentGroup(
+    spaceId: number,
+    id: number,
+    data: { name?: string; parent_id?: number | null },
+  ) {
     const set: Record<string, any> = {};
     if (data.name !== undefined) set.name = data.name;
     if (data.parent_id !== undefined) {
@@ -404,7 +432,12 @@ export class ComponentsService {
         const [parent] = await this.db
           .select({ uuid: componentGroups.uuid })
           .from(componentGroups)
-          .where(and(eq(componentGroups.id, BigInt(data.parent_id)), eq(componentGroups.spaceId, spaceId)))
+          .where(
+            and(
+              eq(componentGroups.id, BigInt(data.parent_id)),
+              eq(componentGroups.spaceId, spaceId),
+            ),
+          )
           .limit(1);
         if (parent) set.parentUuid = parent.uuid;
       }
@@ -415,7 +448,7 @@ export class ComponentsService {
       .set(set)
       .where(and(eq(componentGroups.id, BigInt(id)), eq(componentGroups.spaceId, spaceId)))
       .returning();
-    if (!row) throw new NotFoundException('Group not found');
+    ResultGuard.throwIfNotFound(row, 'Group not found');
     return this.formatGroup(row);
   }
 
@@ -424,7 +457,7 @@ export class ComponentsService {
       .delete(componentGroups)
       .where(and(eq(componentGroups.id, BigInt(id)), eq(componentGroups.spaceId, spaceId)))
       .returning();
-    if (!row) throw new NotFoundException('Group not found');
+    ResultGuard.throwIfNotFound(row, 'Group not found');
     return this.formatGroup(row);
   }
 

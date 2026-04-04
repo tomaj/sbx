@@ -5,7 +5,11 @@ import { AiBrandingRulesController } from './ai-branding-rules.controller';
 import { AiConfigurationsService } from './ai-configurations.service';
 
 @Module({
-  controllers: [AiConfigurationsController, AiConfigurationsSpacesController, AiBrandingRulesController],
+  controllers: [
+    AiConfigurationsController,
+    AiConfigurationsSpacesController,
+    AiBrandingRulesController,
+  ],
   providers: [AiConfigurationsService],
   exports: [AiConfigurationsService],
 })

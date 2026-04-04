@@ -1,16 +1,19 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, desc, eq, ilike, inArray, isNotNull, isNull, ne, or, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, isNull, ne, or, sql } from 'drizzle-orm';
 import { DB } from '../db/db.module';
-import type { DbType } from '../db/db.module';
+import { DbType } from '../db/db.module';
 import { JOBS_CLIENT } from '../jobs/jobs.module';
-import type { JobsClient } from '@sbx/jobs';
+import { JobsClient } from '@sbx/jobs';
 import { discussions, comments, users, stories } from '../db/schema';
+import { ENV } from '../config/config.module';
+import type { Env } from '../config/env.schema';
 
 @Injectable()
 export class DiscussionsService {
   constructor(
     @Inject(DB) private db: DbType,
     @Inject(JOBS_CLIENT) private jobs: JobsClient,
+    @Inject(ENV) private env: Env,
   ) {}
 
   /**
@@ -72,9 +75,8 @@ export class DiscussionsService {
     discussionId: number,
     data: { solved_at?: string | null },
   ) {
-    const solvedAt = data.solved_at !== undefined
-      ? (data.solved_at ? new Date(data.solved_at) : null)
-      : undefined;
+    const solvedAt =
+      data.solved_at !== undefined ? (data.solved_at ? new Date(data.solved_at) : null) : undefined;
 
     const updateSet: Record<string, any> = { updatedAt: new Date() };
     if (solvedAt !== undefined) {
@@ -111,10 +113,7 @@ export class DiscussionsService {
     perPage: number = 25,
     byStatus?: string,
   ) {
-    const conditions = [
-      eq(discussions.spaceId, spaceId),
-      eq(discussions.storyId, storyId),
-    ];
+    const conditions = [eq(discussions.spaceId, spaceId), eq(discussions.storyId, storyId)];
 
     if (byStatus === 'solved') {
       conditions.push(isNotNull(discussions.solvedAt));
@@ -189,7 +188,7 @@ export class DiscussionsService {
     const offset = (page - 1) * perPage;
 
     // Find discussions where the user is mentioned in comments (via message_json mention attrs)
-    const userIdStr = String(userId);
+    const _userIdStr = String(userId);
 
     const conditions = [
       eq(comments.spaceId, spaceId),
@@ -279,7 +278,7 @@ export class DiscussionsService {
 
     let discussionId: number;
     if (isNumeric) {
-      discussionId = parseInt(discussionIdOrUuid);
+      discussionId = parseInt(discussionIdOrUuid, 10);
     } else {
       // Look up by UUID
       const [disc] = await this.db
@@ -320,7 +319,13 @@ export class DiscussionsService {
   async createComment(
     spaceId: number,
     discussionId: number,
-    data: { message?: string; message_json?: any[]; user_id?: number; user_email?: string; user_name?: string },
+    data: {
+      message?: string;
+      message_json?: any[];
+      user_id?: number;
+      user_email?: string;
+      user_name?: string;
+    },
   ) {
     return this.createCommentInternal(spaceId, discussionId, data, {
       email: data.user_email,
@@ -486,14 +491,18 @@ export class DiscussionsService {
 
     // Fetch story name + lastAuthorId
     const [story] = await this.db
-      .select({ name: stories.name, lastAuthorId: stories.lastAuthorId, fullSlug: stories.fullSlug })
+      .select({
+        name: stories.name,
+        lastAuthorId: stories.lastAuthorId,
+        fullSlug: stories.fullSlug,
+      })
       .from(stories)
       .where(and(eq(stories.id, BigInt(disc.storyId)), eq(stories.spaceId, spaceId)))
       .limit(1);
 
     if (!story) return;
 
-    const adminUrl = process.env.ADMIN_URL ?? 'http://localhost:3001';
+    const adminUrl = this.env.ADMIN_URL;
     const storyUrl = `${adminUrl}/spaces/${spaceId}/stories/${disc.storyId}`;
     const storyName = story.name;
 
@@ -531,7 +540,8 @@ export class DiscussionsService {
         .where(eq(users.id, commenterUserId))
         .limit(1);
       if (commenter) {
-        commenterName = [commenter.firstname, commenter.lastname].filter(Boolean).join(' ') || commenterName;
+        commenterName =
+          [commenter.firstname, commenter.lastname].filter(Boolean).join(' ') || commenterName;
       }
     }
 
@@ -628,8 +638,7 @@ export class DiscussionsService {
       userAvatar?: string | null;
     },
   ) {
-    const name =
-      [r.userFirstname, r.userLastname].filter(Boolean).join(' ') || null;
+    const name = [r.userFirstname, r.userLastname].filter(Boolean).join(' ') || null;
     return {
       id: Number(r.id),
       uuid: r.uuid,

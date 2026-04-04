@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { LoggerModule } from 'nestjs-pino';
 import { randomUUID } from 'crypto';
-import type { IncomingMessage, ServerResponse } from 'http';
+import { IncomingMessage } from 'http';
 
 @Module({
   imports: [

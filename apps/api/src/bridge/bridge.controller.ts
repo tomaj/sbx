@@ -1,12 +1,23 @@
-import { Controller, Get, Inject, NotFoundException, Param, Res } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Inject,
+  NotFoundException,
+  Param,
+  ParseIntPipe,
+  Res,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Auth } from '../auth/auth.decorator';
-import type { Response } from 'express';
+import { RateLimit } from '../throttler/throttler.module';
+import { Response } from 'express';
 import { DB } from '../db/db.module';
-import type { DbType } from '../db/db.module';
+import { DbType } from '../db/db.module';
+import { ENV } from '../config/config.module';
+import { Env } from '../config/env.schema';
 import { apiTokens } from '../db/schema';
 import { eq, and } from 'drizzle-orm';
-import { createHash } from 'crypto';
+import { createHmac } from 'crypto';
 
 const BRIDGE_SCRIPT = `(function () {
   'use strict';
@@ -68,7 +79,14 @@ const BRIDGE_SCRIPT = `(function () {
     }
 
     _sendToParent(data) {
-      try { window.parent.postMessage(data, '*'); } catch (_) {}
+      try {
+        // Use document.referrer origin for cross-origin communication with admin
+        var target = '*';
+        try {
+          if (document.referrer) target = new URL(document.referrer).origin;
+        } catch (_r) {}
+        window.parent.postMessage(data, target);
+      } catch (_) {}
     }
 
     _setupClickHandlers() {
@@ -105,9 +123,13 @@ const BRIDGE_SCRIPT = `(function () {
 @ApiTags('Bridge')
 @Controller()
 export class BridgeController {
-  constructor(@Inject(DB) private db: DbType) {}
+  constructor(
+    @Inject(DB) private db: DbType,
+    @Inject(ENV) private env: Env,
+  ) {}
 
   @Get('bridge/v2-latest.js')
+  @RateLimit('none')
   getBridgeScript(@Res() res: Response): void {
     res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
     res.setHeader('Cache-Control', 'no-cache, no-store');
@@ -117,8 +139,7 @@ export class BridgeController {
 
   @Get('v1/admin/spaces/:spaceId/preview-token')
   @Auth('session')
-  async getPreviewToken(@Param('spaceId') spaceId: string) {
-    const spaceIdNum = parseInt(spaceId, 10);
+  async getPreviewToken(@Param('spaceId', ParseIntPipe) spaceId: number) {
     const timestamp = Math.floor(Date.now() / 1000);
 
     // Try preview (private) token first, fall back to public
@@ -127,7 +148,7 @@ export class BridgeController {
     const privateTokens = await this.db
       .select()
       .from(apiTokens)
-      .where(and(eq(apiTokens.spaceId, spaceIdNum), eq(apiTokens.tokenType, 'private')))
+      .where(and(eq(apiTokens.spaceId, spaceId), eq(apiTokens.tokenType, 'private')))
       .limit(1);
 
     if (privateTokens.length > 0) {
@@ -136,7 +157,7 @@ export class BridgeController {
       const publicTokens = await this.db
         .select()
         .from(apiTokens)
-        .where(and(eq(apiTokens.spaceId, spaceIdNum), eq(apiTokens.tokenType, 'public')))
+        .where(and(eq(apiTokens.spaceId, spaceId), eq(apiTokens.tokenType, 'public')))
         .limit(1);
       if (publicTokens.length > 0) {
         tokenRow = publicTokens[0];
@@ -148,12 +169,14 @@ export class BridgeController {
     }
 
     const accessToken = tokenRow.token;
-    const hash = createHash('sha1')
-      .update(`${spaceIdNum}:${accessToken}:${timestamp}`)
+    // HMAC-SHA256 signed with dedicated secret (falls back to JWT_SECRET for backwards compat)
+    const signingKey = this.env.PREVIEW_TOKEN_SECRET ?? this.env.JWT_SECRET;
+    const hash = createHmac('sha256', signingKey)
+      .update(`${spaceId}:${accessToken}:${timestamp}`)
       .digest('hex');
 
     return {
-      space_id: spaceIdNum,
+      space_id: spaceId,
       timestamp,
       token: hash,
       access_token: accessToken,

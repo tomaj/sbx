@@ -1,45 +1,20 @@
-import { Type } from 'class-transformer';
-import { IsBoolean, IsObject, IsOptional, IsString, ValidateNested } from 'class-validator';
+import { z } from 'zod';
+import { createZodDto } from 'nestjs-zod';
 
-export class ComponentDataDto {
-  @IsString()
-  name!: string;
+const ComponentDataSchema = z.object({
+  name: z.string().min(1),
+  display_name: z.string().nullable().optional(),
+  schema: z.record(z.string(), z.unknown()).optional(),
+  is_root: z.boolean().optional(),
+  is_nestable: z.boolean().optional(),
+  color: z.string().nullable().optional(),
+  icon: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
+  component_group_uuid: z.string().nullable().optional(),
+});
 
-  @IsString()
-  @IsOptional()
-  display_name?: string | null;
+const CreateComponentSchema = z.object({
+  component: ComponentDataSchema,
+});
 
-  @IsObject()
-  @IsOptional()
-  schema?: any;
-
-  @IsBoolean()
-  @IsOptional()
-  is_root?: boolean;
-
-  @IsBoolean()
-  @IsOptional()
-  is_nestable?: boolean;
-
-  @IsString()
-  @IsOptional()
-  color?: string | null;
-
-  @IsString()
-  @IsOptional()
-  icon?: string | null;
-
-  @IsString()
-  @IsOptional()
-  description?: string | null;
-
-  @IsString()
-  @IsOptional()
-  component_group_uuid?: string | null;
-}
-
-export class CreateComponentDto {
-  @ValidateNested()
-  @Type(() => ComponentDataDto)
-  component!: ComponentDataDto;
-}
+export class CreateComponentDto extends createZodDto(CreateComponentSchema) {}

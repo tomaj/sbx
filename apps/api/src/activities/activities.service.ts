@@ -1,7 +1,7 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, count, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
 import { DB } from '../db/db.module';
-import type { DbType } from '../db/db.module';
+import { DbType } from '../db/db.module';
 import { activities } from '../db/schema';
 
 interface ActivityFilters {
@@ -21,14 +21,10 @@ export class ActivitiesService {
       opts.byOwnerIds?.length
         ? inArray(activities.ownerId, opts.byOwnerIds.map(BigInt))
         : undefined,
-      opts.types?.length
-        ? inArray(activities.trackableType, opts.types)
-        : undefined,
-      opts.createdAtGte
-        ? gte(activities.createdAt, new Date(opts.createdAtGte))
-        : undefined,
+      opts.types?.length ? inArray(activities.trackableType, opts.types) : undefined,
+      opts.createdAtGte ? gte(activities.createdAt, new Date(opts.createdAtGte)) : undefined,
       opts.createdAtLte
-        ? lte(activities.createdAt, new Date(opts.createdAtLte + 'T23:59:59'))
+        ? lte(activities.createdAt, new Date(`${opts.createdAtLte}T23:59:59`))
         : undefined,
     );
   }
@@ -50,12 +46,7 @@ export class ActivitiesService {
     };
   }
 
-  async findAll(
-    spaceId: number,
-    page: number,
-    perPage: number,
-    opts: ActivityFilters = {},
-  ) {
+  async findAll(spaceId: number, page: number, perPage: number, opts: ActivityFilters = {}) {
     const where = this.buildWhere(spaceId, opts);
 
     const rows = await this.db
@@ -142,7 +133,6 @@ export class ActivitiesService {
         from = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
         periodLabel = 'this month';
         break;
-      case 'last_14_days':
       default:
         from = new Date(now.getTime() - 13 * 86400000).toISOString().slice(0, 10);
         periodLabel = 'last 14 days';
@@ -151,9 +141,10 @@ export class ActivitiesService {
 
     // Use hardcoded format strings to avoid Drizzle creating separate $N params
     // for GROUP BY vs SELECT which causes PostgreSQL 42803 error
-    const bucketExpr = groupBy === 'day'
-      ? sql<string>`to_char(${activities.createdAt}, 'YYYY-MM-DD')`
-      : sql<string>`to_char(${activities.createdAt}, 'YYYY-MM')`;
+    const bucketExpr =
+      groupBy === 'day'
+        ? sql<string>`to_char(${activities.createdAt}, 'YYYY-MM-DD')`
+        : sql<string>`to_char(${activities.createdAt}, 'YYYY-MM')`;
 
     const rows = await this.db
       .select({ bucket: bucketExpr, count: count() })
@@ -162,7 +153,7 @@ export class ActivitiesService {
         and(
           eq(activities.spaceId, spaceId),
           gte(activities.createdAt, new Date(from)),
-          lte(activities.createdAt, new Date(to + 'T23:59:59')),
+          lte(activities.createdAt, new Date(`${to}T23:59:59`)),
         ),
       )
       .groupBy(sql`1`)
@@ -172,8 +163,8 @@ export class ActivitiesService {
 
     // Build full date range with zeros filled
     const data: { date: string; count: number }[] = [];
-    const end = new Date(to + 'T12:00:00');
-    const cur = new Date(from + 'T12:00:00');
+    const end = new Date(`${to}T12:00:00`);
+    const cur = new Date(`${from}T12:00:00`);
     while (cur <= end) {
       const key =
         groupBy === 'day'
@@ -189,8 +180,8 @@ export class ActivitiesService {
     const total = data.reduce((s, r) => s + r.count, 0);
 
     // Previous period total
-    const span = new Date(to + 'T12:00:00').getTime() - new Date(from + 'T12:00:00').getTime();
-    const prevTo = new Date(new Date(from + 'T12:00:00').getTime() - 86400000);
+    const span = new Date(`${to}T12:00:00`).getTime() - new Date(`${from}T12:00:00`).getTime();
+    const prevTo = new Date(new Date(`${from}T12:00:00`).getTime() - 86400000);
     const prevFrom = new Date(prevTo.getTime() - span);
     const [prevResult] = await this.db
       .select({ cnt: count() })
@@ -204,19 +195,20 @@ export class ActivitiesService {
       );
     const previousTotal = Number(prevResult?.cnt ?? 0);
 
-    return { total, previous_total: previousTotal, period_label: periodLabel, group_by: groupBy, data };
+    return {
+      total,
+      previous_total: previousTotal,
+      period_label: periodLabel,
+      group_by: groupBy,
+      data,
+    };
   }
 
   async findOne(spaceId: number, activityId: number) {
     const [row] = await this.db
       .select()
       .from(activities)
-      .where(
-        and(
-          eq(activities.spaceId, spaceId),
-          eq(activities.id, BigInt(activityId)),
-        ),
-      )
+      .where(and(eq(activities.spaceId, spaceId), eq(activities.id, BigInt(activityId))))
       .limit(1);
 
     if (!row) {

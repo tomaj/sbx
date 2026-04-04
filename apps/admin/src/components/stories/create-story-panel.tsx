@@ -1,28 +1,32 @@
-'use client'
+'use client';
 
-import { useState, useEffect } from 'react'
-import { FileText, Folder } from 'lucide-react'
-import { RightSidebar } from '@/components/ui/right-sidebar'
-import { SelectDropdown } from '@/components/ui/select-dropdown'
-import { ContentTypeSelector } from '@/components/ui/content-type-selector'
-import { InfoTooltip } from '@/components/ui/info-tooltip'
+import { useState, useEffect } from 'react';
+import { FileText, Folder } from 'lucide-react';
+import { RightSidebar } from '@/components/ui/right-sidebar';
+import { SelectDropdown } from '@/components/ui/select-dropdown';
+import { ContentTypeSelector } from '@/components/ui/content-type-selector';
+import { InfoTooltip } from '@/components/ui/info-tooltip';
+import { useApi } from '@/lib/swr';
 
 type Component = {
-  id: number
-  name: string
-  display_name: string | null
-  is_root: boolean
-}
+  id: number;
+  name: string;
+  display_name: string | null;
+  is_root: boolean;
+};
 
 type FolderStory = {
-  id: number
-  name: string
-  full_slug: string
-  is_folder: boolean
-}
+  id: number;
+  name: string;
+  full_slug: string;
+  is_folder: boolean;
+};
 
 function toSlug(name: string) {
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
 }
 
 // ─── Shared form fields ───────────────────────────────────────────────────────
@@ -35,12 +39,12 @@ function FormInput({
   placeholder,
   tooltip,
 }: {
-  label: string
-  required?: boolean
-  value: string
-  onChange: (v: string) => void
-  placeholder?: string
-  tooltip?: string
+  label: string;
+  required?: boolean;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  tooltip?: string;
 }) {
   return (
     <div>
@@ -57,7 +61,7 @@ function FormInput({
         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
       />
     </div>
-  )
+  );
 }
 
 function FormTextarea({
@@ -66,10 +70,10 @@ function FormTextarea({
   onChange,
   tooltip,
 }: {
-  label: string
-  value: string
-  onChange: (v: string) => void
-  tooltip?: string
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  tooltip?: string;
 }) {
   return (
     <div>
@@ -84,7 +88,7 @@ function FormTextarea({
         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent resize-none"
       />
     </div>
-  )
+  );
 }
 
 function PanelFooter({
@@ -93,10 +97,10 @@ function PanelFooter({
   saving,
   disabled,
 }: {
-  onCancel: () => void
-  onConfirm: () => void
-  saving: boolean
-  disabled: boolean
+  onCancel: () => void;
+  onConfirm: () => void;
+  saving: boolean;
+  disabled: boolean;
 }) {
   return (
     <div className="flex items-center justify-end gap-3 w-full">
@@ -116,99 +120,106 @@ function PanelFooter({
         {saving ? 'Creating...' : 'Create'}
       </button>
     </div>
-  )
+  );
 }
 
 function useFormData(open: boolean, defaultParentId: number | null) {
-  const [name, setName] = useState('')
-  const [slug, setSlug] = useState('')
-  const [path, setPath] = useState('')
-  const [parentId, setParentId] = useState<number | null>(defaultParentId)
-  const [slugManual, setSlugManual] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [name, setName] = useState('');
+  const [slug, setSlug] = useState('');
+  const [path, setPath] = useState('');
+  const [parentId, setParentId] = useState<number | null>(defaultParentId);
+  const [slugManual, setSlugManual] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!open) return
-    setName(''); setSlug(''); setPath('')
-    setParentId(defaultParentId); setSlugManual(false); setError(null)
-  }, [open, defaultParentId])
+    if (!open) return;
+    setName('');
+    setSlug('');
+    setPath('');
+    setParentId(defaultParentId);
+    setSlugManual(false);
+    setError(null);
+  }, [open, defaultParentId]);
 
   function handleNameChange(val: string) {
-    setName(val)
-    if (!slugManual) setSlug(toSlug(val))
+    setName(val);
+    if (!slugManual) setSlug(toSlug(val));
   }
 
   function handleSlugChange(val: string) {
-    setSlug(val)
-    setSlugManual(true)
+    setSlug(val);
+    setSlugManual(true);
   }
 
-  return { name, setName: handleNameChange, slug, setSlug: handleSlugChange, path, setPath, parentId, setParentId, error, setError }
+  return {
+    name,
+    setName: handleNameChange,
+    slug,
+    setSlug: handleSlugChange,
+    path,
+    setPath,
+    parentId,
+    setParentId,
+    error,
+    setError,
+  };
 }
 
 function useComponentOptions(open: boolean, spaceId: string) {
-  const [components, setComponents] = useState<Component[]>([])
-  const [loading, setLoading] = useState(false)
-
-  useEffect(() => {
-    if (!open) return
-    setLoading(true)
-    fetch(`/api/admin/spaces/${spaceId}/components`)
-      .then((r) => r.json())
-      .then((data) => setComponents((data.components ?? []).filter((c: Component) => c.is_root)))
-      .catch(() => {})
-      .finally(() => setLoading(false))
-  }, [open, spaceId])
-
-  const options = components.map((c) => ({ value: c.name, label: c.display_name || c.name }))
-  return { options, loading }
+  const { data, isLoading } = useApi<{ components: Component[] }>(
+    open ? `/api/admin/spaces/${spaceId}/components` : null,
+  );
+  const components = (data?.components ?? []).filter((c) => c.is_root);
+  const options = components.map((c) => ({ value: c.name, label: c.display_name || c.name }));
+  return { options, loading: isLoading };
 }
 
 function useFolderOptions(open: boolean, spaceId: string) {
-  const [folders, setFolders] = useState<FolderStory[]>([])
-  const [loading, setLoading] = useState(false)
-
-  useEffect(() => {
-    if (!open) return
-    setLoading(true)
-    fetch(`/api/admin/spaces/${spaceId}/stories?per_page=200`)
-      .then((r) => r.json())
-      .then((data) => setFolders((data.stories ?? []).filter((s: FolderStory) => s.is_folder)))
-      .catch(() => {})
-      .finally(() => setLoading(false))
-  }, [open, spaceId])
-
+  const { data, isLoading } = useApi<{ stories: FolderStory[] }>(
+    open ? `/api/admin/spaces/${spaceId}/stories?per_page=200` : null,
+  );
+  const folders = (data?.stories ?? []).filter((s) => s.is_folder);
   const folderOptions = [
     { value: '', label: 'Root' },
     ...folders.map((f) => ({ value: String(f.id), label: f.name })),
-  ]
-  return { folderOptions, loading }
+  ];
+  return { folderOptions, loading: isLoading };
 }
 
 // ─── New Content Story Panel ──────────────────────────────────────────────────
 
 interface CreateStoryPanelProps {
-  spaceId: string
-  open: boolean
-  defaultParentId: number | null
-  onClose: () => void
-  onCreated: (storyId: number) => void
+  spaceId: string;
+  open: boolean;
+  defaultParentId: number | null;
+  onClose: () => void;
+  onCreated: (storyId: number) => void;
 }
 
-export function CreateStoryPanel({ spaceId, open, defaultParentId, onClose, onCreated }: CreateStoryPanelProps) {
-  const { name, setName, slug, setSlug, path, setPath, parentId, setParentId, error, setError } = useFormData(open, defaultParentId)
-  const [contentType, setContentType] = useState('')
-  const [saving, setSaving] = useState(false)
-  const { options: compOptions, loading: compLoading } = useComponentOptions(open, spaceId)
-  const { folderOptions, loading: folderLoading } = useFolderOptions(open, spaceId)
+export function CreateStoryPanel({
+  spaceId,
+  open,
+  defaultParentId,
+  onClose,
+  onCreated,
+}: CreateStoryPanelProps) {
+  const { name, setName, slug, setSlug, path, setPath, parentId, setParentId, error, setError } =
+    useFormData(open, defaultParentId);
+  const [contentType, setContentType] = useState('');
+  const [saving, setSaving] = useState(false);
+  const { options: compOptions, loading: compLoading } = useComponentOptions(open, spaceId);
+  const { folderOptions, loading: folderLoading } = useFolderOptions(open, spaceId);
 
-  useEffect(() => { if (!open) setContentType('') }, [open])
+  useEffect(() => {
+    if (!open) setContentType('');
+  }, [open]);
 
-  const canCreate = name.trim() && slug.trim() && contentType
+  const canCreate = name.trim() && slug.trim() && contentType;
 
   async function handleCreate() {
-    if (!canCreate) return
-    setSaving(true); setError(null)
+    if (!canCreate) return;
+    setSaving(true);
+    setError(null);
     try {
       const res = await fetch(`/api/admin/spaces/${spaceId}/stories`, {
         method: 'POST',
@@ -222,11 +233,17 @@ export function CreateStoryPanel({ spaceId, open, defaultParentId, onClose, onCr
             content: { component: contentType },
           },
         }),
-      })
-      if (!res.ok) { const d = await res.json(); setError(d.message ?? 'Failed to create story'); return }
-      const data = await res.json()
-      onCreated(data.story?.id)
-    } finally { setSaving(false) }
+      });
+      if (!res.ok) {
+        const d = await res.json();
+        setError(d.message ?? 'Failed to create story');
+        return;
+      }
+      const data = await res.json();
+      onCreated(data.story?.id);
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -236,17 +253,34 @@ export function CreateStoryPanel({ spaceId, open, defaultParentId, onClose, onCr
       header={
         <div className="flex items-center gap-2">
           <FileText className="w-5 h-5 text-teal-600" />
-          <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">New Content Story</h2>
+          <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
+            New Content Story
+          </h2>
         </div>
       }
-      footer={<PanelFooter onCancel={onClose} onConfirm={handleCreate} saving={saving} disabled={!canCreate} />}
+      footer={
+        <PanelFooter
+          onCancel={onClose}
+          onConfirm={handleCreate}
+          saving={saving}
+          disabled={!canCreate}
+        />
+      }
     >
       <div className="space-y-4">
         {error && (
-          <div className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg">{error}</div>
+          <div className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg">
+            {error}
+          </div>
         )}
 
-        <FormInput label="Name" required value={name} onChange={setName} placeholder="e.g. Landing" />
+        <FormInput
+          label="Name"
+          required
+          value={name}
+          onChange={setName}
+          placeholder="e.g. Landing"
+        />
         <FormInput label="Slug" value={slug} onChange={setSlug} />
         <FormTextarea
           label="Real Path"
@@ -256,11 +290,13 @@ export function CreateStoryPanel({ spaceId, open, defaultParentId, onClose, onCr
         />
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Parent folder</label>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+            Parent folder
+          </label>
           <SelectDropdown
             options={folderOptions}
             value={parentId !== null ? String(parentId) : ''}
-            onChange={(v) => setParentId(v ? parseInt(v) : null)}
+            onChange={(v) => setParentId(v ? parseInt(v, 10) : null)}
             placeholder="Root"
             loading={folderLoading}
           />
@@ -279,43 +315,55 @@ export function CreateStoryPanel({ spaceId, open, defaultParentId, onClose, onCr
         </div>
       </div>
     </RightSidebar>
-  )
+  );
 }
 
 // ─── New Folder Panel ─────────────────────────────────────────────────────────
 
 interface CreateFolderPanelProps {
-  spaceId: string
-  open: boolean
-  defaultParentId: number | null
-  onClose: () => void
-  onCreated: (storyId: number) => void
+  spaceId: string;
+  open: boolean;
+  defaultParentId: number | null;
+  onClose: () => void;
+  onCreated: (storyId: number) => void;
 }
 
-export function CreateFolderPanel({ spaceId, open, defaultParentId, onClose, onCreated }: CreateFolderPanelProps) {
-  const { name, setName, slug, setSlug, path, setPath, parentId, setParentId, error, setError } = useFormData(open, defaultParentId)
-  const [contentTypeMode, setContentTypeMode] = useState<'all' | 'specific'>('all')
-  const [singleContentType, setSingleContentType] = useState<string | null>(null)
-  const [multiContentTypes, setMultiContentTypes] = useState<string[]>([])
-  const [disableVisualEditor, setDisableVisualEditor] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const { options: compOptions, loading: compLoading } = useComponentOptions(open, spaceId)
-  const { folderOptions, loading: folderLoading } = useFolderOptions(open, spaceId)
+export function CreateFolderPanel({
+  spaceId,
+  open,
+  defaultParentId,
+  onClose,
+  onCreated,
+}: CreateFolderPanelProps) {
+  const { name, setName, slug, setSlug, path, setPath, parentId, setParentId, error, setError } =
+    useFormData(open, defaultParentId);
+  const [contentTypeMode, setContentTypeMode] = useState<'all' | 'specific'>('all');
+  const [singleContentType, setSingleContentType] = useState<string | null>(null);
+  const [multiContentTypes, setMultiContentTypes] = useState<string[]>([]);
+  const [disableVisualEditor, setDisableVisualEditor] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const { options: compOptions, loading: compLoading } = useComponentOptions(open, spaceId);
+  const { folderOptions, loading: folderLoading } = useFolderOptions(open, spaceId);
 
   useEffect(() => {
-    if (!open) { setContentTypeMode('all'); setSingleContentType(null); setMultiContentTypes([]); setDisableVisualEditor(false) }
-  }, [open])
+    if (!open) {
+      setContentTypeMode('all');
+      setSingleContentType(null);
+      setMultiContentTypes([]);
+      setDisableVisualEditor(false);
+    }
+  }, [open]);
 
-  const canCreate = name.trim() && slug.trim()
+  const canCreate = name.trim() && slug.trim();
 
   async function handleCreate() {
-    if (!canCreate) return
-    setSaving(true); setError(null)
+    if (!canCreate) return;
+    setSaving(true);
+    setError(null);
     try {
-      const selectedType = contentTypeMode === 'specific'
-        ? multiContentTypes[0] ?? null
-        : singleContentType
-      const content = selectedType ? { component: selectedType } : {}
+      const selectedType =
+        contentTypeMode === 'specific' ? (multiContentTypes[0] ?? null) : singleContentType;
+      const content = selectedType ? { component: selectedType } : {};
       const res = await fetch(`/api/admin/spaces/${spaceId}/stories`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -329,11 +377,17 @@ export function CreateFolderPanel({ spaceId, open, defaultParentId, onClose, onC
             content,
           },
         }),
-      })
-      if (!res.ok) { const d = await res.json(); setError(d.message ?? 'Failed to create folder'); return }
-      const data = await res.json()
-      onCreated(data.story?.id)
-    } finally { setSaving(false) }
+      });
+      if (!res.ok) {
+        const d = await res.json();
+        setError(d.message ?? 'Failed to create folder');
+        return;
+      }
+      const data = await res.json();
+      onCreated(data.story?.id);
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -346,14 +400,29 @@ export function CreateFolderPanel({ spaceId, open, defaultParentId, onClose, onC
           <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">New Folder</h2>
         </div>
       }
-      footer={<PanelFooter onCancel={onClose} onConfirm={handleCreate} saving={saving} disabled={!canCreate} />}
+      footer={
+        <PanelFooter
+          onCancel={onClose}
+          onConfirm={handleCreate}
+          saving={saving}
+          disabled={!canCreate}
+        />
+      }
     >
       <div className="space-y-4">
         {error && (
-          <div className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg">{error}</div>
+          <div className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg">
+            {error}
+          </div>
         )}
 
-        <FormInput label="Name" required value={name} onChange={setName} placeholder="e.g. Landing" />
+        <FormInput
+          label="Name"
+          required
+          value={name}
+          onChange={setName}
+          placeholder="e.g. Landing"
+        />
         <FormInput label="Slug" value={slug} onChange={setSlug} />
         <FormTextarea
           label="Real Path"
@@ -363,11 +432,13 @@ export function CreateFolderPanel({ spaceId, open, defaultParentId, onClose, onC
         />
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Parent folder</label>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+            Parent folder
+          </label>
           <SelectDropdown
             options={folderOptions}
             value={parentId !== null ? String(parentId) : ''}
-            onChange={(v) => setParentId(v ? parseInt(v) : null)}
+            onChange={(v) => setParentId(v ? parseInt(v, 10) : null)}
             placeholder="Root"
             loading={folderLoading}
           />
@@ -398,7 +469,9 @@ export function CreateFolderPanel({ spaceId, open, defaultParentId, onClose, onC
                 onChange={() => setContentTypeMode('specific')}
                 className="accent-teal-600"
               />
-              <span className="text-sm text-gray-700 dark:text-gray-300">Specific content types</span>
+              <span className="text-sm text-gray-700 dark:text-gray-300">
+                Specific content types
+              </span>
             </label>
           </div>
 
@@ -424,7 +497,9 @@ export function CreateFolderPanel({ spaceId, open, defaultParentId, onClose, onC
         </div>
 
         <div>
-          <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Folder content settings</p>
+          <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Folder content settings
+          </p>
           <label className="flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
@@ -432,11 +507,13 @@ export function CreateFolderPanel({ spaceId, open, defaultParentId, onClose, onC
               onChange={(e) => setDisableVisualEditor(e.target.checked)}
               className="accent-teal-600 w-4 h-4"
             />
-            <span className="text-sm text-gray-700 dark:text-gray-300">Disable visual editor (Form only)</span>
+            <span className="text-sm text-gray-700 dark:text-gray-300">
+              Disable visual editor (Form only)
+            </span>
             <InfoTooltip text="Disabling the visual composer will let you focus on the component definition. Once you've setup the composer you can enable this option for the live-preview." />
           </label>
         </div>
       </div>
     </RightSidebar>
-  )
+  );
 }

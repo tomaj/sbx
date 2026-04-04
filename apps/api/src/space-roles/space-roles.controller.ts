@@ -1,60 +1,52 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  HttpCode,
-  Param,
-  Post,
-  Put,
-  Query,
-  Req,
-} from '@nestjs/common';
+import { Controller, Delete, Get, HttpCode, Param, ParseIntPipe, Req } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Auth } from '../auth/auth.decorator';
 import { SpaceRolesService } from './space-roles.service';
+import { BaseCrudController } from '../shared/base-crud.controller';
 import { ResultGuard } from '../shared/result-guard.util';
+import { BaseCrudService } from '../shared/base-crud.service';
+import { AuthenticatedRequest } from '../auth/authenticated-request.interface';
 
 @ApiTags('Space Roles - MAPI')
 @Controller('v1/spaces/:spaceId/space_roles')
 @Auth('session-or-token')
-export class SpaceRolesController {
-  constructor(private readonly spaceRolesService: SpaceRolesService) {}
-
-  @Get()
-  async getSpaceRoles(
-    @Req() req: any,
-    @Query('search') search?: string,
-    @Query('by_ids') byIds?: string,
-  ) {
-    return this.spaceRolesService.adminList(req.space.id, { search, by_ids: byIds });
+export class SpaceRolesController extends BaseCrudController<unknown> {
+  constructor(private readonly spaceRolesService: SpaceRolesService) {
+    super();
   }
 
-  @Get(':id')
-  async getSpaceRole(@Req() req: any, @Param('id') id: string) {
-    return ResultGuard.throwIfNotFound(await this.spaceRolesService.adminFindOne(req.space.id, parseInt(id)));
+  protected get service(): BaseCrudService<unknown> {
+    // SpaceRolesService is not a BaseCrudService subclass; uses adminFindOne/adminList
+    return this.spaceRolesService as unknown as BaseCrudService<unknown>;
   }
 
-  @Post()
-  @HttpCode(201)
-  async createSpaceRole(@Req() req: any, @Body() body: { space_role: any }) {
-    return this.spaceRolesService.create(req.space.id, body.space_role ?? {});
+  protected async doList(spaceId: number, query: Record<string, string>): Promise<unknown> {
+    return this.spaceRolesService.adminList(spaceId, {
+      search: query.search,
+      by_ids: query.by_ids,
+    });
   }
 
-  @Put(':id')
-  async updateSpaceRole(
-    @Req() req: any,
-    @Param('id') id: string,
-    @Body() body: { space_role: any },
-  ) {
+  protected async doCreate(spaceId: number, body: any): Promise<unknown> {
+    return this.spaceRolesService.create(spaceId, body.space_role ?? {});
+  }
+
+  protected async doUpdate(spaceId: number, id: number, body: any): Promise<unknown> {
     return ResultGuard.throwIfNotFound(
-      await this.spaceRolesService.update(req.space.id, parseInt(id), body.space_role ?? {}),
+      await this.spaceRolesService.update(spaceId, id, body.space_role ?? {}),
     );
   }
 
+  // Space roles uses adminFindOne which includes user_count
+  @Get(':id')
+  async get(@Req() req: AuthenticatedRequest, @Param('id', ParseIntPipe) id: number) {
+    return ResultGuard.throwIfNotFound(await this.spaceRolesService.adminFindOne(req.space.id, id));
+  }
+
+  // Space roles delete returns 200 with the deleted role (not 204 empty)
   @Delete(':id')
   @HttpCode(200)
-  async deleteSpaceRole(@Req() req: any, @Param('id') id: string) {
-    return ResultGuard.throwIfNotFound(await this.spaceRolesService.remove(req.space.id, parseInt(id)));
+  async remove(@Req() req: AuthenticatedRequest, @Param('id', ParseIntPipe) id: number) {
+    return ResultGuard.throwIfNotFound(await this.spaceRolesService.remove(req.space.id, id));
   }
 }

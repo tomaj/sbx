@@ -1,8 +1,32 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { SQL, and, asc, count, desc, eq, gt, gte, ilike, isNull, isNotNull, lt, lte, ne, notInArray, or, sql, inArray } from 'drizzle-orm';
+import {
+  type SQL,
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  gt,
+  ilike,
+  isNull,
+  isNotNull,
+  lt,
+  notInArray,
+  or,
+  sql,
+  inArray,
+} from 'drizzle-orm';
+import { escapeLike } from '../shared/query-parser.util';
 import { DB } from '../db/db.module';
-import type { DbType } from '../db/db.module';
-import { stories, tags, components, componentGroups, storyReleases, storyVersions, releases, users, workflowStageChanges } from '../db/schema';
+import { DbType } from '../db/db.module';
+import {
+  stories,
+  tags,
+  components,
+  componentGroups,
+  storyReleases,
+  storyVersions,
+} from '../db/schema';
 import { JobsClient } from '@sbx/jobs';
 import { JOBS_CLIENT } from '../jobs/jobs.module';
 import { WebhooksService } from '../webhooks/webhooks.service';
@@ -31,25 +55,30 @@ export class StoriesService {
     path?: string | null;
     isStartpage?: boolean;
   }) {
-    void this.db.execute(sql`SELECT nextval('story_versions_id_seq')`).then(({ rows }) => {
-      const versionId = Number((rows[0] as any).nextval);
-      return this.db.insert(storyVersions).values({
-        id: versionId,
-        storyId: params.storyId,
-        spaceId: params.spaceId,
-        userId: params.userId ?? null,
-        releaseId: params.releaseId ?? null,
-        action: params.action,
-        status: params.status,
-        name: params.name,
-        slug: params.slug,
-        fullSlug: params.fullSlug,
-        content: params.content,
-        tagList: params.tagList ?? [],
-        path: params.path ?? null,
-        isStartpage: params.isStartpage ?? false,
+    void this.db
+      .execute(sql`SELECT nextval('story_versions_id_seq')`)
+      .then(({ rows }) => {
+        const versionId = Number((rows[0] as any).nextval);
+        return this.db.insert(storyVersions).values({
+          id: versionId,
+          storyId: params.storyId,
+          spaceId: params.spaceId,
+          userId: params.userId ?? null,
+          releaseId: params.releaseId ?? null,
+          action: params.action,
+          status: params.status,
+          name: params.name,
+          slug: params.slug,
+          fullSlug: params.fullSlug,
+          content: params.content,
+          tagList: params.tagList ?? [],
+          path: params.path ?? null,
+          isStartpage: params.isStartpage ?? false,
+        });
+      })
+      .catch(() => {
+        /* non-critical — never block main flow */
       });
-    }).catch(() => { /* non-critical — never block main flow */ });
   }
 
   async listStoriesAdmin(
@@ -89,11 +118,37 @@ export class StoriesService {
     } = {},
   ) {
     const {
-      page = 1, perPage = 25, search, sortField = 'position', sortDir = 'asc',
-      parentId, contentType, tag, block, published, uuid, storyId, inRelease,
-      byIds, byUuids, byUuidsOrdered, excludingIds, favouriteOf, mine, folderOnly, storyOnly, startsWith,
-      inTrash, withSlug, bySlugs, excludingSlugs, inWorkflowStages, scheduledAtGt, scheduledAtLt,
-      referenceSearch, withSummary,
+      page = 1,
+      perPage = 25,
+      search,
+      sortField = 'position',
+      sortDir = 'asc',
+      parentId,
+      contentType,
+      tag,
+      block,
+      published,
+      uuid,
+      storyId,
+      inRelease,
+      byIds,
+      byUuids,
+      byUuidsOrdered,
+      excludingIds,
+      favouriteOf,
+      mine,
+      folderOnly,
+      storyOnly,
+      startsWith,
+      inTrash,
+      withSlug,
+      bySlugs,
+      excludingSlugs,
+      inWorkflowStages,
+      scheduledAtGt,
+      scheduledAtLt,
+      referenceSearch,
+      withSummary,
     } = opts;
 
     // When filtering by release, join story_releases and return release-specific content
@@ -109,10 +164,10 @@ export class StoriesService {
       // text_search: name OR slug OR full_slug OR content (as text)
       s
         ? or(
-            ilike(stories.name, `%${s}%`),
-            ilike(stories.slug, `%${s}%`),
-            ilike(stories.fullSlug, `%${s}%`),
-            sql`${stories.content}::text ilike ${'%' + s + '%'}`,
+            ilike(stories.name, `%${escapeLike(s)}%`),
+            ilike(stories.slug, `%${escapeLike(s)}%`),
+            ilike(stories.fullSlug, `%${escapeLike(s)}%`),
+            sql`${stories.content}::text ilike ${`%${escapeLike(s)}%`}`,
           )
         : undefined,
       // parent_id filter only when no search
@@ -127,17 +182,21 @@ export class StoriesService {
               : eq(stories.parentId, parentId),
       contentType?.trim()
         ? (() => {
-            const types = contentType.split(',').map((t) => t.trim()).filter(Boolean);
+            const types = contentType
+              .split(',')
+              .slice(0, 1000)
+              .map((t) => t.trim())
+              .filter(Boolean);
             return types.length === 1
               ? eq(stories.contentType, types[0])
               : inArray(stories.contentType, types);
           })()
         : undefined,
       tag?.trim()
-        ? sql`${stories.tagList}::text ilike ${'%' + tag.trim() + '%'}`
+        ? sql`${stories.tagList}::text ilike ${`%${escapeLike(tag.trim())}%`}`
         : undefined,
       block?.trim()
-        ? sql`${stories.content}::text ilike ${'%"component":"' + block.trim() + '"%'}`
+        ? sql`${stories.content}::text ilike ${`%"component":"${escapeLike(block.trim())}"%`}`
         : undefined,
       published !== undefined ? eq(stories.published, published) : undefined,
       uuid?.trim() ? eq(stories.uuid, uuid.trim()) : undefined,
@@ -162,19 +221,23 @@ export class StoriesService {
         : undefined,
       folderOnly ? eq(stories.isFolder, true) : undefined,
       storyOnly ? eq(stories.isFolder, false) : undefined,
-      startsWith?.trim() ? ilike(stories.fullSlug, `${startsWith.trim()}%`) : undefined,
+      startsWith?.trim() ? ilike(stories.fullSlug, `${escapeLike(startsWith.trim())}%`) : undefined,
       withSlug?.trim() ? eq(stories.fullSlug, withSlug.trim()) : undefined,
       bySlugs?.length
         ? or(...bySlugs.map((sl) => ilike(stories.fullSlug, sl.replace(/\*/g, '%'))))
         : undefined,
       excludingSlugs?.length
-        ? and(...excludingSlugs.map((sl) => sql`${stories.fullSlug} not ilike ${sl.replace(/\*/g, '%')}`))
+        ? and(
+            ...excludingSlugs.map(
+              (sl) => sql`${stories.fullSlug} not ilike ${sl.replace(/\*/g, '%')}`,
+            ),
+          )
         : undefined,
       inWorkflowStages?.length
         ? sql`EXISTS (
             SELECT 1 FROM workflow_stage_changes wsc
             WHERE wsc.story_id = ${stories.id}
-              AND wsc.workflow_stage_id = ANY(ARRAY[${sql.raw(inWorkflowStages.join(','))}])
+              AND wsc.workflow_stage_id = ANY(${inWorkflowStages})
               AND wsc.created_at = (
                 SELECT MAX(wsc2.created_at) FROM workflow_stage_changes wsc2
                 WHERE wsc2.story_id = ${stories.id}
@@ -187,7 +250,7 @@ export class StoriesService {
         if (!referenceSearch) return undefined;
         const refs = Array.isArray(referenceSearch) ? referenceSearch : [referenceSearch];
         if (refs.length === 0) return undefined;
-        return or(...refs.map((f) => sql`${stories.content}::text ilike ${'%' + f + '%'}`));
+        return or(...refs.map((f) => sql`${stories.content}::text ilike ${`%${f}%`}`));
       })(),
     ];
 
@@ -221,10 +284,12 @@ export class StoriesService {
       .offset((page - 1) * perPage);
 
     // by_uuids_ordered: preserve input order
-    let formattedStories = rows.map((s) => this.formatStory(s, withSummary));
+    const formattedStories = rows.map((s) => this.formatStory(s, withSummary));
     if (byUuidsOrdered?.length) {
       const orderMap = new Map(byUuidsOrdered.map((uuid, idx) => [uuid, idx]));
-      formattedStories.sort((a, b) => (orderMap.get(a.uuid) ?? 999) - (orderMap.get(b.uuid) ?? 999));
+      formattedStories.sort(
+        (a, b) => (orderMap.get(a.uuid) ?? 999) - (orderMap.get(b.uuid) ?? 999),
+      );
     }
 
     return {
@@ -246,14 +311,11 @@ export class StoriesService {
       eq(stories.spaceId, spaceId),
       isNull(stories.deletedAt),
       sql`${stories.releaseIds} @> ${JSON.stringify([releaseId])}::jsonb`,
-      search?.trim() ? ilike(stories.name, `%${search.trim()}%`) : undefined,
+      search?.trim() ? ilike(stories.name, `%${escapeLike(search.trim())}%`) : undefined,
     ];
     const where = and(...conditions);
 
-    const [{ total }] = await this.db
-      .select({ total: count() })
-      .from(stories)
-      .where(where);
+    const [{ total }] = await this.db.select({ total: count() }).from(stories).where(where);
 
     const rows = await this.db
       .select()
@@ -274,7 +336,13 @@ export class StoriesService {
       this.db
         .selectDistinct({ value: stories.contentType })
         .from(stories)
-        .where(and(eq(stories.spaceId, spaceId), isNull(stories.deletedAt), isNotNull(stories.contentType)))
+        .where(
+          and(
+            eq(stories.spaceId, spaceId),
+            isNull(stories.deletedAt),
+            isNotNull(stories.contentType),
+          ),
+        )
         .orderBy(asc(stories.contentType)),
       this.db
         .select({ name: tags.name })
@@ -323,7 +391,13 @@ export class StoriesService {
     const [story] = await this.db
       .select()
       .from(stories)
-      .where(and(eq(stories.id, BigInt(storyId)), eq(stories.spaceId, spaceId), isNull(stories.deletedAt)))
+      .where(
+        and(
+          eq(stories.id, BigInt(storyId)),
+          eq(stories.spaceId, spaceId),
+          isNull(stories.deletedAt),
+        ),
+      )
       .limit(1);
 
     if (!story) throw new NotFoundException('Story not found');
@@ -456,11 +530,15 @@ export class StoriesService {
     if (data.name !== undefined) updateData.name = data.name;
     if (data.slug !== undefined) updateData.slug = data.slug;
     if (data.tag_list !== undefined) updateData.tagList = data.tag_list;
-    if ('sort_by_date' in data) updateData.sortByDate = data.sort_by_date ? new Date(data.sort_by_date) : null;
+    if ('sort_by_date' in data)
+      updateData.sortByDate = data.sort_by_date ? new Date(data.sort_by_date) : null;
     if ('path' in data) updateData.path = data.path;
     if ('first_published_at' in data)
-      updateData.firstPublishedAt = data.first_published_at ? new Date(data.first_published_at) : null;
-    if ('publish_at' in data) updateData.publishAt = data.publish_at ? new Date(data.publish_at) : null;
+      updateData.firstPublishedAt = data.first_published_at
+        ? new Date(data.first_published_at)
+        : null;
+    if ('publish_at' in data)
+      updateData.publishAt = data.publish_at ? new Date(data.publish_at) : null;
     if ('expire_at' in data) updateData.expireAt = data.expire_at ? new Date(data.expire_at) : null;
     if ('is_startpage' in data) updateData.isStartpage = data.is_startpage;
     if ('disable_fe_editor' in data) updateData.disableFEEditor = data.disable_fe_editor;
@@ -468,13 +546,18 @@ export class StoriesService {
     // Recompute fullSlug when is_startpage or slug changes
     if ('is_startpage' in data || data.slug !== undefined) {
       const [current] = await this.db
-        .select({ slug: stories.slug, parentId: stories.parentId, isStartpage: stories.isStartpage })
+        .select({
+          slug: stories.slug,
+          parentId: stories.parentId,
+          isStartpage: stories.isStartpage,
+        })
         .from(stories)
         .where(and(eq(stories.id, BigInt(storyId)), eq(stories.spaceId, spaceId)))
         .limit(1);
       if (current) {
         const effectiveSlug = data.slug ?? current.slug;
-        const effectiveIsStartpage = 'is_startpage' in data ? data.is_startpage : current.isStartpage;
+        const effectiveIsStartpage =
+          'is_startpage' in data ? data.is_startpage : current.isStartpage;
         const parentId = current.parentId;
         if (parentId) {
           const [parent] = await this.db
@@ -496,7 +579,13 @@ export class StoriesService {
     await this.db
       .update(stories)
       .set(updateData)
-      .where(and(eq(stories.id, BigInt(storyId)), eq(stories.spaceId, spaceId), isNull(stories.deletedAt)));
+      .where(
+        and(
+          eq(stories.id, BigInt(storyId)),
+          eq(stories.spaceId, spaceId),
+          isNull(stories.deletedAt),
+        ),
+      );
 
     // Schedule/cancel delayed jobs when publish_at or expire_at changes
     const storyIdStr = storyId.toString();
@@ -544,7 +633,11 @@ export class StoriesService {
     }
 
     this.logVersion({
-      storyId, spaceId, userId: authorId, action: 'save', status: 'draft',
+      storyId,
+      spaceId,
+      userId: authorId,
+      action: 'save',
+      status: 'draft',
       name: s.name,
       slug: s.slug,
       fullSlug: s.full_slug,
@@ -572,14 +665,25 @@ export class StoriesService {
   ) {
     const [story] = await this.db
       .select({
-        id: stories.id, name: stories.name, slug: stories.slug,
-        fullSlug: stories.fullSlug, content: stories.content,
-        tagList: stories.tagList, path: stories.path,
-        isStartpage: stories.isStartpage, parentId: stories.parentId,
+        id: stories.id,
+        name: stories.name,
+        slug: stories.slug,
+        fullSlug: stories.fullSlug,
+        content: stories.content,
+        tagList: stories.tagList,
+        path: stories.path,
+        isStartpage: stories.isStartpage,
+        parentId: stories.parentId,
         releaseIds: stories.releaseIds,
       })
       .from(stories)
-      .where(and(eq(stories.id, BigInt(storyId)), eq(stories.spaceId, spaceId), isNull(stories.deletedAt)))
+      .where(
+        and(
+          eq(stories.id, BigInt(storyId)),
+          eq(stories.spaceId, spaceId),
+          isNull(stories.deletedAt),
+        ),
+      )
       .limit(1);
     if (!story) throw new NotFoundException('Story not found');
 
@@ -595,7 +699,8 @@ export class StoriesService {
     const existingIds = (story.releaseIds as number[]) ?? [];
 
     const effectiveSlug = changes.slug ?? existingData.slug ?? story.slug;
-    const effectiveIsStartpage = changes.is_startpage ?? existingData.is_startpage ?? story.isStartpage;
+    const effectiveIsStartpage =
+      changes.is_startpage ?? existingData.is_startpage ?? story.isStartpage;
 
     // Recompute full_slug if slug or is_startpage changed
     let effectiveFullSlug = existingData.full_slug ?? story.fullSlug;
@@ -647,11 +752,18 @@ export class StoriesService {
 
     // Side effects AFTER transaction (version logging)
     this.logVersion({
-      storyId, spaceId, releaseId, action: 'save', status: 'draft',
-      name: snapshot.name, slug: snapshot.slug, fullSlug: snapshot.full_slug,
+      storyId,
+      spaceId,
+      releaseId,
+      action: 'save',
+      status: 'draft',
+      name: snapshot.name,
+      slug: snapshot.slug,
+      fullSlug: snapshot.full_slug,
       content: (snapshot.content ?? {}) as Record<string, any>,
       tagList: snapshot.tag_list ?? [],
-      path: snapshot.path, isStartpage: snapshot.is_startpage,
+      path: snapshot.path,
+      isStartpage: snapshot.is_startpage,
     });
 
     return this.getStoryAdmin(spaceId, storyId);
@@ -660,24 +772,31 @@ export class StoriesService {
   async publishStory(spaceId: number, storyId: number, userId?: number | null, _lang?: string) {
     const [current] = await this.db
       .select({
-        firstPublishedAt: stories.firstPublishedAt, name: stories.name, fullSlug: stories.fullSlug,
-        slug: stories.slug, content: stories.content, tagList: stories.tagList,
-        path: stories.path, isStartpage: stories.isStartpage,
+        firstPublishedAt: stories.firstPublishedAt,
+        name: stories.name,
+        fullSlug: stories.fullSlug,
+        slug: stories.slug,
+        content: stories.content,
+        tagList: stories.tagList,
+        path: stories.path,
+        isStartpage: stories.isStartpage,
       })
       .from(stories)
       .where(and(eq(stories.id, BigInt(storyId)), eq(stories.spaceId, spaceId)))
       .limit(1);
 
     const now = new Date();
-    const publishedData = current ? {
-      name: current.name,
-      slug: current.slug,
-      full_slug: current.fullSlug,
-      content: current.content,
-      tag_list: current.tagList,
-      path: current.path,
-      is_startpage: current.isStartpage,
-    } : null;
+    const publishedData = current
+      ? {
+          name: current.name,
+          slug: current.slug,
+          full_slug: current.fullSlug,
+          content: current.content,
+          tag_list: current.tagList,
+          path: current.path,
+          is_startpage: current.isStartpage,
+        }
+      : null;
 
     await this.db
       .update(stories)
@@ -689,7 +808,13 @@ export class StoriesService {
         updatedAt: now,
         ...(publishedData && { publishedData }),
       })
-      .where(and(eq(stories.id, BigInt(storyId)), eq(stories.spaceId, spaceId), isNull(stories.deletedAt)));
+      .where(
+        and(
+          eq(stories.id, BigInt(storyId)),
+          eq(stories.spaceId, spaceId),
+          isNull(stories.deletedAt),
+        ),
+      );
 
     void this.webhooks.dispatch(spaceId, WEBHOOK_ACTIONS.STORY_PUBLISHED, {
       action: 'published',
@@ -701,11 +826,18 @@ export class StoriesService {
 
     if (current) {
       this.logVersion({
-        storyId, spaceId, userId, action: 'publish', status: 'published',
-        name: current.name, slug: current.slug, fullSlug: current.fullSlug,
+        storyId,
+        spaceId,
+        userId,
+        action: 'publish',
+        status: 'published',
+        name: current.name,
+        slug: current.slug,
+        fullSlug: current.fullSlug,
         content: (current.content ?? {}) as Record<string, any>,
         tagList: current.tagList ?? [],
-        path: current.path, isStartpage: current.isStartpage,
+        path: current.path,
+        isStartpage: current.isStartpage,
       });
     }
 
@@ -722,7 +854,13 @@ export class StoriesService {
     await this.db
       .update(stories)
       .set({ published: false, unpublishedChanges: true, updatedAt: new Date() })
-      .where(and(eq(stories.id, BigInt(storyId)), eq(stories.spaceId, spaceId), isNull(stories.deletedAt)));
+      .where(
+        and(
+          eq(stories.id, BigInt(storyId)),
+          eq(stories.spaceId, spaceId),
+          isNull(stories.deletedAt),
+        ),
+      );
 
     void this.webhooks.dispatch(spaceId, WEBHOOK_ACTIONS.STORY_UNPUBLISHED, {
       action: 'unpublished',
@@ -734,9 +872,16 @@ export class StoriesService {
 
     if (current) {
       this.logVersion({
-        storyId, spaceId, userId, action: 'unpublish', status: 'unpublished',
-        name: current.name, slug: '', fullSlug: current.fullSlug,
-        content: {}, tagList: [],
+        storyId,
+        spaceId,
+        userId,
+        action: 'unpublish',
+        status: 'unpublished',
+        name: current.name,
+        slug: '',
+        fullSlug: current.fullSlug,
+        content: {},
+        tagList: [],
       });
     }
 
@@ -818,9 +963,13 @@ export class StoriesService {
           path: data.path ?? null,
           is_startpage: data.is_startpage ?? false,
         };
-        await tx
-          .insert(storyReleases)
-          .values({ storyId: Number(id), releaseId, content: snapshot, createdAt: now, updatedAt: now });
+        await tx.insert(storyReleases).values({
+          storyId: Number(id),
+          releaseId,
+          content: snapshot,
+          createdAt: now,
+          updatedAt: now,
+        });
         await tx
           .update(stories)
           .set({ releaseIds: [releaseId] })
@@ -853,10 +1002,18 @@ export class StoriesService {
     }
 
     this.logVersion({
-      storyId: Number(id), spaceId, userId: authorId, action: 'create', status: 'draft',
-      name: data.name, slug: data.slug, fullSlug,
-      content: data.content ?? {}, tagList: data.tag_list ?? [],
-      path: data.path, isStartpage: data.is_startpage,
+      storyId: Number(id),
+      spaceId,
+      userId: authorId,
+      action: 'create',
+      status: 'draft',
+      name: data.name,
+      slug: data.slug,
+      fullSlug,
+      content: data.content ?? {},
+      tagList: data.tag_list ?? [],
+      path: data.path,
+      isStartpage: data.is_startpage,
     });
 
     return this.getStoryAdmin(spaceId, Number(id));
@@ -931,11 +1088,21 @@ export class StoriesService {
     return base;
   }
 
-  async partialUpdateStory(spaceId: number, storyId: number, updates: { favourite_for_user_ids?: number[] }) {
+  async partialUpdateStory(
+    spaceId: number,
+    storyId: number,
+    updates: { favourite_for_user_ids?: number[] },
+  ) {
     const [story] = await this.db
       .select()
       .from(stories)
-      .where(and(eq(stories.id, BigInt(storyId)), eq(stories.spaceId, spaceId), isNull(stories.deletedAt)))
+      .where(
+        and(
+          eq(stories.id, BigInt(storyId)),
+          eq(stories.spaceId, spaceId),
+          isNull(stories.deletedAt),
+        ),
+      )
       .limit(1);
     if (!story) throw new NotFoundException('Story not found');
 

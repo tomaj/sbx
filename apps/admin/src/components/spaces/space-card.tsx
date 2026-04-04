@@ -1,21 +1,21 @@
-'use client'
+'use client';
 
-import type React from 'react'
-import Link from 'next/link'
-import { Star } from 'lucide-react'
-import { TimeAgo } from '@/components/ui/time-ago'
-import { UserAvatar } from '@/components/ui/user-avatar'
-import type { Space } from '@sbx/types'
+import type React from 'react';
+import Link from 'next/link';
+import { Star } from 'lucide-react';
+import { TimeAgo } from '@/components/ui/time-ago';
+import { UserAvatar } from '@/components/ui/user-avatar';
+import type { Space } from '@sbx/types';
 
 interface SpaceCardProps {
-  space: Space
-  isFav?: boolean
-  onToggleFav?: () => void
+  space: Space;
+  isFav?: boolean;
+  onToggleFav?: () => void;
 }
 
 export function SpaceCard({ space, isFav = false, onToggleFav }: SpaceCardProps) {
-  const visibleMembers = space.members.slice(0, 5)
-  const extraCount = space.members.length - visibleMembers.length
+  const visibleMembers = space.members.slice(0, 5);
+  const extraCount = space.members.length - visibleMembers.length;
 
   return (
     <div className="relative">
@@ -44,7 +44,7 @@ export function SpaceCard({ space, isFav = false, onToggleFav }: SpaceCardProps)
         </div>
 
         {/* Member avatars */}
-        <div className="flex items-center mb-5">
+        <div className="flex items-center mb-5 min-h-[36px]">
           {visibleMembers.map((member, i) => (
             <UserAvatar
               key={i}
@@ -69,7 +69,9 @@ export function SpaceCard({ space, isFav = false, onToggleFav }: SpaceCardProps)
 
         {/* Last activity */}
         <div className="pt-4 border-t border-gray-100 dark:border-gray-800 flex items-center gap-1">
-          <span className="text-xs text-gray-400 group-hover:text-teal-500 dark:group-hover:text-teal-400 transition-colors">Updated</span>
+          <span className="text-xs text-gray-400 group-hover:text-teal-500 dark:group-hover:text-teal-400 transition-colors">
+            Updated
+          </span>
           <TimeAgo
             date={space.last_activity_at ?? space.updated_at}
             className="text-xs text-gray-400 group-hover:text-teal-500 dark:group-hover:text-teal-400 transition-colors"
@@ -77,5 +79,5 @@ export function SpaceCard({ space, isFav = false, onToggleFav }: SpaceCardProps)
         </div>
       </Link>
     </div>
-  )
+  );
 }

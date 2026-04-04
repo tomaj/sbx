@@ -1,39 +1,56 @@
-'use client'
+'use client';
 
-import type { ComponentGroup } from '../group-tree'
-import type { WorkingField } from './types'
-import { SelectDropdown } from '@/components/ui/select-dropdown'
-import { TagsMultiselect } from '@/components/ui/tags-multiselect'
+import type { ComponentGroup } from '../group-tree';
+import type { WorkingField } from './types';
+import { SelectDropdown } from '@/components/ui/select-dropdown';
+import { TagsMultiselect } from '@/components/ui/tags-multiselect';
+import { InfoTooltip } from '@/components/ui/info-tooltip';
+import { FormField, inputCls } from '@/components/ui/form-field';
+import { BLOCK_ICONS } from '../block-icons';
+import { AssetField } from '@/components/story-editor/fields/asset-field';
+import type { AssetFieldDef } from './types';
 
-type BlockType = 'nestable' | 'content_type' | 'universal'
+type BlockType = 'nestable' | 'content_type' | 'universal';
 
-const PREVIEW_FIELD_TYPES = new Set(['text', 'textarea', 'option', 'number', 'markdown'])
+const PREVIEW_FIELD_TYPES = new Set(['text', 'textarea', 'option', 'number', 'markdown']);
 
 const PRESET_COLORS = [
-  '#ef6252', '#ff6159', '#ffac00', '#f4cc48', '#fbce41',
-  '#2db47d', '#00b3b0', '#374dc3', '#395ece', '#dfe3e8',
-]
+  '#ef6252',
+  '#ff6159',
+  '#ffac00',
+  '#f4cc48',
+  '#fbce41',
+  '#2db47d',
+  '#00b3b0',
+  '#374dc3',
+  '#395ece',
+  '#dfe3e8',
+];
 
 interface ConfigTabProps {
-  spaceId: string
-  displayName: string
-  description: string
-  blockType: BlockType
-  groupUuid: string | null
-  groups: ComponentGroup[]
-  schemaFields: WorkingField[]
-  previewField: string | null
-  previewTmpl: string
-  internalTags: { id: number; name: string }[]
-  color: string | null
-  onDisplayNameChange: (v: string) => void
-  onDescriptionChange: (v: string) => void
-  onBlockTypeChange: (v: BlockType) => void
-  onGroupUuidChange: (v: string | null) => void
-  onPreviewFieldChange: (v: string | null) => void
-  onPreviewTmplChange: (v: string) => void
-  onInternalTagsChange: (v: { id: number; name: string }[]) => void
-  onColorChange: (v: string | null) => void
+  spaceId: string;
+  displayName: string;
+  description: string;
+  blockType: BlockType;
+  groupUuid: string | null;
+  groups: ComponentGroup[];
+  schemaFields: WorkingField[];
+  previewField: string | null;
+  previewTmpl: string;
+  internalTags: { id: number; name: string }[];
+  color: string | null;
+  icon: string | null;
+  image: string | null;
+  onDisplayNameChange: (v: string) => void;
+  onDescriptionChange: (v: string) => void;
+  onBlockTypeChange: (v: BlockType) => void;
+  onGroupUuidChange: (v: string | null) => void;
+  onPreviewFieldChange: (v: string | null) => void;
+  onPreviewTmplChange: (v: string) => void;
+  onInternalTagsChange: (v: { id: number; name: string }[]) => void;
+  onColorChange: (v: string | null) => void;
+  onIconChange: (v: string | null) => void;
+  onImageChange: (v: string | null) => void;
 }
 
 export function ConfigTab({
@@ -48,6 +65,8 @@ export function ConfigTab({
   previewTmpl,
   internalTags,
   color,
+  icon,
+  image,
   onDisplayNameChange,
   onDescriptionChange,
   onBlockTypeChange,
@@ -56,46 +75,39 @@ export function ConfigTab({
   onPreviewTmplChange,
   onInternalTagsChange,
   onColorChange,
+  onIconChange,
+  onImageChange,
 }: ConfigTabProps) {
-
   const previewFieldOptions = [
     { value: '', label: 'Automatic' },
     ...schemaFields
       .filter((f) => PREVIEW_FIELD_TYPES.has(f.def.type))
       .map((f) => ({ value: f.key, label: f.def.display_name || f.key })),
-  ]
+  ];
 
   return (
     <div className="flex-1 overflow-y-auto px-8 py-6 space-y-5">
       {/* Display name */}
-      <div>
-        <label className="block text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">
-          Display name
-        </label>
+      <FormField label="Display name" description="Human-readable name shown in the editor">
         <input
           type="text"
           value={displayName}
           onChange={(e) => onDisplayNameChange(e.target.value)}
           placeholder="My Block"
-          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-teal-500"
+          className={inputCls}
         />
-        <p className="mt-1 text-xs text-gray-400">Human-readable name shown in the editor</p>
-      </div>
+      </FormField>
 
       {/* Description */}
-      <div>
-        <label className="block text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">
-          Description
-        </label>
+      <FormField label="Description" description="Used in the editor interface only">
         <input
           type="text"
           value={description}
           onChange={(e) => onDescriptionChange(e.target.value)}
           placeholder="What this block is for..."
-          className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-teal-500"
+          className={inputCls}
         />
-        <p className="mt-1 text-xs text-gray-400">Used in the editor interface only</p>
-      </div>
+      </FormField>
 
       {/* Block type */}
       <div>
@@ -105,9 +117,21 @@ export function ConfigTab({
         <div className="flex flex-col gap-2">
           {(
             [
-              { value: 'nestable' as BlockType, title: 'Nestable block', desc: 'e.g. Hero, Grid, Section, Newsletter Section...' },
-              { value: 'content_type' as BlockType, title: 'Content type block', desc: 'e.g. Landing pages, Post, Authors, Product...' },
-              { value: 'universal' as BlockType, title: 'Universal block', desc: 'Can be used as both content type and nested block.' },
+              {
+                value: 'nestable' as BlockType,
+                title: 'Nestable block',
+                desc: 'e.g. Hero, Grid, Section, Newsletter Section...',
+              },
+              {
+                value: 'content_type' as BlockType,
+                title: 'Content type block',
+                desc: 'e.g. Landing pages, Post, Authors, Product...',
+              },
+              {
+                value: 'universal' as BlockType,
+                title: 'Universal block',
+                desc: 'Can be used as both content type and nested block.',
+              },
             ] as Array<{ value: BlockType; title: string; desc: string }>
           ).map(({ value, title, desc }) => (
             <button
@@ -120,7 +144,9 @@ export function ConfigTab({
                   : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'
               }`}
             >
-              <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${blockType === value ? 'border-teal-600' : 'border-gray-400'}`}>
+              <div
+                className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${blockType === value ? 'border-teal-600' : 'border-gray-400'}`}
+              >
                 {blockType === value && <div className="w-2 h-2 rounded-full bg-teal-600" />}
               </div>
               <div>
@@ -134,8 +160,9 @@ export function ConfigTab({
 
       {/* Block Folder */}
       <div>
-        <label className="block text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">
+        <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">
           Block Folder
+          <InfoTooltip text="If you select a folder, the block will be added inside that block folder. Otherwise, the block will be added inside the 'All blocks' section." />
         </label>
         <SelectDropdown
           value={groupUuid}
@@ -147,34 +174,31 @@ export function ConfigTab({
 
       {/* Tags */}
       <div>
-        <label className="block text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">
+        <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">
           Tags
+          <InfoTooltip text="Specifies a custom icon for this block to make it easier to find it" />
         </label>
         <TagsMultiselect spaceId={spaceId} value={internalTags} onChange={onInternalTagsChange} />
-        <p className="mt-1 text-xs text-gray-400">Tags allow you to categorize components and filter blocks.</p>
+        <p className="mt-1 text-xs text-gray-400">
+          Tags allow you to categorize components and filter blocks.
+        </p>
       </div>
 
       {/* Preview field */}
-      <div>
-        <label className="block text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">
-          Preview field
-        </label>
+      <FormField
+        label="Preview field"
+        description="Field shown as the preview text in the blocks list."
+      >
         <SelectDropdown
           value={previewField ?? ''}
           onChange={(v) => onPreviewFieldChange(v || null)}
           options={previewFieldOptions}
           placeholder="Automatic"
         />
-        <p className="mt-1 text-xs text-gray-400">
-          Field shown as the preview text in the blocks list.
-        </p>
-      </div>
+      </FormField>
 
       {/* Preview template */}
-      <div>
-        <label className="block text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">
-          Preview template
-        </label>
+      <FormField label="Preview template">
         <textarea
           value={previewTmpl}
           onChange={(e) => onPreviewTmplChange(e.target.value)}
@@ -195,14 +219,25 @@ export function ConfigTab({
             Read the docs
           </a>
         </p>
-      </div>
+      </FormField>
 
-      {/* Block color */}
+      {/* Preview screenshot */}
+      <AssetField
+        fieldKey="image"
+        def={{ type: 'asset', display_name: 'Preview screenshot' } as AssetFieldDef}
+        value={image ? { filename: image } : undefined}
+        onChange={(v) => onImageChange(v?.filename ?? null)}
+        spaceId={spaceId}
+      />
+
+      {/* Block icon */}
       <div>
-        <label className="block text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">
-          Block color
+        <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">
+          Block icon
+          <InfoTooltip text="Specifies a custom icon for this block to make it easier to find it" />
         </label>
-        <div className="flex items-center gap-2 flex-wrap mb-2">
+        {/* Color picker */}
+        <div className="flex items-center gap-2 flex-wrap mb-3">
           {PRESET_COLORS.map((hex) => (
             <button
               key={hex}
@@ -217,28 +252,36 @@ export function ConfigTab({
           ))}
           <button
             type="button"
-            onClick={() => onColorChange(null)}
+            onClick={() => {
+              onColorChange(null);
+              onIconChange(null);
+            }}
             className="text-xs text-teal-600 dark:text-teal-400 hover:underline ml-1"
           >
             Use default
           </button>
         </div>
-        <div className="flex items-center gap-2">
-          <input
-            type="color"
-            value={color?.startsWith('#') ? color : '#000000'}
-            onChange={(e) => onColorChange(e.target.value)}
-            className="w-8 h-8 rounded cursor-pointer border border-gray-200 dark:border-gray-600"
-          />
-          <input
-            type="text"
-            value={color ?? ''}
-            onChange={(e) => onColorChange(e.target.value || null)}
-            placeholder="#000000 or CSS value"
-            className="flex-1 px-2 py-1 text-sm border border-gray-200 dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-teal-500"
-          />
+        {/* Icon picker grid */}
+        <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-3">
+          <div className="grid grid-cols-9 gap-1">
+            {BLOCK_ICONS.map(({ name, icon: Icon }) => (
+              <button
+                key={name}
+                type="button"
+                onClick={() => onIconChange(name === icon ? null : name)}
+                className={`w-9 h-9 rounded-lg flex items-center justify-center transition-colors ${
+                  icon === name
+                    ? 'bg-teal-100 dark:bg-teal-900/40 text-teal-700 dark:text-teal-300 ring-1 ring-teal-500'
+                    : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                }`}
+                title={name}
+              >
+                <Icon className="w-5 h-5" />
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </div>
-  )
+  );
 }

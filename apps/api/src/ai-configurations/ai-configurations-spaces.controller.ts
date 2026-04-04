@@ -5,9 +5,9 @@ import {
   Get,
   HttpCode,
   Param,
+  ParseIntPipe,
   Post,
   Put,
-  Query,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Auth } from '../auth/auth.decorator';
@@ -24,8 +24,8 @@ export class AiConfigurationsSpacesController {
   constructor(private readonly service: AiConfigurationsService) {}
 
   @Get()
-  list(@Param('spaceId') spaceId: string) {
-    return this.service.listConfigurations(parseInt(spaceId));
+  list(@Param('spaceId', ParseIntPipe) spaceId: number) {
+    return this.service.listConfigurations(spaceId);
   }
 
   @Get('providers')
@@ -34,13 +34,14 @@ export class AiConfigurationsSpacesController {
   }
 
   @Get(':id')
-  getOne(@Param('id') id: string, @Param('spaceId') spaceId: string) {
-    return this.service.getConfiguration(parseInt(id), parseInt(spaceId));
+  getOne(@Param('id', ParseIntPipe) id: number, @Param('spaceId', ParseIntPipe) spaceId: number) {
+    return this.service.getConfiguration(id, spaceId);
   }
 
   @Post()
+  @HttpCode(201)
   create(
-    @Param('spaceId') spaceId: string,
+    @Param('spaceId', ParseIntPipe) spaceId: number,
     @Body() body: {
       ai_configuration: {
         name: string;
@@ -52,13 +53,13 @@ export class AiConfigurationsSpacesController {
       };
     },
   ) {
-    return this.service.createConfiguration(parseInt(spaceId), body.ai_configuration);
+    return this.service.createConfiguration(spaceId, body.ai_configuration);
   }
 
   @Put(':id')
   update(
-    @Param('id') id: string,
-    @Param('spaceId') spaceId: string,
+    @Param('id', ParseIntPipe) id: number,
+    @Param('spaceId', ParseIntPipe) spaceId: number,
     @Body() body: {
       ai_configuration: {
         name?: string;
@@ -70,17 +71,24 @@ export class AiConfigurationsSpacesController {
       };
     },
   ) {
-    return this.service.updateConfiguration(parseInt(id), parseInt(spaceId), body.ai_configuration);
+    return this.service.updateConfiguration(id, spaceId, body.ai_configuration);
   }
 
   @Delete(':id')
-  @HttpCode(204)
-  async delete(@Param('id') id: string, @Param('spaceId') spaceId: string) {
-    await this.service.deleteConfiguration(parseInt(id), parseInt(spaceId));
+  @HttpCode(200)
+  async delete(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('spaceId', ParseIntPipe) spaceId: number,
+  ) {
+    await this.service.deleteConfiguration(id, spaceId);
+    return {};
   }
 
   @Put(':id/set_as_default')
-  setDefault(@Param('id') id: string, @Param('spaceId') spaceId: string) {
-    return this.service.setDefault(parseInt(id), parseInt(spaceId));
+  setDefault(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('spaceId', ParseIntPipe) spaceId: number,
+  ) {
+    return this.service.setDefault(id, spaceId);
   }
 }

@@ -1,6 +1,6 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import {
-  SQL,
+  type SQL,
   and,
   asc,
   count,
@@ -16,15 +16,10 @@ import {
   sql,
   inArray,
 } from 'drizzle-orm';
+import { escapeLike } from '../shared/query-parser.util';
 import { DB } from '../db/db.module';
-import type { DbType } from '../db/db.module';
-import {
-  stories,
-  tags,
-  components,
-  componentGroups,
-  storyReleases,
-} from '../db/schema';
+import { DbType } from '../db/db.module';
+import { stories, tags, components, componentGroups, storyReleases } from '../db/schema';
 
 @Injectable()
 export class StoriesQueryService {
@@ -117,10 +112,10 @@ export class StoriesQueryService {
       // text_search: name OR slug OR full_slug OR content (as text)
       s
         ? or(
-            ilike(stories.name, `%${s}%`),
-            ilike(stories.slug, `%${s}%`),
-            ilike(stories.fullSlug, `%${s}%`),
-            sql`${stories.content}::text ilike ${'%' + s + '%'}`,
+            ilike(stories.name, `%${escapeLike(s)}%`),
+            ilike(stories.slug, `%${escapeLike(s)}%`),
+            ilike(stories.fullSlug, `%${escapeLike(s)}%`),
+            sql`${stories.content}::text ilike ${`%${escapeLike(s)}%`}`,
           )
         : undefined,
       // parent_id filter only when no search
@@ -137,6 +132,7 @@ export class StoriesQueryService {
         ? (() => {
             const types = contentType
               .split(',')
+              .slice(0, 1000)
               .map((t) => t.trim())
               .filter(Boolean);
             return types.length === 1
@@ -145,19 +141,17 @@ export class StoriesQueryService {
           })()
         : undefined,
       tag?.trim()
-        ? sql`${stories.tagList}::text ilike ${'%' + tag.trim() + '%'}`
+        ? sql`${stories.tagList}::text ilike ${`%${escapeLike(tag.trim())}%`}`
         : undefined,
       block?.trim()
-        ? sql`${stories.content}::text ilike ${'%"component":"' + block.trim() + '"%'}`
+        ? sql`${stories.content}::text ilike ${`%"component":"${escapeLike(block.trim())}"%`}`
         : undefined,
       published !== undefined ? eq(stories.published, published) : undefined,
       uuid?.trim() ? eq(stories.uuid, uuid.trim()) : undefined,
       storyId !== undefined ? eq(stories.id, BigInt(storyId)) : undefined,
       byIds?.length ? inArray(stories.id, byIds) : undefined,
       byUuids?.length ? inArray(stories.uuid, byUuids) : undefined,
-      byUuidsOrdered?.length
-        ? inArray(stories.uuid, byUuidsOrdered)
-        : undefined,
+      byUuidsOrdered?.length ? inArray(stories.uuid, byUuidsOrdered) : undefined,
       excludingIds?.length ? notInArray(stories.id, excludingIds) : undefined,
       mine !== undefined
         ? sql`EXISTS (
@@ -175,22 +169,15 @@ export class StoriesQueryService {
         : undefined,
       folderOnly ? eq(stories.isFolder, true) : undefined,
       storyOnly ? eq(stories.isFolder, false) : undefined,
-      startsWith?.trim()
-        ? ilike(stories.fullSlug, `${startsWith.trim()}%`)
-        : undefined,
+      startsWith?.trim() ? ilike(stories.fullSlug, `${escapeLike(startsWith.trim())}%`) : undefined,
       withSlug?.trim() ? eq(stories.fullSlug, withSlug.trim()) : undefined,
       bySlugs?.length
-        ? or(
-            ...bySlugs.map((sl) =>
-              ilike(stories.fullSlug, sl.replace(/\*/g, '%')),
-            ),
-          )
+        ? or(...bySlugs.map((sl) => ilike(stories.fullSlug, sl.replace(/\*/g, '%'))))
         : undefined,
       excludingSlugs?.length
         ? and(
             ...excludingSlugs.map(
-              (sl) =>
-                sql`${stories.fullSlug} not ilike ${sl.replace(/\*/g, '%')}`,
+              (sl) => sql`${stories.fullSlug} not ilike ${sl.replace(/\*/g, '%')}`,
             ),
           )
         : undefined,
@@ -209,24 +196,15 @@ export class StoriesQueryService {
       scheduledAtLt ? lt(stories.publishAt, scheduledAtLt) : undefined,
       (() => {
         if (!referenceSearch) return undefined;
-        const refs = Array.isArray(referenceSearch)
-          ? referenceSearch
-          : [referenceSearch];
+        const refs = Array.isArray(referenceSearch) ? referenceSearch : [referenceSearch];
         if (refs.length === 0) return undefined;
-        return or(
-          ...refs.map(
-            (f) => sql`${stories.content}::text ilike ${'%' + f + '%'}`,
-          ),
-        );
+        return or(...refs.map((f) => sql`${stories.content}::text ilike ${`%${f}%`}`));
       })(),
     ];
 
     const where = and(...conditions);
 
-    const [{ total }] = await this.db
-      .select({ total: count() })
-      .from(stories)
-      .where(where);
+    const [{ total }] = await this.db.select({ total: count() }).from(stories).where(where);
 
     const orderCol =
       sortField === 'name'
@@ -254,14 +232,11 @@ export class StoriesQueryService {
       .offset((page - 1) * perPage);
 
     // by_uuids_ordered: preserve input order
-    let formattedStories = rows.map((s) => this.formatStory(s, withSummary));
+    const formattedStories = rows.map((s) => this.formatStory(s, withSummary));
     if (byUuidsOrdered?.length) {
-      const orderMap = new Map(
-        byUuidsOrdered.map((uuid, idx) => [uuid, idx]),
-      );
+      const orderMap = new Map(byUuidsOrdered.map((uuid, idx) => [uuid, idx]));
       formattedStories.sort(
-        (a, b) =>
-          (orderMap.get(a.uuid) ?? 999) - (orderMap.get(b.uuid) ?? 999),
+        (a, b) => (orderMap.get(a.uuid) ?? 999) - (orderMap.get(b.uuid) ?? 999),
       );
     }
 
@@ -282,14 +257,11 @@ export class StoriesQueryService {
       eq(stories.spaceId, spaceId),
       isNull(stories.deletedAt),
       sql`${stories.releaseIds} @> ${JSON.stringify([releaseId])}::jsonb`,
-      search?.trim() ? ilike(stories.name, `%${search.trim()}%`) : undefined,
+      search?.trim() ? ilike(stories.name, `%${escapeLike(search.trim())}%`) : undefined,
     ];
     const where = and(...conditions);
 
-    const [{ total }] = await this.db
-      .select({ total: count() })
-      .from(stories)
-      .where(where);
+    const [{ total }] = await this.db.select({ total: count() }).from(stories).where(where);
 
     const rows = await this.db
       .select()
@@ -334,9 +306,7 @@ export class StoriesQueryService {
     ]);
 
     return {
-      content_types: contentTypeRows
-        .map((r) => r.value)
-        .filter(Boolean) as string[],
+      content_types: contentTypeRows.map((r) => r.value).filter(Boolean) as string[],
       tags: tagRows.map((r) => r.name),
       blocks: componentRows.map((r) => ({
         value: r.name,
@@ -371,9 +341,7 @@ export class StoriesQueryService {
     const rows = await this.db
       .select()
       .from(stories)
-      .where(
-        and(eq(stories.spaceId, spaceId), inArray(stories.id, ancestorIds)),
-      );
+      .where(and(eq(stories.spaceId, spaceId), inArray(stories.id, ancestorIds)));
 
     // Reorder rows to match CTE depth order (root first)
     const rowMap = new Map(rows.map((r) => [r.id.toString(), r]));
@@ -405,12 +373,7 @@ export class StoriesQueryService {
       const [snapshot] = await this.db
         .select({ content: storyReleases.content })
         .from(storyReleases)
-        .where(
-          and(
-            eq(storyReleases.storyId, storyId),
-            eq(storyReleases.releaseId, releaseId),
-          ),
-        )
+        .where(and(eq(storyReleases.storyId, storyId), eq(storyReleases.releaseId, releaseId)))
         .limit(1);
       if (snapshot) {
         const d = snapshot.content as Record<string, any>;
@@ -433,9 +396,7 @@ export class StoriesQueryService {
       const [parent] = await this.db
         .select({ disableFEEditor: stories.disableFEEditor })
         .from(stories)
-        .where(
-          and(eq(stories.id, story.parentId), eq(stories.spaceId, spaceId)),
-        )
+        .where(and(eq(stories.id, story.parentId), eq(stories.spaceId, spaceId)))
         .limit(1);
       if (parent) parentDisableFEEditor = parent.disableFEEditor;
     }
@@ -445,12 +406,7 @@ export class StoriesQueryService {
       const [comp] = await this.db
         .select({ schema: components.schema })
         .from(components)
-        .where(
-          and(
-            eq(components.spaceId, spaceId),
-            eq(components.name, story.contentType),
-          ),
-        )
+        .where(and(eq(components.spaceId, spaceId), eq(components.name, story.contentType)))
         .limit(1);
       if (comp) componentSchema = comp.schema as Record<string, any>;
     }
@@ -501,9 +457,7 @@ export class StoriesQueryService {
     };
   }
 
-  formatStoryWithContent(
-    s: typeof stories.$inferSelect,
-  ): Record<string, any> {
+  formatStoryWithContent(s: typeof stories.$inferSelect): Record<string, any> {
     return {
       ...this.formatStory(s),
       content: s.content as Record<string, any>,
@@ -512,10 +466,7 @@ export class StoriesQueryService {
     };
   }
 
-  formatStory(
-    s: typeof stories.$inferSelect,
-    withSummary = false,
-  ): Record<string, any> {
+  formatStory(s: typeof stories.$inferSelect, withSummary = false): Record<string, any> {
     const base: Record<string, any> = {
       id: Number(s.id),
       uuid: s.uuid,

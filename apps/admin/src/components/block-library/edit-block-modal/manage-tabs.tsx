@@ -1,60 +1,60 @@
-'use client'
+'use client';
 
-import { useRef } from 'react'
-import { GripVertical, Trash2, Plus } from 'lucide-react'
-import type { WorkingTab } from './types'
-import { DEFAULT_TAB_KEY } from './types'
+import { useRef } from 'react';
+import { GripVertical, Trash2, Plus } from 'lucide-react';
+import type { WorkingTab } from './types';
+import { DEFAULT_TAB_KEY } from './types';
 
 interface ManageTabsProps {
-  tabs: WorkingTab[]
-  onTabsChange: (tabs: WorkingTab[]) => void
-  onBack: () => void
+  tabs: WorkingTab[];
+  onTabsChange: (tabs: WorkingTab[]) => void;
+  onBack: () => void;
 }
 
 export function ManageTabs({ tabs, onTabsChange, onBack }: ManageTabsProps) {
-  const dragKey = useRef<string | null>(null)
-  const dragOverKey = useRef<string | null>(null)
+  const dragKey = useRef<string | null>(null);
+  const dragOverKey = useRef<string | null>(null);
 
   function handleDragStart(key: string) {
-    dragKey.current = key
+    dragKey.current = key;
   }
 
   function handleDragOver(e: React.DragEvent, key: string) {
-    e.preventDefault()
-    dragOverKey.current = key
+    e.preventDefault();
+    dragOverKey.current = key;
   }
 
   function handleDrop() {
-    const from = dragKey.current
-    const to = dragOverKey.current
-    if (!from || !to || from === to) return
+    const from = dragKey.current;
+    const to = dragOverKey.current;
+    if (!from || !to || from === to) return;
 
-    const next = [...tabs]
-    const fromIdx = next.findIndex((t) => t.key === from)
-    const toIdx = next.findIndex((t) => t.key === to)
-    if (fromIdx === -1 || toIdx === -1) return
+    const next = [...tabs];
+    const fromIdx = next.findIndex((t) => t.key === from);
+    const toIdx = next.findIndex((t) => t.key === to);
+    if (fromIdx === -1 || toIdx === -1) return;
 
     // Don't allow reordering the General tab
-    if (from === DEFAULT_TAB_KEY || to === DEFAULT_TAB_KEY) return
+    if (from === DEFAULT_TAB_KEY || to === DEFAULT_TAB_KEY) return;
 
-    const [moved] = next.splice(fromIdx, 1)
-    next.splice(toIdx, 0, moved)
-    onTabsChange(next)
-    dragKey.current = null
-    dragOverKey.current = null
+    const [moved] = next.splice(fromIdx, 1);
+    next.splice(toIdx, 0, moved);
+    onTabsChange(next);
+    dragKey.current = null;
+    dragOverKey.current = null;
   }
 
   function handleRename(key: string, name: string) {
-    onTabsChange(tabs.map((t) => (t.key === key ? { ...t, name } : t)))
+    onTabsChange(tabs.map((t) => (t.key === key ? { ...t, name } : t)));
   }
 
   function handleDelete(key: string) {
-    onTabsChange(tabs.filter((t) => t.key !== key))
+    onTabsChange(tabs.filter((t) => t.key !== key));
   }
 
   function handleAddTab() {
-    const key = `__tab_${Date.now()}`
-    onTabsChange([...tabs, { key, name: 'New tab' }])
+    const key = `__tab_${Date.now()}`;
+    onTabsChange([...tabs, { key, name: 'New tab' }]);
   }
 
   return (
@@ -69,7 +69,9 @@ export function ManageTabs({ tabs, onTabsChange, onBack }: ManageTabsProps) {
             onDrop={handleDrop}
             className="flex items-center gap-2"
           >
-            <div className={`text-gray-300 cursor-grab ${tab.key === DEFAULT_TAB_KEY ? 'opacity-30 cursor-not-allowed' : ''}`}>
+            <div
+              className={`text-gray-300 cursor-grab ${tab.key === DEFAULT_TAB_KEY ? 'opacity-30 cursor-not-allowed' : ''}`}
+            >
               <GripVertical className="w-4 h-4" />
             </div>
             <input
@@ -111,5 +113,5 @@ export function ManageTabs({ tabs, onTabsChange, onBack }: ManageTabsProps) {
         </button>
       </div>
     </div>
-  )
+  );
 }

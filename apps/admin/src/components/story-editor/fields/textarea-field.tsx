@@ -1,20 +1,24 @@
-'use client'
+'use client';
 
-import type { TextareaFieldDef } from '@/components/block-library/edit-block-modal/types'
-import { fieldLabel } from '../field-label'
-import { FieldLabel } from '../FieldLabel'
+import type { TextareaFieldDef } from '@/components/block-library/edit-block-modal/types';
+import { fieldLabel } from '../field-label';
+import { FieldLabel } from '../FieldLabel';
 
 interface Props {
-  fieldKey: string
-  def: TextareaFieldDef
-  value: string | undefined
-  onChange: (v: string) => void
+  fieldKey: string;
+  def: TextareaFieldDef;
+  value: string | undefined;
+  onChange: (v: string) => void;
 }
 
 export function TextareaField({ fieldKey, def, value, onChange }: Props) {
   return (
     <div>
-      <FieldLabel label={fieldLabel(def.display_name, fieldKey)} required={def.required} description={def.description} />
+      <FieldLabel
+        label={fieldLabel(def.display_name, fieldKey)}
+        required={def.required}
+        description={def.description}
+      />
       <textarea
         value={value ?? ''}
         onChange={(e) => onChange(e.target.value)}
@@ -24,8 +28,10 @@ export function TextareaField({ fieldKey, def, value, onChange }: Props) {
         dir={def.rtl ? 'rtl' : undefined}
       />
       {def.max_length && (
-        <p className="text-xs text-gray-400 mt-1 text-right">{(value ?? '').length} / {def.max_length}</p>
+        <p className="text-xs text-gray-400 mt-1 text-right">
+          {(value ?? '').length} / {def.max_length}
+        </p>
       )}
     </div>
-  )
+  );
 }

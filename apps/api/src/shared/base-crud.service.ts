@@ -1,8 +1,8 @@
-import { Inject } from '@nestjs/common'
-import { and, asc, eq } from 'drizzle-orm'
-import { DB } from '../db/db.module'
-import type { DbType } from '../db/db.module'
-import type { PgColumn } from 'drizzle-orm/pg-core'
+import { Inject } from '@nestjs/common';
+import { and, asc, eq } from 'drizzle-orm';
+import { DB } from '../db/db.module';
+import { DbType } from '../db/db.module';
+import { PgColumn } from 'drizzle-orm/pg-core';
 
 /**
  * Abstract base class for simple space-scoped CRUD services.
@@ -23,22 +23,22 @@ export abstract class BaseCrudService<TFormatted> {
   constructor(@Inject(DB) protected readonly db: DbType) {}
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  protected abstract get table(): any
-  protected abstract get idColumn(): PgColumn
-  protected abstract get spaceColumn(): PgColumn
-  protected abstract get orderColumn(): PgColumn
+  protected abstract get table(): any;
+  protected abstract get idColumn(): PgColumn;
+  protected abstract get spaceColumn(): PgColumn;
+  protected abstract get orderColumn(): PgColumn;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  protected abstract format(row: any): TFormatted
+  protected abstract format(row: any): TFormatted;
 
   async findAll(spaceId: number): Promise<Record<string, TFormatted[]>> {
     const rows = await this.db
       .select()
       .from(this.table)
       .where(eq(this.spaceColumn, spaceId))
-      .orderBy(asc(this.orderColumn))
+      .orderBy(asc(this.orderColumn));
 
-    return this.wrapList(rows.map((r: unknown) => this.format(r)))
+    return this.wrapList(rows.map((r: unknown) => this.format(r)));
   }
 
   async findOne(spaceId: number, id: number): Promise<Record<string, TFormatted> | null> {
@@ -46,34 +46,34 @@ export abstract class BaseCrudService<TFormatted> {
       .select()
       .from(this.table)
       .where(and(eq(this.idColumn, id), eq(this.spaceColumn, spaceId)))
-      .limit(1)
+      .limit(1);
 
-    if (!row) return null
-    return this.wrapOne(this.format(row))
+    if (!row) return null;
+    return this.wrapOne(this.format(row));
   }
 
   async remove(spaceId: number, id: number): Promise<Record<string, TFormatted> | null> {
     const rows = await this.db
       .delete(this.table)
       .where(and(eq(this.idColumn, id), eq(this.spaceColumn, spaceId)))
-      .returning()
+      .returning();
 
-    const deleted = Array.isArray(rows) ? rows[0] : undefined
-    if (!deleted) return null
-    return this.wrapOne(this.format(deleted))
+    const deleted = Array.isArray(rows) ? rows[0] : undefined;
+    if (!deleted) return null;
+    return this.wrapOne(this.format(deleted));
   }
 
   /**
    * Wrap a list of formatted rows. Override to use the correct response key.
    */
   protected wrapList(items: TFormatted[]): Record<string, TFormatted[]> {
-    return { items }
+    return { items };
   }
 
   /**
    * Wrap a single formatted row. Override to use the correct response key.
    */
   protected wrapOne(item: TFormatted): Record<string, TFormatted> {
-    return { item }
+    return { item };
   }
 }

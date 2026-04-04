@@ -1,34 +1,34 @@
-'use client'
+'use client';
 
-import { useState, useRef, useEffect } from 'react'
-import { authClient } from '@/lib/auth-client'
-import { useRouter } from 'next/navigation'
-import { LogOut, Settings } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react';
+import { logout } from '@/lib/auth-client';
+import { useRouter } from 'next/navigation';
+import { LogOut, Settings } from 'lucide-react';
 
 interface UserMenuProps {
-  name: string
-  email: string
+  name: string;
+  email: string;
 }
 
 export function UserMenu({ name, email }: UserMenuProps) {
-  const [open, setOpen] = useState(false)
-  const router = useRouter()
-  const ref = useRef<HTMLDivElement>(null)
+  const [open, setOpen] = useState(false);
+  const router = useRouter();
+  const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false)
+        setOpen(false);
       }
     }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [])
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
 
   async function handleSignOut() {
-    await authClient.signOut()
-    router.push('/login')
-    router.refresh()
+    await logout();
+    router.push('/login');
+    router.refresh();
   }
 
   const initials = name
@@ -36,7 +36,7 @@ export function UserMenu({ name, email }: UserMenuProps) {
     .map((n) => n[0])
     .join('')
     .toUpperCase()
-    .slice(0, 2)
+    .slice(0, 2);
 
   return (
     <div ref={ref} className="relative">
@@ -57,7 +57,10 @@ export function UserMenu({ name, email }: UserMenuProps) {
           </div>
           <div className="border-t border-gray-100 dark:border-gray-800 p-2 space-y-0.5">
             <button
-              onClick={() => { setOpen(false); router.push('/settings/account') }}
+              onClick={() => {
+                setOpen(false);
+                router.push('/settings/account');
+              }}
               className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
             >
               <Settings className="size-4" />
@@ -77,5 +80,5 @@ export function UserMenu({ name, email }: UserMenuProps) {
         <span className="text-sm text-slate-200 truncate">{name || email}</span>
       </button>
     </div>
-  )
+  );
 }

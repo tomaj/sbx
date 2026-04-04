@@ -1,10 +1,4 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  Put,
-} from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Put } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Auth } from '../auth/auth.decorator';
 import { SpacesService } from './spaces.service';
@@ -22,13 +16,13 @@ export class SpacesController {
   }
 
   @Get(':id')
-  async get(@Param('id') id: string) {
-    return ResultGuard.throwIfNotFound(await this.spacesService.getSpaceById(parseInt(id)));
+  async get(@Param('id', ParseIntPipe) id: number) {
+    return ResultGuard.throwIfNotFound(await this.spacesService.getSpaceById(id));
   }
 
   @Put(':id')
   async update(
-    @Param('id') id: string,
+    @Param('id', ParseIntPipe) id: number,
     @Body()
     body: {
       space: {
@@ -48,7 +42,7 @@ export class SpacesController {
   ) {
     const s = body.space;
     return ResultGuard.throwIfNotFound(
-      await this.spacesService.updateSpace(parseInt(id), {
+      await this.spacesService.updateSpace(id, {
         name: s.name,
         domain: s.domain,
         defaultLang: s.default_lang,

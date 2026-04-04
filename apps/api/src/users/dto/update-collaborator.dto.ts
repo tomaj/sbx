@@ -1,24 +1,14 @@
-import { Type } from 'class-transformer';
-import { IsArray, IsNumber, IsOptional, IsString, ValidateNested } from 'class-validator';
+import { z } from 'zod';
+import { createZodDto } from 'nestjs-zod';
 
-export class UpdateCollaboratorDataDto {
-  @IsString()
-  @IsOptional()
-  role?: string;
+const UpdateCollaboratorDataSchema = z.object({
+  role: z.string().optional(),
+  space_role_id: z.number().int().nullable().optional(),
+  space_role_ids: z.array(z.number().int()).optional(),
+});
 
-  @IsNumber()
-  @IsOptional()
-  space_role_id?: number | null;
+const UpdateCollaboratorSchema = z.object({
+  collaborator: UpdateCollaboratorDataSchema.optional(),
+});
 
-  @IsArray()
-  @IsNumber({}, { each: true })
-  @IsOptional()
-  space_role_ids?: number[];
-}
-
-export class UpdateCollaboratorDto {
-  @ValidateNested()
-  @Type(() => UpdateCollaboratorDataDto)
-  @IsOptional()
-  collaborator?: UpdateCollaboratorDataDto;
-}
+export class UpdateCollaboratorDto extends createZodDto(UpdateCollaboratorSchema) {}

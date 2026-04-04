@@ -99,10 +99,10 @@ export function parseOperations(opsString: string): ImageOps {
   const cropMatch = rem.match(/^(\d+)x(\d+):(\d+)x(\d+)/);
   if (cropMatch) {
     ops.crop = {
-      x1: parseInt(cropMatch[1]),
-      y1: parseInt(cropMatch[2]),
-      x2: parseInt(cropMatch[3]),
-      y2: parseInt(cropMatch[4]),
+      x1: parseInt(cropMatch[1], 10),
+      y1: parseInt(cropMatch[2], 10),
+      x2: parseInt(cropMatch[3], 10),
+      y2: parseInt(cropMatch[4], 10),
     };
     rem = rem.slice(cropMatch[0].length).replace(/^\//, '');
   }
@@ -116,8 +116,8 @@ export function parseOperations(opsString: string): ImageOps {
   // 3. Resize: [-]WIDTHx[-]HEIGHT
   const resizeMatch = rem.match(/^(-?\d+)x(-?\d+)/);
   if (resizeMatch) {
-    const w = parseInt(resizeMatch[1]);
-    const h = parseInt(resizeMatch[2]);
+    const w = parseInt(resizeMatch[1], 10);
+    const h = parseInt(resizeMatch[2], 10);
     ops.flipH = w < 0;
     ops.width = Math.abs(w);
     ops.flipV = h < 0;
@@ -175,21 +175,21 @@ function splitFilterTokens(filtersStr: string): string[] {
 function applyFilter(name: string, value: string, ops: ImageOps): void {
   switch (name) {
     case 'quality':
-      ops.quality = clamp(parseInt(value), 0, 100);
+      ops.quality = clamp(parseInt(value, 10), 0, 100);
       break;
 
     case 'blur': {
       const parts = value.split(',');
-      const radius = clamp(parseInt(parts[0]), 0, 150);
+      const radius = clamp(parseInt(parts[0], 10), 0, 150);
       ops.blur = { radius };
       if (parts[1] !== undefined) {
-        ops.blur.sigma = clamp(parseInt(parts[1]), 0, 150);
+        ops.blur.sigma = clamp(parseInt(parts[1], 10), 0, 150);
       }
       break;
     }
 
     case 'brightness':
-      ops.brightness = clamp(parseInt(value), -100, 100);
+      ops.brightness = clamp(parseInt(value, 10), -100, 100);
       break;
 
     case 'grayscale':
@@ -197,7 +197,7 @@ function applyFilter(name: string, value: string, ops: ImageOps): void {
       break;
 
     case 'rotate': {
-      const deg = parseInt(value);
+      const deg = parseInt(value, 10);
       if ([0, 90, 180, 270].includes(deg)) {
         ops.rotate = deg as 0 | 90 | 180 | 270;
       }
@@ -218,10 +218,10 @@ function applyFilter(name: string, value: string, ops: ImageOps): void {
       const m = value.match(/^(\d+)x(\d+):(\d+)x(\d+)$/);
       if (m) {
         ops.focal = {
-          x1: parseInt(m[1]),
-          y1: parseInt(m[2]),
-          x2: parseInt(m[3]),
-          y2: parseInt(m[4]),
+          x1: parseInt(m[1], 10),
+          y1: parseInt(m[2], 10),
+          x2: parseInt(m[3], 10),
+          y2: parseInt(m[4], 10),
         };
       }
       break;
@@ -239,16 +239,16 @@ function applyFilter(name: string, value: string, ops: ImageOps): void {
       const parts = value.split(',');
       const [radiusStr, ...rest] = parts;
       const [radiusA, radiusB] = radiusStr.split('|');
-      const radius = parseInt(radiusA);
-      const ellipsis = radiusB !== undefined ? parseInt(radiusB) : undefined;
+      const radius = parseInt(radiusA, 10);
+      const ellipsis = radiusB !== undefined ? parseInt(radiusB, 10) : undefined;
 
       if (parts.length >= 5) {
         ops.roundCorner = {
           radius,
           ...(ellipsis !== undefined && { ellipsis }),
-          r: clamp(parseInt(rest[0]), 0, 255),
-          g: clamp(parseInt(rest[1]), 0, 255),
-          b: clamp(parseInt(rest[2]), 0, 255),
+          r: clamp(parseInt(rest[0], 10), 0, 255),
+          g: clamp(parseInt(rest[1], 10), 0, 255),
+          b: clamp(parseInt(rest[2], 10), 0, 255),
           transparent: rest[3] === '1',
         };
       } else if (parts.length === 1) {

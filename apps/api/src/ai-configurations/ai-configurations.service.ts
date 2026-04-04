@@ -1,41 +1,91 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { Inject } from '@nestjs/common';
+import { ResultGuard } from '../shared/result-guard.util';
 import { eq } from 'drizzle-orm';
 import { DB } from '../db/db.module';
-import type { DbType } from '../db/db.module';
+import { DbType } from '../db/db.module';
 import { spaces } from '../db/schema';
-import type { AiStoredSettings, AiConfigurationRecord, AiBrandingRule } from '../ai/ai.types';
+import { AiStoredSettings, AiConfigurationRecord, AiBrandingRule } from '../ai/ai.types';
 
 /** Available providers and their supported models for /v1/ai_configurations/providers */
 export const AI_PROVIDERS = {
   custom: {
     openai: {
       models: [
-        { label: 'GPT-4o', value: 'gpt-4o', caption: 'Fastest GPT-4 model with multimodal support and high-quality reasoning (128k context)' },
+        {
+          label: 'GPT-4o',
+          value: 'gpt-4o',
+          caption:
+            'Fastest GPT-4 model with multimodal support and high-quality reasoning (128k context)',
+        },
         { label: 'GPT-4', value: 'gpt-4', caption: 'High-quality reasoning, long context (128k)' },
-        { label: 'GPT-4 Turbo', value: 'gpt-4-turbo', caption: 'Cheaper and faster GPT-4 variant (128k context)' },
-        { label: 'GPT-3.5 Turbo', value: 'gpt-3.5-turbo', caption: 'Fast and cost-effective (16k context)' },
+        {
+          label: 'GPT-4 Turbo',
+          value: 'gpt-4-turbo',
+          caption: 'Cheaper and faster GPT-4 variant (128k context)',
+        },
+        {
+          label: 'GPT-3.5 Turbo',
+          value: 'gpt-3.5-turbo',
+          caption: 'Fast and cost-effective (16k context)',
+        },
       ],
     },
     anthropic: {
       models: [
-        { label: 'Claude 3.5 Sonnet', value: 'claude-3-5-sonnet-20241022', caption: 'Most intelligent Claude 3.5 model' },
-        { label: 'Claude 3.5 Haiku', value: 'claude-3-5-haiku-20241022', caption: 'Fastest Claude 3.5 model' },
-        { label: 'Claude 3 Opus', value: 'claude-3-opus-20240229', caption: 'Most powerful Claude 3 model' },
+        {
+          label: 'Claude 3.5 Sonnet',
+          value: 'claude-3-5-sonnet-20241022',
+          caption: 'Most intelligent Claude 3.5 model',
+        },
+        {
+          label: 'Claude 3.5 Haiku',
+          value: 'claude-3-5-haiku-20241022',
+          caption: 'Fastest Claude 3.5 model',
+        },
+        {
+          label: 'Claude 3 Opus',
+          value: 'claude-3-opus-20240229',
+          caption: 'Most powerful Claude 3 model',
+        },
       ],
     },
     anthropic_bedrock: {
       models: [
-        { label: 'Claude 3.5 Sonnet (Bedrock)', value: 'anthropic.claude-3-5-sonnet-20241022-v2:0', caption: 'Claude 3.5 Sonnet via AWS Bedrock' },
-        { label: 'Claude 3 Opus (Bedrock)', value: 'anthropic.claude-3-opus-20240229-v1:0', caption: 'Claude 3 Opus via AWS Bedrock' },
-        { label: 'Claude 3 Sonnet (Bedrock)', value: 'anthropic.claude-3-sonnet-20240229-v1:0', caption: 'Claude 3 Sonnet via AWS Bedrock' },
+        {
+          label: 'Claude 3.5 Sonnet (Bedrock)',
+          value: 'anthropic.claude-3-5-sonnet-20241022-v2:0',
+          caption: 'Claude 3.5 Sonnet via AWS Bedrock',
+        },
+        {
+          label: 'Claude 3 Opus (Bedrock)',
+          value: 'anthropic.claude-3-opus-20240229-v1:0',
+          caption: 'Claude 3 Opus via AWS Bedrock',
+        },
+        {
+          label: 'Claude 3 Sonnet (Bedrock)',
+          value: 'anthropic.claude-3-sonnet-20240229-v1:0',
+          caption: 'Claude 3 Sonnet via AWS Bedrock',
+        },
       ],
     },
     gemini: {
       models: [
-        { label: 'Gemini 1.5 Flash', value: 'gemini-1.5-flash', caption: 'Fast and versatile Gemini model' },
-        { label: 'Gemini 1.5 Pro', value: 'gemini-1.5-pro', caption: 'Most capable Gemini 1.5 model' },
-        { label: 'Gemini 2.0 Flash', value: 'gemini-2.0-flash', caption: 'Next-gen Gemini Flash model' },
+        {
+          label: 'Gemini 1.5 Flash',
+          value: 'gemini-1.5-flash',
+          caption: 'Fast and versatile Gemini model',
+        },
+        {
+          label: 'Gemini 1.5 Pro',
+          value: 'gemini-1.5-pro',
+          caption: 'Most capable Gemini 1.5 model',
+        },
+        {
+          label: 'Gemini 2.0 Flash',
+          value: 'gemini-2.0-flash',
+          caption: 'Next-gen Gemini Flash model',
+        },
       ],
     },
   },
@@ -51,7 +101,7 @@ export class AiConfigurationsService {
       .from(spaces)
       .where(eq(spaces.id, spaceId))
       .limit(1);
-    if (!row) throw new NotFoundException('Space not found');
+    ResultGuard.throwIfNotFound(row, 'Space not found');
     return (row.aiSettings as AiStoredSettings) ?? {};
   }
 
@@ -77,8 +127,10 @@ export class AiConfigurationsService {
 
   async getConfiguration(id: number, spaceId: number) {
     const settings = await this.loadSettings(spaceId);
-    const config = (settings.configurations ?? []).find((c) => c.id === id);
-    if (!config) throw new NotFoundException('AI configuration not found');
+    const config = ResultGuard.throwIfNotFound(
+      (settings.configurations ?? []).find((c) => c.id === id),
+      'AI configuration not found',
+    );
     return { ai_configuration: this.formatConfig(config) };
   }
 
@@ -135,7 +187,7 @@ export class AiConfigurationsService {
     const storedSettings = await this.loadSettings(spaceId);
     const configs = storedSettings.configurations ?? [];
     const idx = configs.findIndex((c) => c.id === id);
-    if (idx === -1) throw new NotFoundException('AI configuration not found');
+    ResultGuard.throwIfNotFound(idx !== -1 ? configs[idx] : null, 'AI configuration not found');
 
     const updated: AiConfigurationRecord = {
       ...configs[idx],
@@ -170,8 +222,10 @@ export class AiConfigurationsService {
 
   async setDefault(id: number, spaceId: number) {
     const storedSettings = await this.loadSettings(spaceId);
-    const config = (storedSettings.configurations ?? []).find((c) => c.id === id);
-    if (!config) throw new NotFoundException('AI configuration not found');
+    const config = ResultGuard.throwIfNotFound(
+      (storedSettings.configurations ?? []).find((c) => c.id === id),
+      'AI configuration not found',
+    );
 
     await this.saveSettings(spaceId, { ...storedSettings, default_configuration_id: id });
     return { ai_configuration: this.formatConfig(config) };

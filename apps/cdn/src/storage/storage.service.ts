@@ -1,10 +1,6 @@
 import { Injectable, Logger, NotFoundException, PayloadTooLargeException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import {
-  S3Client,
-  GetObjectCommand,
-  NoSuchKey,
-} from '@aws-sdk/client-s3';
+import { S3Client, GetObjectCommand, NoSuchKey } from '@aws-sdk/client-s3';
 import { Readable } from 'stream';
 
 @Injectable()
@@ -13,7 +9,7 @@ export class StorageService {
   private readonly bucket: string;
   private readonly logger = new Logger(StorageService.name);
 
-  constructor(private readonly config: ConfigService) {
+  constructor(readonly config: ConfigService) {
     this.s3 = new S3Client({
       endpoint: config.getOrThrow<string>('MINIO_ENDPOINT'),
       region: config.get<string>('MINIO_REGION', 'us-east-1'),

@@ -1,55 +1,55 @@
-'use client'
+'use client';
 
-import { useState } from 'react'
-import { Trash2 } from 'lucide-react'
-import { UserAvatar } from './user-avatar'
-import { ConfirmModal } from './confirm-modal'
-import { formatDate } from '@/lib/date'
+import { useState } from 'react';
+import { Trash2 } from 'lucide-react';
+import { UserAvatar } from './user-avatar';
+import { ConfirmModal } from './confirm-modal';
+import { formatDate } from '@/lib/date';
 
 export interface CommentData {
-  id: number
-  uuid: string
-  discussion_id: number
-  user_id: number | null
-  user_name: string | null
-  user_avatar: string | null
-  message: string | null
-  created_at: string | Date
-  updated_at: string | Date
+  id: number;
+  uuid: string;
+  discussion_id: number;
+  user_id: number | null;
+  user_name: string | null;
+  user_avatar: string | null;
+  message: string | null;
+  created_at: string | Date;
+  updated_at: string | Date;
 }
 
 interface CommentItemProps {
-  comment: CommentData
-  onDelete?: (commentId: number) => Promise<void>
-  canDelete?: boolean
+  comment: CommentData;
+  onDelete?: (commentId: number) => Promise<void>;
+  canDelete?: boolean;
 }
 
 function formatRelativeTime(date: string | Date): string {
-  const d = typeof date === 'string' ? new Date(date) : date
-  const now = new Date()
-  const diffMs = now.getTime() - d.getTime()
-  const diffMin = Math.floor(diffMs / 60000)
-  if (diffMin < 1) return 'just now'
-  if (diffMin < 60) return `${diffMin}m ago`
-  const diffH = Math.floor(diffMin / 60)
-  if (diffH < 24) return `${diffH}h ago`
-  const diffD = Math.floor(diffH / 24)
-  if (diffD < 30) return `${diffD}d ago`
-  return formatDate(d)
+  const d = typeof date === 'string' ? new Date(date) : date;
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1) return 'just now';
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffH = Math.floor(diffMin / 60);
+  if (diffH < 24) return `${diffH}h ago`;
+  const diffD = Math.floor(diffH / 24);
+  if (diffD < 30) return `${diffD}d ago`;
+  return formatDate(d);
 }
 
 export function CommentItem({ comment, onDelete, canDelete }: CommentItemProps) {
-  const [showConfirm, setShowConfirm] = useState(false)
-  const [isDeleting, setIsDeleting] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   async function handleDelete() {
-    if (!onDelete) return
-    setIsDeleting(true)
+    if (!onDelete) return;
+    setIsDeleting(true);
     try {
-      await onDelete(comment.id)
+      await onDelete(comment.id);
     } finally {
-      setIsDeleting(false)
-      setShowConfirm(false)
+      setIsDeleting(false);
+      setShowConfirm(false);
     }
   }
 
@@ -98,5 +98,5 @@ export function CommentItem({ comment, onDelete, canDelete }: CommentItemProps) 
         onCancel={() => setShowConfirm(false)}
       />
     </>
-  )
+  );
 }

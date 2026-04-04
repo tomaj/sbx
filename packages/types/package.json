@@ -13,9 +13,12 @@
   },
   "scripts": {
     "build": "tsc",
-    "dev": "tsc --watch"
+    "dev": "tsc --watch",
+    "lint": "biome check src/",
+    "format": "biome format --write src/"
   },
   "devDependencies": {
-    "typescript": "^5.7.3"
+    "@biomejs/biome": "catalog:",
+    "typescript": "catalog:"
   }
 }

@@ -1,6 +1,6 @@
-import type { Metadata } from 'next'
-import PageContent from './page.client'
+import type { Metadata } from 'next';
+import PageContent from './page.client';
 
-export const metadata: Metadata = { title: 'Field Types' }
+export const metadata: Metadata = { title: 'Field Types' };
 
-export default PageContent
+export default PageContent;

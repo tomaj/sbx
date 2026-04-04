@@ -2,7 +2,7 @@ import { Inject, Injectable, ConflictException } from '@nestjs/common';
 import { and, asc, desc, eq, ilike, inArray, notInArray, or, sql, count } from 'drizzle-orm';
 import { randomBytes } from 'crypto';
 import { DB } from '../db/db.module';
-import type { DbType } from '../db/db.module';
+import { DbType } from '../db/db.module';
 import { spaceMembers, spaces, users } from '../db/schema';
 import { WebhooksService } from '../webhooks/webhooks.service';
 import { WEBHOOK_ACTIONS } from '../webhooks/webhook-actions';
@@ -48,28 +48,27 @@ export class UsersService {
 
     const where = and(...conditions);
 
-    const [{ total }] = await this.db
-      .select({ total: count() })
-      .from(users)
-      .where(where);
+    const [{ total }] = await this.db.select({ total: count() }).from(users).where(where);
 
     const isDesc = sortDir === 'desc';
     const roleOrder = sql`(EXISTS (SELECT 1 FROM space_members sm WHERE sm.user_id = users.id AND sm.role = 'admin'))`;
 
     const orderExpr =
       sortBy === 'role'
-        ? (isDesc
-            ? sql`${roleOrder} ASC, ${users.firstname} ASC`
-            : sql`${roleOrder} DESC, ${users.firstname} ASC`)
+        ? isDesc
+          ? sql`${roleOrder} ASC, ${users.firstname} ASC`
+          : sql`${roleOrder} DESC, ${users.firstname} ASC`
         : sortBy === 'email'
-          ? (isDesc ? desc(users.email) : asc(users.email))
+          ? isDesc
+            ? desc(users.email)
+            : asc(users.email)
           : sortBy === 'lastname'
-            ? (isDesc
-                ? sql`${users.lastname} DESC, ${users.firstname} ASC`
-                : sql`${users.lastname} ASC, ${users.firstname} ASC`)
-            : (isDesc
-                ? sql`${users.firstname} DESC, ${users.lastname} ASC`
-                : sql`${users.firstname} ASC, ${users.lastname} ASC`);
+            ? isDesc
+              ? sql`${users.lastname} DESC, ${users.firstname} ASC`
+              : sql`${users.lastname} ASC, ${users.firstname} ASC`
+            : isDesc
+              ? sql`${users.firstname} DESC, ${users.lastname} ASC`
+              : sql`${users.firstname} ASC, ${users.lastname} ASC`;
 
     const rows = await this.db
       .select()
@@ -81,18 +80,19 @@ export class UsersService {
 
     const userIds = rows.map((u) => u.id);
 
-    const memberships = userIds.length > 0
-      ? await this.db
-          .select({
-            userId: spaceMembers.userId,
-            spaceId: spaceMembers.spaceId,
-            spaceName: spaces.name,
-            role: spaceMembers.role,
-          })
-          .from(spaceMembers)
-          .leftJoin(spaces, eq(spaceMembers.spaceId, spaces.id))
-          .where(inArray(spaceMembers.userId, userIds))
-      : [];
+    const memberships =
+      userIds.length > 0
+        ? await this.db
+            .select({
+              userId: spaceMembers.userId,
+              spaceId: spaceMembers.spaceId,
+              spaceName: spaces.name,
+              role: spaceMembers.role,
+            })
+            .from(spaceMembers)
+            .leftJoin(spaces, eq(spaceMembers.spaceId, spaces.id))
+            .where(inArray(spaceMembers.userId, userIds))
+        : [];
 
     const membershipsByUser = new Map<number, typeof memberships>();
     for (const m of memberships) {
@@ -133,11 +133,7 @@ export class UsersService {
   }
 
   async getMe(email: string) {
-    const [user] = await this.db
-      .select()
-      .from(users)
-      .where(eq(users.email, email))
-      .limit(1);
+    const [user] = await this.db.select().from(users).where(eq(users.email, email)).limit(1);
     if (!user) return null;
     return {
       id: user.id,
@@ -158,18 +154,17 @@ export class UsersService {
     return updated ?? null;
   }
 
-  async updateUser(id: number, dto: { firstname?: string; lastname?: string; disabled?: boolean; favouriteSpaces?: number[] }) {
+  async updateUser(
+    id: number,
+    dto: { firstname?: string; lastname?: string; disabled?: boolean; favouriteSpaces?: number[] },
+  ) {
     const patch: Record<string, any> = { updatedAt: new Date() };
     if (dto.firstname !== undefined) patch.firstname = dto.firstname;
     if (dto.lastname !== undefined) patch.lastname = dto.lastname;
     if (dto.disabled !== undefined) patch.disabled = dto.disabled;
     if (dto.favouriteSpaces !== undefined) patch.favouriteSpaces = dto.favouriteSpaces;
 
-    const [updated] = await this.db
-      .update(users)
-      .set(patch)
-      .where(eq(users.id, id))
-      .returning();
+    const [updated] = await this.db.update(users).set(patch).where(eq(users.id, id)).returning();
 
     return {
       id: updated.id,
@@ -280,7 +275,9 @@ export class UsersService {
       .update(spaceMembers)
       .set({
         ...(dto.role !== undefined && { role: dto.role }),
-        ...(dto.spaceRoleId !== undefined && { spaceRoleId: dto.spaceRoleId ? BigInt(dto.spaceRoleId) : null }),
+        ...(dto.spaceRoleId !== undefined && {
+          spaceRoleId: dto.spaceRoleId ? BigInt(dto.spaceRoleId) : null,
+        }),
         ...(dto.spaceRoleIds !== undefined && { spaceRoleIds: dto.spaceRoleIds }),
       })
       .where(and(eq(spaceMembers.id, memberId), eq(spaceMembers.spaceId, spaceId)))
@@ -290,22 +287,18 @@ export class UsersService {
   }
 
   async removeSpaceMember(spaceId: number, memberId: number) {
-    const [member] = await this.db
-      .select({ userId: spaceMembers.userId })
-      .from(spaceMembers)
-      .where(and(eq(spaceMembers.id, memberId), eq(spaceMembers.spaceId, spaceId)))
-      .limit(1);
-
-    await this.db
+    // Atomic delete + return in one query to avoid TOCTOU race condition
+    const [deleted] = await this.db
       .delete(spaceMembers)
-      .where(and(eq(spaceMembers.id, memberId), eq(spaceMembers.spaceId, spaceId)));
+      .where(and(eq(spaceMembers.id, memberId), eq(spaceMembers.spaceId, spaceId)))
+      .returning({ userId: spaceMembers.userId });
 
-    if (member) {
+    if (deleted) {
       void this.webhooks.dispatch(spaceId, WEBHOOK_ACTIONS.USER_REMOVED, {
         action: 'user_removed',
         space_id: spaceId,
-        user_id: member.userId,
-        text: `User ${member.userId} was removed from space ${spaceId}.`,
+        user_id: deleted.userId,
+        text: `User ${deleted.userId} was removed from space ${spaceId}.`,
       });
     }
 
@@ -376,9 +369,7 @@ export class UsersService {
         user_id: row.users.id,
         space_id: row.space_members.spaceId,
         role: row.space_members.role,
-        space_role_id: row.space_members.spaceRoleId
-          ? Number(row.space_members.spaceRoleId)
-          : null,
+        space_role_id: row.space_members.spaceRoleId ? Number(row.space_members.spaceRoleId) : null,
         space_role_ids: [],
         permissions: row.space_members.permissions ?? [],
         allowed_path: row.space_members.allowedPath,
@@ -415,9 +406,7 @@ export class UsersService {
         user_id: row.users.id,
         space_id: row.space_members.spaceId,
         role: row.space_members.role,
-        space_role_id: row.space_members.spaceRoleId
-          ? Number(row.space_members.spaceRoleId)
-          : null,
+        space_role_id: row.space_members.spaceRoleId ? Number(row.space_members.spaceRoleId) : null,
         space_role_ids: [],
         permissions: row.space_members.permissions ?? [],
         allowed_path: row.space_members.allowedPath,
@@ -457,9 +446,7 @@ export class UsersService {
         user_id: r.users.id,
         space_id: r.space_members.spaceId,
         role: r.space_members.role,
-        space_role_id: r.space_members.spaceRoleId
-          ? Number(r.space_members.spaceRoleId)
-          : null,
+        space_role_id: r.space_members.spaceRoleId ? Number(r.space_members.spaceRoleId) : null,
         space_role_ids: [],
         permissions: r.space_members.permissions ?? [],
         allowed_path: r.space_members.allowedPath,

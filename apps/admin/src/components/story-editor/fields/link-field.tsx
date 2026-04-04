@@ -1,172 +1,178 @@
-'use client'
+'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react'
-import { Image, AtSign, Link2, Globe, ChevronDown, ChevronRight, Search, Folder, ExternalLink, X, TriangleAlert } from 'lucide-react'
-import type { LinkFieldDef, MultilinkFieldDef } from '@/components/block-library/edit-block-modal/types'
-import { fieldLabel } from '../field-label'
-import { FieldLabel } from '../FieldLabel'
-import { AssetPickerModal } from '@/components/assets/asset-picker-modal'
-import { AssetThumb } from '@/components/assets/asset-thumb'
-import type { Asset } from '@/components/assets/asset-grid'
-import { normalizeAssetFilename } from '@/lib/utils'
-import { StoryStatusIcon } from '@/components/stories/story-status-icon'
+import { useState, useRef, useEffect } from 'react';
+import { useApi } from '@/lib/swr';
+import {
+  Image,
+  AtSign,
+  Link2,
+  Globe,
+  ChevronDown,
+  ChevronRight,
+  Search,
+  Folder,
+  ExternalLink,
+  X,
+  TriangleAlert,
+} from 'lucide-react';
+import type {
+  LinkFieldDef,
+  MultilinkFieldDef,
+} from '@/components/block-library/edit-block-modal/types';
+import { fieldLabel } from '../field-label';
+import { FieldLabel } from '../FieldLabel';
+import { AssetPickerModal } from '@/components/assets/asset-picker-modal';
+import { AssetThumb } from '@/components/assets/asset-thumb';
+import type { Asset } from '@/components/assets/asset-grid';
+import { normalizeAssetFilename } from '@/lib/utils';
+import { StoryStatusIcon } from '@/components/stories/story-status-icon';
 
 interface LinkValue {
-  linktype?: 'url' | 'story' | 'email' | 'asset'
-  url?: string
-  href?: string
-  cached_url?: string
-  target?: '_blank' | '_self'
-  anchor?: string
-  id?: string
+  linktype?: 'url' | 'story' | 'email' | 'asset';
+  url?: string;
+  href?: string;
+  cached_url?: string;
+  target?: '_blank' | '_self';
+  anchor?: string;
+  id?: string;
 }
 
 interface StoryItem {
-  id: number
-  uuid: string
-  name: string
-  full_slug: string
-  is_folder: boolean
-  published: boolean
-  unpublished_changes: boolean
+  id: number;
+  uuid: string;
+  name: string;
+  full_slug: string;
+  is_folder: boolean;
+  published: boolean;
+  unpublished_changes: boolean;
 }
 
 interface BreadcrumbEntry {
-  id: number
-  name: string
+  id: number;
+  name: string;
 }
 
 interface Props {
-  fieldKey: string
-  def: LinkFieldDef | MultilinkFieldDef
-  value: LinkValue | undefined
-  onChange: (v: LinkValue) => void
-  spaceId: string
+  fieldKey: string;
+  def: LinkFieldDef | MultilinkFieldDef;
+  value: LinkValue | undefined;
+  onChange: (v: LinkValue) => void;
+  spaceId: string;
 }
 
-type LinkType = 'url' | 'story' | 'email' | 'asset'
+type LinkType = 'url' | 'story' | 'email' | 'asset';
 
 const LINK_TYPES: { type: LinkType; label: string; Icon: React.ElementType }[] = [
   { type: 'asset', label: 'Asset', Icon: Image },
   { type: 'email', label: 'Email', Icon: AtSign },
   { type: 'story', label: 'Internal link', Icon: Link2 },
   { type: 'url', label: 'URL', Icon: Globe },
-]
+];
 
 function getAvailableTypes(def: LinkFieldDef | MultilinkFieldDef): LinkType[] {
-  return LINK_TYPES
-    .filter((t) => {
-      if (t.type === 'asset') return def.asset_link_type !== false
-      if (t.type === 'email') return def.email_link_type !== false
-      return true
-    })
-    .map((t) => t.type)
+  return LINK_TYPES.filter((t) => {
+    if (t.type === 'asset') return def.asset_link_type !== false;
+    if (t.type === 'email') return def.email_link_type !== false;
+    return true;
+  }).map((t) => t.type);
 }
 
 export function LinkField({ fieldKey, def, value, onChange, spaceId }: Props) {
-  const available = getAvailableTypes(def)
-  const linktype: LinkType = (value?.linktype as LinkType | undefined) ?? 'url'
-  const allowTarget = def.allow_target_blank ?? false
+  const available = getAvailableTypes(def);
+  const linktype: LinkType = (value?.linktype as LinkType | undefined) ?? 'url';
+  const allowTarget = def.allow_target_blank ?? false;
 
-  const [typeDropdownOpen, setTypeDropdownOpen] = useState(false)
-  const [assetPickerOpen, setAssetPickerOpen] = useState(false)
-  const [storyPanelOpen, setStoryPanelOpen] = useState(false)
-  const [storySearch, setStorySearch] = useState('')
-  const [stories, setStories] = useState<StoryItem[]>([])
-  const [storiesLoading, setStoriesLoading] = useState(false)
-  const [breadcrumb, setBreadcrumb] = useState<BreadcrumbEntry[]>([])
-  const currentParentId = breadcrumb.length > 0 ? breadcrumb[breadcrumb.length - 1].id : null
-  const [selectedStoryName, setSelectedStoryName] = useState<string>('')
-  const [selectedStoryPublished, setSelectedStoryPublished] = useState<boolean | null>(null)
-  const [selectedStoryId, setSelectedStoryId] = useState<number | null>(null)
+  const [typeDropdownOpen, setTypeDropdownOpen] = useState(false);
+  const [assetPickerOpen, setAssetPickerOpen] = useState(false);
+  const [storyPanelOpen, setStoryPanelOpen] = useState(false);
+  const [storySearch, setStorySearch] = useState('');
+  const [breadcrumb, setBreadcrumb] = useState<BreadcrumbEntry[]>([]);
+  const currentParentId = breadcrumb.length > 0 ? breadcrumb[breadcrumb.length - 1].id : null;
 
-  const typeDropdownRef = useRef<HTMLDivElement>(null)
-  const storyPanelRef = useRef<HTMLDivElement>(null)
+  const storiesUrl = (() => {
+    if (!storyPanelOpen) return null;
+    const params = new URLSearchParams({ per_page: '50' });
+    if (storySearch.trim()) {
+      params.set('text_search', storySearch.trim());
+    } else {
+      params.set('parent_id', currentParentId !== null ? String(currentParentId) : '');
+    }
+    return `/api/admin/spaces/${spaceId}/stories?${params}`;
+  })();
+  const { data: storiesData, isLoading: storiesLoading } = useApi<{ stories: StoryItem[] }>(
+    storiesUrl,
+  );
+  const stories = storiesData?.stories ?? [];
+  const [selectedStoryName, setSelectedStoryName] = useState<string>('');
+  const [selectedStoryPublished, setSelectedStoryPublished] = useState<boolean | null>(null);
+  const [selectedStoryId, setSelectedStoryId] = useState<number | null>(null);
+
+  const typeDropdownRef = useRef<HTMLDivElement>(null);
+  const storyPanelRef = useRef<HTMLDivElement>(null);
 
   function update(patch: Partial<LinkValue>) {
-    onChange({ ...(value ?? {}), ...patch })
+    onChange({ ...(value ?? {}), ...patch });
   }
 
   function selectType(t: LinkType) {
-    setTypeDropdownOpen(false)
-    setBreadcrumb([])
-    setStorySearch('')
-    setStoryPanelOpen(false)
-    setSelectedStoryName('')
-    setSelectedStoryPublished(null)
-    setSelectedStoryId(null)
-    onChange({ linktype: t, url: '', href: '', cached_url: '', id: '', target: value?.target })
+    setTypeDropdownOpen(false);
+    setBreadcrumb([]);
+    setStorySearch('');
+    setStoryPanelOpen(false);
+    setSelectedStoryName('');
+    setSelectedStoryPublished(null);
+    setSelectedStoryId(null);
+    onChange({ linktype: t, url: '', href: '', cached_url: '', id: '', target: value?.target });
   }
 
   function clearStory() {
-    setSelectedStoryName('')
-    setSelectedStoryPublished(null)
-    setSelectedStoryId(null)
-    onChange({ linktype: 'story', url: '', href: '', cached_url: '', id: '', target: value?.target })
+    setSelectedStoryName('');
+    setSelectedStoryPublished(null);
+    setSelectedStoryId(null);
+    onChange({
+      linktype: 'story',
+      url: '',
+      href: '',
+      cached_url: '',
+      id: '',
+      target: value?.target,
+    });
   }
 
   // Close type dropdown on outside click
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (typeDropdownRef.current && !typeDropdownRef.current.contains(e.target as Node)) {
-        setTypeDropdownOpen(false)
+        setTypeDropdownOpen(false);
       }
     }
-    if (typeDropdownOpen) document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [typeDropdownOpen])
+    if (typeDropdownOpen) document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [typeDropdownOpen]);
 
   // Close story panel on outside click
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (storyPanelRef.current && !storyPanelRef.current.contains(e.target as Node)) {
-        setStoryPanelOpen(false)
+        setStoryPanelOpen(false);
       }
     }
-    if (storyPanelOpen) document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [storyPanelOpen])
-
-  // Fetch stories for internal link browser
-  const fetchStories = useCallback(() => {
-    const controller = new AbortController()
-    setStoriesLoading(true)
-    const params = new URLSearchParams({ per_page: '50' })
-    if (storySearch.trim()) {
-      params.set('text_search', storySearch.trim())
-    } else {
-      params.set('parent_id', currentParentId !== null ? String(currentParentId) : '')
-    }
-    fetch(`/api/admin/spaces/${spaceId}/stories?${params}`, { signal: controller.signal })
-      .then((r) => r.json())
-      .then((data) => {
-        setStories(data.stories ?? [])
-        setStoriesLoading(false)
-      })
-      .catch((err) => {
-        if (err?.name !== 'AbortError') setStoriesLoading(false)
-      })
-    return () => controller.abort()
-  }, [spaceId, storySearch, currentParentId])
-
-  useEffect(() => {
-    if (!storyPanelOpen) return
-    const cleanup = fetchStories()
-    return cleanup
-  }, [storyPanelOpen, fetchStories])
+    if (storyPanelOpen) document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [storyPanelOpen]);
 
   function handleAssetSelect(assets: Asset[]) {
-    const asset = assets[0]
-    if (!asset) return
-    const url = normalizeAssetFilename(asset.filename)
-    update({ linktype: 'asset', url, href: url, cached_url: url, id: String(asset.id) })
-    setAssetPickerOpen(false)
+    const asset = assets[0];
+    if (!asset) return;
+    const url = normalizeAssetFilename(asset.filename);
+    update({ linktype: 'asset', url, href: url, cached_url: url, id: String(asset.id) });
+    setAssetPickerOpen(false);
   }
 
   function handleStorySelect(story: StoryItem) {
     if (story.is_folder) {
-      setBreadcrumb((prev) => [...prev, { id: story.id, name: story.name }])
-      setStorySearch('')
+      setBreadcrumb((prev) => [...prev, { id: story.id, name: story.name }]);
+      setStorySearch('');
     } else {
       update({
         linktype: 'story',
@@ -174,41 +180,45 @@ export function LinkField({ fieldKey, def, value, onChange, spaceId }: Props) {
         url: story.full_slug,
         href: story.full_slug,
         cached_url: story.full_slug,
-      })
-      setSelectedStoryName(story.name)
-      setSelectedStoryPublished(story.published)
-      setSelectedStoryId(story.id)
-      setStoryPanelOpen(false)
-      setBreadcrumb([])
-      setStorySearch('')
+      });
+      setSelectedStoryName(story.name);
+      setSelectedStoryPublished(story.published);
+      setSelectedStoryId(story.id);
+      setStoryPanelOpen(false);
+      setBreadcrumb([]);
+      setStorySearch('');
     }
   }
 
   function navigateBreadcrumb(index: number) {
     if (index < 0) {
-      setBreadcrumb([])
+      setBreadcrumb([]);
     } else {
-      setBreadcrumb((prev) => prev.slice(0, index + 1))
+      setBreadcrumb((prev) => prev.slice(0, index + 1));
     }
-    setStorySearch('')
+    setStorySearch('');
   }
 
-  const currentType = LINK_TYPES.find((t) => t.type === linktype)
-  const CurrentIcon = currentType?.Icon ?? Globe
+  const currentType = LINK_TYPES.find((t) => t.type === linktype);
+  const CurrentIcon = currentType?.Icon ?? Globe;
 
-  const displayUrl = value?.cached_url || value?.url || value?.href || ''
-  const assetUrl = linktype === 'asset' ? displayUrl : ''
-  const assetShortName = assetUrl.split('/').pop() ?? ''
-  const selectedStorySlug = linktype === 'story' ? displayUrl : ''
-  const storyIsUnpublished = linktype === 'story' && selectedStorySlug && selectedStoryPublished === false
+  const displayUrl = value?.cached_url || value?.url || value?.href || '';
+  const assetUrl = linktype === 'asset' ? displayUrl : '';
+  const assetShortName = assetUrl.split('/').pop() ?? '';
+  const selectedStorySlug = linktype === 'story' ? displayUrl : '';
+  const storyIsUnpublished =
+    linktype === 'story' && selectedStorySlug && selectedStoryPublished === false;
 
   return (
     <div>
-      <FieldLabel label={fieldLabel(def.display_name, fieldKey)} required={def.required} description={def.description} />
+      <FieldLabel
+        label={fieldLabel(def.display_name, fieldKey)}
+        required={def.required}
+        description={def.description}
+      />
 
       {/* Main input row */}
       <div className="group/input flex items-stretch border border-gray-300 dark:border-gray-600 rounded-lg overflow-visible bg-white dark:bg-gray-800 focus-within:ring-2 focus-within:ring-teal-500 focus-within:border-teal-500">
-
         {/* Type selector */}
         <div className="relative flex-shrink-0" ref={typeDropdownRef}>
           <button
@@ -228,7 +238,9 @@ export function LinkField({ fieldKey, def, value, onChange, spaceId }: Props) {
                   type="button"
                   onClick={() => selectType(type)}
                   className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors ${
-                    type === linktype ? 'text-teal-600 dark:text-teal-400 font-medium' : 'text-gray-700 dark:text-gray-300'
+                    type === linktype
+                      ? 'text-teal-600 dark:text-teal-400 font-medium'
+                      : 'text-gray-700 dark:text-gray-300'
                   }`}
                 >
                   <Icon className="w-4 h-4 flex-shrink-0" />
@@ -245,7 +257,9 @@ export function LinkField({ fieldKey, def, value, onChange, spaceId }: Props) {
             type={linktype === 'email' ? 'email' : 'url'}
             placeholder={linktype === 'email' ? 'email@example.com' : 'https://'}
             value={displayUrl}
-            onChange={(e) => update({ url: e.target.value, href: e.target.value, cached_url: e.target.value })}
+            onChange={(e) =>
+              update({ url: e.target.value, href: e.target.value, cached_url: e.target.value })
+            }
             className="flex-1 px-3 py-2 text-sm bg-transparent text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none min-w-0"
           />
         )}
@@ -280,7 +294,9 @@ export function LinkField({ fieldKey, def, value, onChange, spaceId }: Props) {
                   <p className="font-semibold text-gray-900 dark:text-gray-100 truncate leading-tight">
                     {selectedStoryName || selectedStorySlug.split('/').pop()}
                   </p>
-                  <p className="text-xs text-gray-400 truncate leading-tight mt-0.5">{selectedStorySlug}</p>
+                  <p className="text-xs text-gray-400 truncate leading-tight mt-0.5">
+                    {selectedStorySlug}
+                  </p>
                 </div>
               ) : (
                 <span className="text-gray-400">Internal link</span>
@@ -334,7 +350,9 @@ export function LinkField({ fieldKey, def, value, onChange, spaceId }: Props) {
       {storyIsUnpublished && (
         <div className="mt-1.5 flex items-center gap-2 px-3 py-2 rounded-lg border border-amber-400/60 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-500/40">
           <TriangleAlert className="w-4 h-4 text-amber-500 flex-shrink-0" />
-          <span className="text-sm font-medium text-amber-700 dark:text-amber-400">Unpublished linked story</span>
+          <span className="text-sm font-medium text-amber-700 dark:text-amber-400">
+            Unpublished linked story
+          </span>
         </div>
       )}
 
@@ -351,9 +369,11 @@ export function LinkField({ fieldKey, def, value, onChange, spaceId }: Props) {
                 <AssetThumb
                   filename={assetUrl}
                   contentType={
-                    /\.(jpg|jpeg|png|gif|webp|avif)$/i.test(assetUrl) ? 'image/jpeg'
-                    : /\.svg$/i.test(assetUrl) ? 'image/svg+xml'
-                    : 'application/octet-stream'
+                    /\.(jpg|jpeg|png|gif|webp|avif)$/i.test(assetUrl)
+                      ? 'image/jpeg'
+                      : /\.svg$/i.test(assetUrl)
+                        ? 'image/svg+xml'
+                        : 'application/octet-stream'
                   }
                   spaceId={spaceId}
                   size={120}
@@ -361,7 +381,9 @@ export function LinkField({ fieldKey, def, value, onChange, spaceId }: Props) {
                   iconClassName="w-6 h-6 text-gray-400"
                 />
               </div>
-              <span className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{assetShortName}</span>
+              <span className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">
+                {assetShortName}
+              </span>
             </button>
           ) : (
             <button
@@ -372,7 +394,9 @@ export function LinkField({ fieldKey, def, value, onChange, spaceId }: Props) {
               <div className="w-16 h-16 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center flex-shrink-0">
                 <Image className="w-6 h-6 text-gray-400" />
               </div>
-              <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">+ Add Asset</span>
+              <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                + Add Asset
+              </span>
             </button>
           )}
         </div>
@@ -411,7 +435,6 @@ export function LinkField({ fieldKey, def, value, onChange, spaceId }: Props) {
             <div className="flex items-center gap-2 px-2 py-1.5 border border-gray-200 dark:border-gray-700 rounded-lg focus-within:ring-2 focus-within:ring-teal-500 focus-within:border-teal-500">
               <Search className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
               <input
-                autoFocus
                 type="text"
                 value={storySearch}
                 onChange={(e) => setStorySearch(e.target.value)}
@@ -443,7 +466,9 @@ export function LinkField({ fieldKey, def, value, onChange, spaceId }: Props) {
                       {entry.name}
                     </button>
                   ) : (
-                    <span className="text-gray-900 dark:text-gray-100 font-medium">{entry.name}</span>
+                    <span className="text-gray-900 dark:text-gray-100 font-medium">
+                      {entry.name}
+                    </span>
                   )}
                 </span>
               ))}
@@ -452,40 +477,53 @@ export function LinkField({ fieldKey, def, value, onChange, spaceId }: Props) {
 
           {/* Story / folder list */}
           <div className="max-h-56 overflow-y-auto">
-            {storiesLoading && Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-3 px-4 py-2.5 border-b border-gray-50 dark:border-gray-800 last:border-0">
-                <div className="w-4 h-4 rounded-full bg-gray-200 dark:bg-gray-700 animate-pulse flex-shrink-0" />
-                <div className="flex-1 space-y-1">
-                  <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-2/5" />
-                  <div className="h-2.5 bg-gray-100 dark:bg-gray-800 rounded animate-pulse w-3/5" />
+            {storiesLoading &&
+              Array.from({ length: 4 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="flex items-center gap-3 px-4 py-2.5 border-b border-gray-50 dark:border-gray-800 last:border-0"
+                >
+                  <div className="w-4 h-4 rounded-full bg-gray-200 dark:bg-gray-700 animate-pulse flex-shrink-0" />
+                  <div className="flex-1 space-y-1">
+                    <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-2/5" />
+                    <div className="h-2.5 bg-gray-100 dark:bg-gray-800 rounded animate-pulse w-3/5" />
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
             {!storiesLoading && stories.length === 0 && (
-              <div className="px-4 py-6 text-center text-sm text-gray-400">No content items found</div>
+              <div className="px-4 py-6 text-center text-sm text-gray-400">
+                No content items found
+              </div>
             )}
-            {!storiesLoading && stories.map((story) => (
-              <button
-                key={story.id}
-                type="button"
-                onClick={() => handleStorySelect(story)}
-                className={`w-full flex items-center gap-3 px-4 py-2.5 text-left border-b border-gray-50 dark:border-gray-800 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors ${
-                  value?.id === story.uuid ? 'bg-teal-50 dark:bg-teal-900/20' : ''
-                }`}
-              >
-                {story.is_folder
-                  ? <Folder className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                  : <StoryStatusIcon published={story.published} unpublishedChanges={story.unpublished_changes} />
-                }
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{story.name}</p>
-                  <p className="text-xs text-gray-400 truncate">{story.full_slug}</p>
-                </div>
-                {story.is_folder && (
-                  <ChevronRight className="w-4 h-4 text-gray-300 flex-shrink-0" />
-                )}
-              </button>
-            ))}
+            {!storiesLoading &&
+              stories.map((story) => (
+                <button
+                  key={story.id}
+                  type="button"
+                  onClick={() => handleStorySelect(story)}
+                  className={`w-full flex items-center gap-3 px-4 py-2.5 text-left border-b border-gray-50 dark:border-gray-800 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors ${
+                    value?.id === story.uuid ? 'bg-teal-50 dark:bg-teal-900/20' : ''
+                  }`}
+                >
+                  {story.is_folder ? (
+                    <Folder className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                  ) : (
+                    <StoryStatusIcon
+                      published={story.published}
+                      unpublishedChanges={story.unpublished_changes}
+                    />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                      {story.name}
+                    </p>
+                    <p className="text-xs text-gray-400 truncate">{story.full_slug}</p>
+                  </div>
+                  {story.is_folder && (
+                    <ChevronRight className="w-4 h-4 text-gray-300 flex-shrink-0" />
+                  )}
+                </button>
+              ))}
           </div>
         </div>
       )}
@@ -500,5 +538,5 @@ export function LinkField({ fieldKey, def, value, onChange, spaceId }: Props) {
         />
       )}
     </div>
-  )
+  );
 }

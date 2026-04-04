@@ -1,29 +1,29 @@
-'use client'
+'use client';
 
-import { use, useState, useEffect, useCallback, useRef } from 'react'
-import { usePerPage } from '@/hooks/use-per-page'
-import Link from 'next/link'
-import { ArrowLeft, GripVertical, Trash2 } from 'lucide-react'
-import { SearchBar } from '@/components/ui/search-bar'
-import { RightSidebar } from '@/components/ui/right-sidebar'
-import { ConfirmModal } from '@/components/ui/confirm-modal'
-import { UnsavedChangesModal } from '@/components/ui/unsaved-changes-modal'
-import { useUnsavedChanges } from '@/hooks/use-unsaved-changes'
-import { Pagination } from '@/components/ui/pagination'
-import type { DatasourceEntry, DatasourceWithDimensions } from '@sbx/types'
+import { use, useState, useEffect, useCallback, useRef } from 'react';
+import { usePerPage } from '@/hooks/use-per-page';
+import Link from 'next/link';
+import { ArrowLeft, GripVertical, Trash2 } from 'lucide-react';
+import { SearchBar } from '@/components/ui/search-bar';
+import { CrudSidebarForm } from '@/components/ui/crud-sidebar-form';
+import { useDelete } from '@/hooks/use-delete';
+import { useApi } from '@/lib/swr';
+import { Pagination } from '@/components/ui/pagination';
+import { SkeletonBlock } from '@/components/ui/skeleton';
+import type { DatasourceEntry, DatasourceWithDimensions } from '@sbx/types';
 
 // ---- Entry row ----
 
 interface EntryRowProps {
-  entry: DatasourceEntry
-  onSave: (id: number, name: string, value: string) => Promise<void>
-  onDelete: (entry: DatasourceEntry) => void
-  dragging: boolean
-  isDropTarget: boolean
-  onDragStart: () => void
-  onDragOver: (e: React.DragEvent) => void
-  onDrop: () => void
-  onDragEnd: () => void
+  entry: DatasourceEntry;
+  onSave: (id: number, name: string, value: string) => Promise<void>;
+  onDelete: (entry: DatasourceEntry) => void;
+  dragging: boolean;
+  isDropTarget: boolean;
+  onDragStart: () => void;
+  onDragOver: (e: React.DragEvent) => void;
+  onDrop: () => void;
+  onDragEnd: () => void;
 }
 
 function EntryRow({
@@ -37,22 +37,25 @@ function EntryRow({
   onDrop,
   onDragEnd,
 }: EntryRowProps) {
-  const [name, setName] = useState(entry.name)
-  const [value, setValue] = useState(entry.value)
-  const [saving, setSaving] = useState(false)
-  const isDirty = name !== entry.name || value !== entry.value
+  const [name, setName] = useState(entry.name);
+  const [value, setValue] = useState(entry.value);
+  const [saving, setSaving] = useState(false);
+  const isDirty = name !== entry.name || value !== entry.value;
 
   async function handleSave() {
-    setSaving(true)
-    await onSave(entry.id, name, value)
-    setSaving(false)
+    setSaving(true);
+    await onSave(entry.id, name, value);
+    setSaving(false);
   }
 
   return (
     <div
       draggable
       onDragStart={onDragStart}
-      onDragOver={(e) => { e.preventDefault(); onDragOver(e) }}
+      onDragOver={(e) => {
+        e.preventDefault();
+        onDragOver(e);
+      }}
       onDrop={onDrop}
       onDragEnd={onDragEnd}
       className={`flex items-center gap-3 px-4 py-2.5 border-b transition-colors ${
@@ -98,7 +101,7 @@ function EntryRow({
         <Trash2 className="size-4" />
       </button>
     </div>
-  )
+  );
 }
 
 // ---- Main page ----
@@ -106,69 +109,69 @@ function EntryRow({
 export default function DatasourceDetailPage({
   params,
 }: {
-  params: Promise<{ spaceId: string; datasourceId: string }>
+  params: Promise<{ spaceId: string; datasourceId: string }>;
 }) {
-  const { spaceId, datasourceId } = use(params)
+  const { spaceId, datasourceId } = use(params);
 
-  const [datasource, setDatasource] = useState<DatasourceWithDimensions | null>(null)
-  const [entries, setEntries] = useState<DatasourceEntry[]>([])
-  const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(1)
-  const [perPage, setPerPage] = usePerPage('perPage:datasource-entries', 25)
-  const [search, setSearch] = useState('')
-  const [isLoading, setIsLoading] = useState(true)
+  const { data: dsData, mutate: mutateDatasource } = useApi<{
+    datasource: DatasourceWithDimensions;
+  }>(`/api/admin/spaces/${spaceId}/datasources/${datasourceId}`);
+  const datasource = dsData?.datasource ?? null;
 
-  const [newName, setNewName] = useState('')
-  const [newValue, setNewValue] = useState('')
-  const [adding, setAdding] = useState(false)
+  const [entries, setEntries] = useState<DatasourceEntry[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = usePerPage('perPage:datasource-entries', 25);
+  const [search, setSearch] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
 
-  const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [editName, setEditName] = useState('')
-  const [editSlug, setEditSlug] = useState('')
-  const [editSaving, setEditSaving] = useState(false)
-  const [editError, setEditError] = useState<string | null>(null)
-  const [editIsDirty, setEditIsDirty] = useState(false)
-  const { showModal: showUnsavedModal, handleConfirm: confirmUnsaved, handleCancel: cancelUnsaved } = useUnsavedChanges(editIsDirty)
+  const [newName, setNewName] = useState('');
+  const [newValue, setNewValue] = useState('');
+  const [adding, setAdding] = useState(false);
 
-  const [deleteTarget, setDeleteTarget] = useState<DatasourceEntry | null>(null)
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editSlug, setEditSlug] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editIsDirty, setEditIsDirty] = useState(false);
 
-  const dragIndex = useRef<number | null>(null)
-  const [dragSourceIndex, setDragSourceIndex] = useState<number | null>(null)
-  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
-
-  // Fetch datasource via MAPI single GET
-  const fetchDatasource = useCallback(async () => {
-    const res = await fetch(`/api/admin/spaces/${spaceId}/datasources/${datasourceId}`)
-    if (res.ok) {
-      const data = await res.json()
-      if (data.datasource) setDatasource(data.datasource)
-    }
-  }, [spaceId, datasourceId])
+  const dragIndex = useRef<number | null>(null);
+  const [dragSourceIndex, setDragSourceIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   // Fetch entries via MAPI /datasource_entries?datasource_id=...
   const fetchEntries = useCallback(async () => {
-    setIsLoading(true)
+    setIsLoading(true);
     const p = new URLSearchParams({
       datasource_id: datasourceId,
       page: String(page),
       per_page: String(perPage),
-    })
-    if (search.trim()) p.set('search', search.trim())
-    const res = await fetch(`/api/admin/spaces/${spaceId}/datasource_entries?${p}`)
+    });
+    if (search.trim()) p.set('search', search.trim());
+    const res = await fetch(`/api/admin/spaces/${spaceId}/datasource_entries?${p}`);
     if (res.ok) {
-      const data = await res.json()
-      setEntries(data.datasource_entries ?? [])
-      setTotal(data.total ?? 0)
+      const data = await res.json();
+      setEntries(data.datasource_entries ?? []);
+      setTotal(data.total ?? 0);
     }
-    setIsLoading(false)
-  }, [spaceId, datasourceId, page, perPage, search])
+    setIsLoading(false);
+  }, [spaceId, datasourceId, page, perPage, search]);
 
-  useEffect(() => { fetchDatasource() }, [fetchDatasource])
-  useEffect(() => { fetchEntries() }, [fetchEntries])
+  const entryDelete = useDelete<DatasourceEntry>({
+    getUrl: (e) => `/api/admin/spaces/${spaceId}/datasource_entries/${e.id}`,
+    onSuccess: fetchEntries,
+    title: 'Delete Entry',
+    getMessage: (e) => `Delete entry "${e.name}"?`,
+  });
+
+  useEffect(() => {
+    fetchEntries();
+  }, [fetchEntries]);
 
   async function handleAdd() {
-    if (!newName.trim() || !newValue.trim()) return
-    setAdding(true)
+    if (!newName.trim() || !newValue.trim()) return;
+    setAdding(true);
     const res = await fetch(`/api/admin/spaces/${spaceId}/datasource_entries`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -176,16 +179,16 @@ export default function DatasourceDetailPage({
         datasource_entry: {
           name: newName.trim(),
           value: newValue.trim(),
-          datasource_id: parseInt(datasourceId),
+          datasource_id: parseInt(datasourceId, 10),
         },
       }),
-    })
+    });
     if (res.ok) {
-      setNewName('')
-      setNewValue('')
-      fetchEntries()
+      setNewName('');
+      setNewValue('');
+      fetchEntries();
     }
-    setAdding(false)
+    setAdding(false);
   }
 
   async function handleSaveEntry(id: number, name: string, value: string) {
@@ -193,81 +196,69 @@ export default function DatasourceDetailPage({
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ datasource_entry: { name, value } }),
-    })
-    fetchEntries()
-  }
-
-  async function handleDeleteEntry() {
-    if (!deleteTarget) return
-    await fetch(`/api/admin/spaces/${spaceId}/datasource_entries/${deleteTarget.id}`, {
-      method: 'DELETE',
-    })
-    setDeleteTarget(null)
-    fetchEntries()
+    });
+    fetchEntries();
   }
 
   function openEdit() {
-    if (!datasource) return
-    setEditName(datasource.name)
-    setEditSlug(datasource.slug)
-    setEditError(null)
-    setEditIsDirty(false)
-    setSidebarOpen(true)
+    if (!datasource) return;
+    setEditName(datasource.name);
+    setEditSlug(datasource.slug);
+    setEditError(null);
+    setEditIsDirty(false);
+    setSidebarOpen(true);
   }
 
   async function handleEditSave() {
-    if (!datasource) return
-    setEditSaving(true)
-    setEditError(null)
+    if (!datasource) return;
+    setEditSaving(true);
+    setEditError(null);
     try {
       const res = await fetch(`/api/admin/spaces/${spaceId}/datasources/${datasource.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ datasource: { name: editName.trim(), slug: editSlug.trim() } }),
-      })
-      const data = await res.json()
+      });
+      const data = await res.json();
       if (res.ok) {
-        setEditIsDirty(false)
-        setSidebarOpen(false)
-        fetchDatasource()
+        setEditIsDirty(false);
+        setSidebarOpen(false);
+        mutateDatasource();
       } else {
-        setEditError(data.message ?? 'Failed to update datasource')
+        setEditError(data.message ?? 'Failed to update datasource');
       }
     } catch {
-      setEditError('Network error')
+      setEditError('Network error');
     } finally {
-      setEditSaving(false)
+      setEditSaving(false);
     }
   }
 
   function handleDragStart(index: number) {
-    dragIndex.current = index
-    setDragSourceIndex(index)
+    dragIndex.current = index;
+    setDragSourceIndex(index);
   }
 
   function handleDragOver(index: number) {
-    if (dragOverIndex !== index) setDragOverIndex(index)
+    if (dragOverIndex !== index) setDragOverIndex(index);
   }
 
   async function handleDrop(dropIndex: number) {
-    const from = dragIndex.current
-    setDragSourceIndex(null)
-    setDragOverIndex(null)
-    dragIndex.current = null
-    if (from === null || from === dropIndex) return
-    const reordered = [...entries]
-    const [moved] = reordered.splice(from, 1)
-    reordered.splice(dropIndex, 0, moved)
-    setEntries(reordered)
-    await fetch(
-      `/api/admin/spaces/${spaceId}/datasources/${datasourceId}/entries/reorder`,
-      {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids: reordered.map((e) => e.id) }),
-      },
-    )
-    fetchEntries()
+    const from = dragIndex.current;
+    setDragSourceIndex(null);
+    setDragOverIndex(null);
+    dragIndex.current = null;
+    if (from === null || from === dropIndex) return;
+    const reordered = [...entries];
+    const [moved] = reordered.splice(from, 1);
+    reordered.splice(dropIndex, 0, moved);
+    setEntries(reordered);
+    await fetch(`/api/admin/spaces/${spaceId}/datasources/${datasourceId}/entries/reorder`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: reordered.map((e) => e.id) }),
+    });
+    fetchEntries();
   }
 
   return (
@@ -302,7 +293,9 @@ export default function DatasourceDetailPage({
               onChange={(e) => setNewName(e.target.value)}
               placeholder="Name"
               className="flex-1 px-3 py-2 border border-gray-200 dark:border-gray-700 rounded text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-teal-500"
-              onKeyDown={(e) => { if (e.key === 'Enter') handleAdd() }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleAdd();
+              }}
             />
             <input
               type="text"
@@ -310,7 +303,9 @@ export default function DatasourceDetailPage({
               onChange={(e) => setNewValue(e.target.value)}
               placeholder="Value"
               className="flex-[2] px-3 py-2 border border-gray-200 dark:border-gray-700 rounded text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-teal-500"
-              onKeyDown={(e) => { if (e.key === 'Enter') handleAdd() }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleAdd();
+              }}
             />
             <button
               onClick={handleAdd}
@@ -324,7 +319,10 @@ export default function DatasourceDetailPage({
           <div className="mb-2">
             <SearchBar
               value={search}
-              onChange={(v) => { setSearch(v); setPage(1) }}
+              onChange={(v) => {
+                setSearch(v);
+                setPage(1);
+              }}
               placeholder="Search by name or value..."
             />
           </div>
@@ -338,17 +336,11 @@ export default function DatasourceDetailPage({
                 key={i}
                 className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 dark:border-gray-800"
               >
-                <div className="size-4 rounded bg-gray-200 dark:bg-gray-700 animate-pulse" />
-                <div
-                  className="h-8 rounded bg-gray-200 dark:bg-gray-700 animate-pulse flex-1"
-                  style={{ animationDelay: `${i * 40}ms` }}
-                />
-                <div
-                  className="h-8 rounded bg-gray-200 dark:bg-gray-700 animate-pulse flex-[2]"
-                  style={{ animationDelay: `${i * 40 + 20}ms` }}
-                />
-                <div className="h-8 w-14 rounded bg-gray-200 dark:bg-gray-700 animate-pulse" />
-                <div className="size-7 rounded bg-gray-200 dark:bg-gray-700 animate-pulse" />
+                <SkeletonBlock className="size-4" />
+                <SkeletonBlock className="h-8 flex-1" />
+                <SkeletonBlock className="h-8 flex-[2]" />
+                <SkeletonBlock className="h-8 w-14" />
+                <SkeletonBlock className="size-7" />
               </div>
             ))
           ) : entries.length === 0 ? (
@@ -359,13 +351,17 @@ export default function DatasourceDetailPage({
                 key={entry.id}
                 entry={entry}
                 onSave={handleSaveEntry}
-                onDelete={setDeleteTarget}
+                onDelete={entryDelete.confirm}
                 dragging={dragSourceIndex === index}
                 isDropTarget={dragOverIndex === index && dragSourceIndex !== index}
                 onDragStart={() => handleDragStart(index)}
                 onDragOver={() => handleDragOver(index)}
                 onDrop={() => handleDrop(index)}
-                onDragEnd={() => { dragIndex.current = null; setDragSourceIndex(null); setDragOverIndex(null) }}
+                onDragEnd={() => {
+                  dragIndex.current = null;
+                  setDragSourceIndex(null);
+                  setDragOverIndex(null);
+                }}
               />
             ))
           )}
@@ -376,37 +372,23 @@ export default function DatasourceDetailPage({
           page={page}
           perPage={perPage}
           onPageChange={setPage}
-          onPerPageChange={(n) => { setPerPage(n); setPage(1) }}
+          onPerPageChange={(n) => {
+            setPerPage(n);
+            setPage(1);
+          }}
           storageKey="perPage:datasource-entries"
         />
       </div>
 
       {/* Edit sidebar */}
-      <RightSidebar
+      <CrudSidebarForm
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
-        header={
-          <span className="font-semibold text-gray-900 dark:text-gray-100">
-            {datasource?.name}
-          </span>
-        }
-        footer={
-          <div className="ml-auto flex items-center gap-2">
-            <button
-              onClick={() => setSidebarOpen(false)}
-              className="px-4 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleEditSave}
-              disabled={editSaving}
-              className="px-4 py-2 text-sm bg-teal-200 hover:bg-teal-300 disabled:opacity-60 text-teal-800 rounded-md font-medium transition-colors"
-            >
-              {editSaving ? 'Saving...' : 'Save'}
-            </button>
-          </div>
-        }
+        title={datasource?.name ?? 'Edit Datasource'}
+        isSubmitting={editSaving}
+        isDirty={editIsDirty}
+        onSubmit={handleEditSave}
+        noForm
       >
         {editError && (
           <p className="text-sm text-red-500 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-md">
@@ -420,7 +402,10 @@ export default function DatasourceDetailPage({
           <input
             type="text"
             value={editName}
-            onChange={(e) => { setEditName(e.target.value); setEditIsDirty(true) }}
+            onChange={(e) => {
+              setEditName(e.target.value);
+              setEditIsDirty(true);
+            }}
             className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-md text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
           />
         </div>
@@ -431,22 +416,16 @@ export default function DatasourceDetailPage({
           <input
             type="text"
             value={editSlug}
-            onChange={(e) => { setEditSlug(e.target.value); setEditIsDirty(true) }}
+            onChange={(e) => {
+              setEditSlug(e.target.value);
+              setEditIsDirty(true);
+            }}
             className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-md text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
           />
         </div>
-      </RightSidebar>
+      </CrudSidebarForm>
 
-      <ConfirmModal
-        open={!!deleteTarget}
-        title="Delete Entry"
-        message={`Delete entry "${deleteTarget?.name}"?`}
-        confirmLabel="Delete"
-        onConfirm={handleDeleteEntry}
-        onCancel={() => setDeleteTarget(null)}
-      />
-
-      <UnsavedChangesModal open={showUnsavedModal} onConfirm={confirmUnsaved} onCancel={cancelUnsaved} />
+      {entryDelete.modal}
     </>
-  )
+  );
 }

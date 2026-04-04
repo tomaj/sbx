@@ -1,9 +1,9 @@
-'use client'
+'use client';
 
-import { useTheme } from 'next-themes'
-import { useEffect, useState } from 'react'
-import { Check } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { useTheme } from 'next-themes';
+import { useEffect, useState } from 'react';
+import { Check } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 const themes = [
   {
@@ -34,21 +34,21 @@ const themes = [
       </div>
     ),
   },
-]
+];
 
 export default function AppearancePage() {
-  const { theme, setTheme } = useTheme()
-  const [mounted, setMounted] = useState(false)
-  const [saved, setSaved] = useState(false)
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  const [saved, setSaved] = useState(false);
 
-  useEffect(() => setMounted(true), [])
+  useEffect(() => setMounted(true), []);
 
   function handleSave() {
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
   }
 
-  if (!mounted) return null
+  if (!mounted) return null;
 
   return (
     <div>
@@ -97,5 +97,5 @@ export default function AppearancePage() {
         ))}
       </div>
     </div>
-  )
+  );
 }

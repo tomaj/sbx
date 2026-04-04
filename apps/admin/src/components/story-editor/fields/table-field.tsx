@@ -1,21 +1,21 @@
-'use client'
+'use client';
 
-import type { TableFieldDef } from '@/components/block-library/edit-block-modal/types'
+import type { TableFieldDef } from '@/components/block-library/edit-block-modal/types';
 
 interface TableValue {
-  thead?: Array<{ value: string }>
-  tbody?: Array<{ body: Array<{ value: string }> }>
+  thead?: Array<{ value: string }>;
+  tbody?: Array<{ body: Array<{ value: string }> }>;
 }
 
 interface Props {
-  fieldKey: string
-  def: TableFieldDef
-  value: TableValue | undefined
-  onChange: (v: TableValue) => void
+  fieldKey: string;
+  def: TableFieldDef;
+  value: TableValue | undefined;
+  onChange: (v: TableValue) => void;
 }
 
 export function TableField({ fieldKey, def, value, onChange }: Props) {
-  const raw = JSON.stringify(value ?? {}, null, 2)
+  const raw = JSON.stringify(value ?? {}, null, 2);
 
   return (
     <div>
@@ -30,8 +30,11 @@ export function TableField({ fieldKey, def, value, onChange }: Props) {
         <textarea
           value={raw}
           onChange={(e) => {
-            try { onChange(JSON.parse(e.target.value)) }
-            catch { /* ignore parse errors while typing */ }
+            try {
+              onChange(JSON.parse(e.target.value));
+            } catch {
+              /* ignore parse errors while typing */
+            }
           }}
           rows={6}
           className="w-full px-3 py-2 text-xs font-mono border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-500 resize-y"
@@ -41,5 +44,5 @@ export function TableField({ fieldKey, def, value, onChange }: Props) {
         </span>
       </div>
     </div>
-  )
+  );
 }

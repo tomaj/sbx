@@ -1,3 +1,4 @@
+import { AuthenticatedRequest } from '../auth/authenticated-request.interface';
 import { Controller, Get, Param, ParseIntPipe, Query, Req } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Auth } from '../auth/auth.decorator';
@@ -43,10 +44,7 @@ export class SpaceStatisticsController {
   }
 
   @Get(':date')
-  async getByDate(
-    @Req() req: any,
-    @Param('date') date: string,
-  ) {
+  async getByDate(@Req() req: AuthenticatedRequest, @Param('date') date: string) {
     const rows = await this.statisticsService.findBySpaceAndMonth(req.space.id, date);
     return { statistics: rows };
   }
@@ -70,9 +68,11 @@ export class OrgStatisticsController {
     @Query('group_by') groupBy?: string,
   ) {
     const today = new Date().toISOString().slice(0, 10);
-    const from = startDate ?? new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
+    const from =
+      startDate ??
+      new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
     const to = endDate ?? today;
-    const gb = (groupBy === 'day' || groupBy === 'year') ? groupBy : 'month';
+    const gb = groupBy === 'day' || groupBy === 'year' ? groupBy : 'month';
     return this.statisticsService.orgAllTraffic(from, to, gb);
   }
 
@@ -82,7 +82,9 @@ export class OrgStatisticsController {
     @Query('end_date') endDate?: string,
   ) {
     const today = new Date().toISOString().slice(0, 10);
-    const from = startDate ?? new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
+    const from =
+      startDate ??
+      new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
     const to = endDate ?? today;
     return this.statisticsService.orgAssetsTraffic(from, to);
   }

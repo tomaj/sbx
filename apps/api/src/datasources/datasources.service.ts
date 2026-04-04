@@ -1,11 +1,9 @@
-import {
-  Inject,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
-import { and, asc, desc, count, eq, ilike, inArray, max, or, sql } from 'drizzle-orm';
+import { Inject, Injectable } from '@nestjs/common';
+import { and, asc, desc, count, eq, ilike, inArray, max, or } from 'drizzle-orm';
+import { ResultGuard } from '../shared/result-guard.util';
+import { QueryParserUtil, escapeLike } from '../shared/query-parser.util';
 import { DB } from '../db/db.module';
-import type { DbType } from '../db/db.module';
+import { DbType } from '../db/db.module';
 import { datasourceEntries, datasources, spaces } from '../db/schema';
 import { WebhooksService } from '../webhooks/webhooks.service';
 import { WEBHOOK_ACTIONS } from '../webhooks/webhook-actions';
@@ -35,7 +33,14 @@ function formatDimension(d: StoredDimension) {
   };
 }
 
-function formatDatasource(ds: { id: bigint; name: string; slug: string; dimensions: unknown; createdAt: Date; updatedAt: Date }) {
+function formatDatasource(ds: {
+  id: bigint;
+  name: string;
+  slug: string;
+  dimensions: unknown;
+  createdAt: Date;
+  updatedAt: Date;
+}) {
   const dims = (ds.dimensions as StoredDimension[] | null) ?? [];
   return {
     id: Number(ds.id),
@@ -112,7 +117,7 @@ export class DatasourcesService {
         id: Number(ds.id),
         name: ds.name,
         slug: ds.slug,
-        dimensions: ds.dimensions as any[] ?? [],
+        dimensions: (ds.dimensions as any[]) ?? [],
       })),
       cv,
     };
@@ -134,7 +139,7 @@ export class DatasourcesService {
         id: Number(ds.id),
         name: ds.name,
         slug: ds.slug,
-        dimensions: ds.dimensions as any[] ?? [],
+        dimensions: (ds.dimensions as any[]) ?? [],
       },
       cv,
     };
@@ -197,12 +202,11 @@ export class DatasourcesService {
     },
   ) {
     const { page, perPage, search, sortField, sortDir, byIds } = opts;
-    const conditions: any[] = [eq(datasources.spaceId, spaceId)];
-    if (search) conditions.push(ilike(datasources.name, `%${search}%`));
-    if (byIds && byIds.length > 0) {
-      conditions.push(inArray(datasources.id, byIds.map(BigInt)));
-    }
-    const where = and(...conditions);
+    const where = QueryParserUtil.buildWhere(
+      eq(datasources.spaceId, spaceId),
+      search ? ilike(datasources.name, `%${escapeLike(search)}%`) : null,
+      byIds && byIds.length > 0 ? inArray(datasources.id, byIds.map(BigInt)) : null,
+    );
 
     const orderCol = sortField === 'created_at' ? datasources.createdAt : datasources.name;
     const orderFn = sortDir === 'desc' ? desc(orderCol) : asc(orderCol);
@@ -253,7 +257,7 @@ export class DatasourcesService {
       .from(datasources)
       .where(and(eq(datasources.id, id), eq(datasources.spaceId, spaceId)))
       .limit(1);
-    if (!existing.length) throw new NotFoundException('Datasource not found');
+    ResultGuard.throwIfNotFound(existing[0], 'Datasource not found');
 
     const existingDims = (existing[0].dimensions as StoredDimension[] | null) ?? [];
     const updateData: any = { updatedAt: new Date() };
@@ -268,7 +272,7 @@ export class DatasourcesService {
       .set(updateData)
       .where(and(eq(datasources.id, id), eq(datasources.spaceId, spaceId)))
       .returning();
-    if (!row) throw new NotFoundException('Datasource not found');
+    ResultGuard.throwIfNotFound(row, 'Datasource not found');
     return formatDatasource(row);
   }
 
@@ -281,22 +285,19 @@ export class DatasourcesService {
 
   async listEntriesAdmin(
     datasourceId: bigint,
-    spaceId: number,
+    _spaceId: number,
     opts: { page: number; perPage: number; search?: string },
   ) {
     const { page, perPage, search } = opts;
-    const conditions: any[] = [
+    const where = QueryParserUtil.buildWhere(
       eq(datasourceEntries.datasourceId, datasourceId),
-    ];
-    if (search) {
-      conditions.push(
-        or(
-          ilike(datasourceEntries.name, `%${search}%`),
-          ilike(datasourceEntries.value, `%${search}%`),
-        ),
-      );
-    }
-    const where = and(...conditions);
+      search
+        ? or(
+            ilike(datasourceEntries.name, `%${escapeLike(search)}%`),
+            ilike(datasourceEntries.value, `%${escapeLike(search)}%`),
+          )
+        : null,
+    );
 
     const [rows, totals] = await Promise.all([
       this.db
@@ -306,10 +307,7 @@ export class DatasourcesService {
         .orderBy(asc(datasourceEntries.position), asc(datasourceEntries.name))
         .limit(perPage)
         .offset((page - 1) * perPage),
-      this.db
-        .select({ total: count() })
-        .from(datasourceEntries)
-        .where(where),
+      this.db.select({ total: count() }).from(datasourceEntries).where(where),
     ]);
 
     return {
@@ -327,7 +325,10 @@ export class DatasourcesService {
     };
   }
 
-  async createEntry(datasourceId: bigint, data: { name: string; value: string; position?: number }) {
+  async createEntry(
+    datasourceId: bigint,
+    data: { name: string; value: string; position?: number },
+  ) {
     const id = BigInt(Date.now()) * 1000n + BigInt(Math.floor(Math.random() * 1000));
     let position = data.position;
     if (position === undefined || position === 0) {
@@ -349,12 +350,16 @@ export class DatasourcesService {
       })
       .returning();
 
-    void this.dispatchDatasourceEntryEvent(datasourceId, WEBHOOK_ACTIONS.DATASOURCE_ENTRIES_UPDATED, {
-      action: 'datasource_entries_updated',
-      entry_id: Number(row.id),
-      name: row.name,
-      value: row.value,
-    });
+    void this.dispatchDatasourceEntryEvent(
+      datasourceId,
+      WEBHOOK_ACTIONS.DATASOURCE_ENTRIES_UPDATED,
+      {
+        action: 'datasource_entries_updated',
+        entry_id: Number(row.id),
+        name: row.name,
+        value: row.value,
+      },
+    );
 
     return {
       id: Number(row.id),
@@ -369,7 +374,13 @@ export class DatasourcesService {
   async updateEntry(
     entryId: bigint,
     datasourceId: bigint,
-    data: { name?: string; value?: string; position?: number; dimension_value?: string; dimension_entry_value?: string },
+    data: {
+      name?: string;
+      value?: string;
+      position?: number;
+      dimension_value?: string;
+      dimension_entry_value?: string;
+    },
   ) {
     const updateData: any = { updatedAt: new Date() };
     if (data.name !== undefined) updateData.name = data.name;
@@ -380,30 +391,36 @@ export class DatasourcesService {
       const existing = await this.db
         .select({ dimensionValue: datasourceEntries.dimensionValue })
         .from(datasourceEntries)
-        .where(and(eq(datasourceEntries.id, entryId), eq(datasourceEntries.datasourceId, datasourceId)))
+        .where(
+          and(eq(datasourceEntries.id, entryId), eq(datasourceEntries.datasourceId, datasourceId)),
+        )
         .limit(1);
       const currentDimVal = (existing[0]?.dimensionValue as Record<string, string>) ?? {};
-      updateData.dimensionValue = { ...currentDimVal, [data.dimension_entry_value]: data.dimension_value };
+      updateData.dimensionValue = {
+        ...currentDimVal,
+        [data.dimension_entry_value]: data.dimension_value,
+      };
     }
 
     const [row] = await this.db
       .update(datasourceEntries)
       .set(updateData)
       .where(
-        and(
-          eq(datasourceEntries.id, entryId),
-          eq(datasourceEntries.datasourceId, datasourceId),
-        ),
+        and(eq(datasourceEntries.id, entryId), eq(datasourceEntries.datasourceId, datasourceId)),
       )
       .returning();
-    if (!row) throw new NotFoundException('Entry not found');
+    ResultGuard.throwIfNotFound(row, 'Entry not found');
 
-    void this.dispatchDatasourceEntryEvent(datasourceId, WEBHOOK_ACTIONS.DATASOURCE_ENTRIES_UPDATED, {
-      action: 'datasource_entries_updated',
-      entry_id: Number(row.id),
-      name: row.name,
-      value: row.value,
-    });
+    void this.dispatchDatasourceEntryEvent(
+      datasourceId,
+      WEBHOOK_ACTIONS.DATASOURCE_ENTRIES_UPDATED,
+      {
+        action: 'datasource_entries_updated',
+        entry_id: Number(row.id),
+        name: row.name,
+        value: row.value,
+      },
+    );
 
     return {
       id: Number(row.id),
@@ -419,16 +436,17 @@ export class DatasourcesService {
     await this.db
       .delete(datasourceEntries)
       .where(
-        and(
-          eq(datasourceEntries.id, entryId),
-          eq(datasourceEntries.datasourceId, datasourceId),
-        ),
+        and(eq(datasourceEntries.id, entryId), eq(datasourceEntries.datasourceId, datasourceId)),
       );
 
-    void this.dispatchDatasourceEntryEvent(datasourceId, WEBHOOK_ACTIONS.DATASOURCE_ENTRIES_UPDATED, {
-      action: 'datasource_entries_updated',
-      entry_id: Number(entryId),
-    });
+    void this.dispatchDatasourceEntryEvent(
+      datasourceId,
+      WEBHOOK_ACTIONS.DATASOURCE_ENTRIES_UPDATED,
+      {
+        action: 'datasource_entries_updated',
+        entry_id: Number(entryId),
+      },
+    );
 
     return { success: true };
   }
@@ -514,19 +532,16 @@ export class DatasourcesService {
     perPage = 25,
     opts?: { search?: string; dimensionEntryValue?: string },
   ) {
-    const conditions: any[] = [eq(datasources.spaceId, spaceId)];
-    if (datasourceId) {
-      conditions.push(eq(datasourceEntries.datasourceId, BigInt(datasourceId)));
-    }
-    if (opts?.search) {
-      conditions.push(
-        or(
-          ilike(datasourceEntries.name, `%${opts.search}%`),
-          ilike(datasourceEntries.value, `%${opts.search}%`),
-        ),
-      );
-    }
-    const where = and(...conditions);
+    const where = QueryParserUtil.buildWhere(
+      eq(datasources.spaceId, spaceId),
+      datasourceId ? eq(datasourceEntries.datasourceId, BigInt(datasourceId)) : null,
+      opts?.search
+        ? or(
+            ilike(datasourceEntries.name, `%${escapeLike(opts.search)}%`),
+            ilike(datasourceEntries.value, `%${escapeLike(opts.search)}%`),
+          )
+        : null,
+    );
 
     const [rows, totals] = await Promise.all([
       this.db
@@ -546,7 +561,9 @@ export class DatasourcesService {
         .orderBy(asc(datasourceEntries.position), asc(datasourceEntries.name))
         .limit(perPage)
         .offset((page - 1) * perPage),
-      this.db.select({ total: count() }).from(datasourceEntries)
+      this.db
+        .select({ total: count() })
+        .from(datasourceEntries)
         .innerJoin(datasources, eq(datasourceEntries.datasourceId, datasources.id))
         .where(where),
     ]);
@@ -587,10 +604,7 @@ export class DatasourcesService {
         updatedAt: datasourceEntries.updatedAt,
       })
       .from(datasourceEntries)
-      .innerJoin(
-        datasources,
-        eq(datasourceEntries.datasourceId, datasources.id),
-      )
+      .innerJoin(datasources, eq(datasourceEntries.datasourceId, datasources.id))
       .where(
         opts.datasourceSlug
           ? eq(datasources.slug, opts.datasourceSlug)

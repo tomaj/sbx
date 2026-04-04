@@ -14,8 +14,5 @@ export const AUTH_STRATEGIES = 'auth:strategies';
  *   @Auth('session-or-token')  // accepts either (MAPI endpoints)
  */
 export function Auth(...strategies: AuthStrategy[]) {
-  return applyDecorators(
-    SetMetadata(AUTH_STRATEGIES, strategies),
-    UseGuards(UnifiedAuthGuard),
-  );
+  return applyDecorators(SetMetadata(AUTH_STRATEGIES, strategies), UseGuards(UnifiedAuthGuard));
 }

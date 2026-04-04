@@ -1,10 +1,20 @@
-import { IsEmail, IsString, MinLength } from 'class-validator';
+import { z } from 'zod';
+import { createZodDto } from 'nestjs-zod';
 
-export class LoginDto {
-  @IsEmail()
-  email!: string;
+/**
+ * Pattern: nestjs-zod DTO
+ *
+ * Define the schema with Zod — nestjs-zod generates:
+ *   1. The DTO class (for NestJS DI, ValidationPipe, etc.)
+ *   2. Swagger schema (auto-generated — no @ApiProperty() needed)
+ *   3. Full TypeScript type inference
+ *
+ * Use ZodValidationPipe (global or per-controller) instead of ValidationPipe
+ * when you want strict Zod validation rather than class-validator.
+ */
+export const LoginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1),
+});
 
-  @IsString()
-  @MinLength(1)
-  password!: string;
-}
+export class LoginDto extends createZodDto(LoginSchema) {}

@@ -1,10 +1,10 @@
-import React from 'react'
+import type React from 'react';
 
 interface PageLayoutProps {
-  title: string
-  description?: string
-  action?: React.ReactNode
-  children: React.ReactNode
+  title: string;
+  description?: string;
+  action?: React.ReactNode;
+  children: React.ReactNode;
 }
 
 export function PageLayout({ title, description, action, children }: PageLayoutProps) {
@@ -21,5 +21,5 @@ export function PageLayout({ title, description, action, children }: PageLayoutP
       </div>
       {children}
     </div>
-  )
+  );
 }

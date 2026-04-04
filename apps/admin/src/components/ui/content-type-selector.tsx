@@ -1,16 +1,17 @@
-'use client'
+'use client';
 
-import { useState, useRef, useEffect, useMemo } from 'react'
-import { ChevronDown, X, Check } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { useState, useRef, useEffect, useMemo } from 'react';
+import { useApi } from '@/lib/swr';
+import { ChevronDown, X, Check } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface ContentTypeSelectorProps {
-  spaceId?: string
+  spaceId?: string;
   /** Pre-loaded options — if provided, skips the API fetch */
-  options?: { value: string; label: string }[]
-  value: string[]
-  onChange: (value: string[]) => void
-  placeholder?: string
+  options?: { value: string; label: string }[];
+  value: string[];
+  onChange: (value: string[]) => void;
+  placeholder?: string;
 }
 
 export function ContentTypeSelector({
@@ -20,59 +21,55 @@ export function ContentTypeSelector({
   onChange,
   placeholder = 'All content types',
 }: ContentTypeSelectorProps) {
-  const [open, setOpen] = useState(false)
-  const [search, setSearch] = useState('')
-  const [fetchedComponents, setFetchedComponents] = useState<string[]>([])
-  const containerRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Only fetch from API when no pre-loaded options are provided
-  useEffect(() => {
-    if (preloadedOptions !== undefined || !spaceId) return
-    fetch(`/api/admin/spaces/${spaceId}/components?per_page=500`)
-      .then((r) => r.json())
-      .then((d) => {
-        const names: string[] = (d.components ?? []).map((c: any) => c.name as string)
-        names.sort()
-        setFetchedComponents(names)
-      })
-      .catch(() => {})
-  }, [spaceId, preloadedOptions])
+  const { data: componentsData } = useApi<{ components: { name: string }[] }>(
+    preloadedOptions === undefined && spaceId
+      ? `/api/admin/spaces/${spaceId}/components?per_page=500`
+      : null,
+  );
+  const fetchedComponents = useMemo(() => {
+    const names = (componentsData?.components ?? []).map((c) => c.name);
+    names.sort();
+    return names;
+  }, [componentsData]);
 
-  const components = preloadedOptions
-    ? preloadedOptions.map((o) => o.value)
-    : fetchedComponents
+  const components = preloadedOptions ? preloadedOptions.map((o) => o.value) : fetchedComponents;
 
   useEffect(() => {
-    if (!open) return
+    if (!open) return;
     function handle(e: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false)
-        setSearch('')
+        setOpen(false);
+        setSearch('');
       }
     }
-    document.addEventListener('mousedown', handle)
-    return () => document.removeEventListener('mousedown', handle)
-  }, [open])
+    document.addEventListener('mousedown', handle);
+    return () => document.removeEventListener('mousedown', handle);
+  }, [open]);
 
   function toggle(name: string) {
-    onChange(value.includes(name) ? value.filter((v) => v !== name) : [...value, name])
+    onChange(value.includes(name) ? value.filter((v) => v !== name) : [...value, name]);
   }
 
   function remove(name: string, e: React.MouseEvent) {
-    e.stopPropagation()
-    onChange(value.filter((v) => v !== name))
+    e.stopPropagation();
+    onChange(value.filter((v) => v !== name));
   }
 
   function openDropdown() {
-    setOpen(true)
-    setTimeout(() => inputRef.current?.focus(), 0)
+    setOpen(true);
+    setTimeout(() => inputRef.current?.focus(), 0);
   }
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    return q ? components.filter((c) => c.toLowerCase().includes(q)) : components
-  }, [components, search])
+    const q = search.trim().toLowerCase();
+    return q ? components.filter((c) => c.toLowerCase().includes(q)) : components;
+  }, [components, search]);
 
   return (
     <div ref={containerRef} className="relative">
@@ -87,22 +84,22 @@ export function ContentTypeSelector({
         )}
       >
         {value.map((v) => {
-          const label = preloadedOptions?.find((o) => o.value === v)?.label ?? v
+          const label = preloadedOptions?.find((o) => o.value === v)?.label ?? v;
           return (
-          <span
-            key={v}
-            className="inline-flex items-center gap-1 bg-gray-100 dark:bg-gray-700 rounded px-2 py-0.5 text-xs text-gray-800 dark:text-gray-200 shrink-0"
-          >
-            {label}
-            <button
-              type="button"
-              onClick={(e) => remove(v, e)}
-              className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 leading-none"
+            <span
+              key={v}
+              className="inline-flex items-center gap-1 bg-gray-100 dark:bg-gray-700 rounded px-2 py-0.5 text-xs text-gray-800 dark:text-gray-200 shrink-0"
             >
-              <X className="w-3 h-3" />
-            </button>
-          </span>
-          )
+              {label}
+              <button
+                type="button"
+                onClick={(e) => remove(v, e)}
+                className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 leading-none"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          );
         })}
         <input
           ref={inputRef}
@@ -130,8 +127,8 @@ export function ContentTypeSelector({
             </p>
           ) : (
             filtered.map((name) => {
-              const checked = value.includes(name)
-              const label = preloadedOptions?.find((o) => o.value === name)?.label ?? name
+              const checked = value.includes(name);
+              const label = preloadedOptions?.find((o) => o.value === name)?.label ?? name;
               return (
                 <button
                   key={name}
@@ -160,11 +157,11 @@ export function ContentTypeSelector({
                     {label}
                   </span>
                 </button>
-              )
+              );
             })
           )}
         </div>
       )}
     </div>
-  )
+  );
 }

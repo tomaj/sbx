@@ -1,5 +1,5 @@
 import { Controller, Get, Headers, Req, Res } from '@nestjs/common';
-import type { Request, Response } from 'express';
+import { Request, Response } from 'express';
 import { createHash } from 'crypto';
 import { AssetService } from './asset.service';
 
@@ -7,7 +7,11 @@ import { AssetService } from './asset.service';
 export class AssetController {
   constructor(private readonly assetService: AssetService) {}
 
-  private sendAsset(res: Response, ifNoneMatch: string, result: { buffer: Buffer; contentType: string }) {
+  private sendAsset(
+    res: Response,
+    ifNoneMatch: string,
+    result: { buffer: Buffer; contentType: string },
+  ) {
     const etag = `"${createHash('sha1').update(result.buffer).digest('hex').slice(0, 16)}"`;
     if (ifNoneMatch && ifNoneMatch === etag) {
       return res.status(304).end();
@@ -40,7 +44,11 @@ export class AssetController {
     @Headers('cloudfront-viewer-country') viewerCountry: string,
   ) {
     // Rewrite /avatars/... → /f/avatars/... so toObjectKey() yields avatars/... as the MinIO key
-    const result = await this.assetService.handle({ urlPath: '/f' + req.path, accept: accept ?? '', viewerCountry });
+    const result = await this.assetService.handle({
+      urlPath: `/f${req.path}`,
+      accept: accept ?? '',
+      viewerCountry,
+    });
     return this.sendAsset(res, ifNoneMatch, result);
   }
 
@@ -57,7 +65,11 @@ export class AssetController {
     @Headers('if-none-match') ifNoneMatch: string,
     @Headers('cloudfront-viewer-country') viewerCountry: string,
   ) {
-    const result = await this.assetService.handle({ urlPath: req.path, accept: accept ?? '', viewerCountry });
+    const result = await this.assetService.handle({
+      urlPath: req.path,
+      accept: accept ?? '',
+      viewerCountry,
+    });
     return this.sendAsset(res, ifNoneMatch, result);
   }
 }

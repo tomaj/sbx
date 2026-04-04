@@ -6,11 +6,12 @@
     "resolvePackageJsonExports": true,
     "target": "ES2023",
     "outDir": "./dist",
-    "baseUrl": "./",
     "removeComments": true,
+    "isolatedModules": false,
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
     "allowSyntheticDefaultImports": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+    "types": ["node", "vitest/globals"]
   }
 }

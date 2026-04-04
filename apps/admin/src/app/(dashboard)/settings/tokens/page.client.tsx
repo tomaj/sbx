@@ -1,14 +1,14 @@
-'use client'
+'use client';
 
-import { useState, useEffect, useCallback } from 'react'
-import { Pencil, Trash2, TriangleAlert } from 'lucide-react'
-import { SelectDropdown } from '@/components/ui/select-dropdown'
-import { ConfirmModal } from '@/components/ui/confirm-modal'
-import { RightSidebar } from '@/components/ui/right-sidebar'
-import { UnsavedChangesModal } from '@/components/ui/unsaved-changes-modal'
-import { useUnsavedChanges } from '@/hooks/use-unsaved-changes'
-import type { PersonalAccessToken } from '@sbx/types'
-import { formatDateTime as formatDate, formatDate as formatDateOnly } from '@/lib/date'
+import { useState } from 'react';
+import { Pencil, Trash2, TriangleAlert } from 'lucide-react';
+import { SelectDropdown } from '@/components/ui/select-dropdown';
+import { CrudSidebarForm } from '@/components/ui/crud-sidebar-form';
+import { CopyButton } from '@/components/ui/copy-button';
+import { useApi } from '@/lib/swr';
+import { useDelete } from '@/hooks/use-delete';
+import type { PersonalAccessToken } from '@sbx/types';
+import { formatDateTime as formatDate, formatDate as formatDateOnly } from '@/lib/date';
 
 const EXPIRY_OPTIONS = [
   { label: '30 days', days: 30 },
@@ -16,93 +16,76 @@ const EXPIRY_OPTIONS = [
   { label: '90 days', days: 90 },
   { label: '1 year', days: 365 },
   { label: 'No expiration', days: 0 },
-]
+];
 
 export default function TokensPage() {
-  const [tokens, setTokens] = useState<PersonalAccessToken[]>([])
-  const [showForm, setShowForm] = useState(false)
-  const [tokenName, setTokenName] = useState('')
-  const [expiryDays, setExpiryDays] = useState(90)
-  const [generating, setGenerating] = useState(false)
-  const [newToken, setNewToken] = useState<string | null>(null)
-  const [copied, setCopied] = useState(false)
+  const { data, mutate } = useApi<{ tokens: PersonalAccessToken[] }>('/api/admin/tokens');
+  const tokens = data?.tokens ?? [];
 
-  const [deleteId, setDeleteId] = useState<number | null>(null)
-  const [editToken, setEditToken] = useState<PersonalAccessToken | null>(null)
-  const [editName, setEditName] = useState('')
-  const [editIsDirty, setEditIsDirty] = useState(false)
-  const { showModal: showUnsavedModal, handleConfirm: confirmUnsaved, handleCancel: cancelUnsaved } = useUnsavedChanges(editIsDirty)
-  const [saving, setSaving] = useState(false)
+  const [showForm, setShowForm] = useState(false);
+  const [tokenName, setTokenName] = useState('');
+  const [expiryDays, setExpiryDays] = useState(90);
+  const [generating, setGenerating] = useState(false);
+  const [newToken, setNewToken] = useState<string | null>(null);
 
-  const fetchTokens = useCallback(async () => {
-    const res = await fetch('/api/admin/tokens')
-    if (res.ok) {
-      const data = await res.json()
-      setTokens(Array.isArray(data.tokens) ? data.tokens : [])
-    }
-  }, [])
+  const [editToken, setEditToken] = useState<PersonalAccessToken | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editIsDirty, setEditIsDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  useEffect(() => { fetchTokens() }, [fetchTokens])
+  const tokenDelete = useDelete<PersonalAccessToken>({
+    getUrl: (t) => `/api/admin/tokens/${t.id}`,
+    onSuccess: () => mutate(),
+    title: 'Delete token',
+    getMessage: () => 'Are you sure you want to delete this token? This action cannot be undone.',
+  });
 
   async function handleGenerate() {
-    if (!tokenName.trim()) return
-    setGenerating(true)
+    if (!tokenName.trim()) return;
+    setGenerating(true);
     const res = await fetch('/api/admin/tokens', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: tokenName, expiresInDays: expiryDays || undefined }),
-    })
+    });
     if (res.ok) {
-      const data = await res.json()
-      setNewToken(data.token)
-      setTokenName('')
-      fetchTokens()
+      const data = await res.json();
+      setNewToken(data.token);
+      setTokenName('');
+      mutate();
     }
-    setGenerating(false)
-  }
-
-  async function handleDelete() {
-    if (deleteId === null) return
-    await fetch(`/api/admin/tokens/${deleteId}`, { method: 'DELETE' })
-    setDeleteId(null)
-    fetchTokens()
+    setGenerating(false);
   }
 
   async function handleSaveEdit() {
-    if (!editToken || !editName.trim()) return
-    setSaving(true)
+    if (!editToken || !editName.trim()) return;
+    setSaving(true);
     await fetch(`/api/admin/tokens/${editToken.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: editName }),
-    })
-    setSaving(false)
-    setEditIsDirty(false)
-    setEditToken(null)
-    fetchTokens()
+    });
+    setSaving(false);
+    setEditIsDirty(false);
+    setEditToken(null);
+    mutate();
   }
 
   function openEdit(token: PersonalAccessToken) {
-    setEditToken(token)
-    setEditName(token.name)
-    setEditIsDirty(false)
-  }
-
-  function handleCopy() {
-    if (newToken) {
-      navigator.clipboard.writeText(newToken)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    }
+    setEditToken(token);
+    setEditName(token.name);
+    setEditIsDirty(false);
   }
 
   const expiryDate = expiryDays
     ? formatDateOnly(new Date(Date.now() + expiryDays * 86400000))
-    : null
+    : null;
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">Personal access token</h1>
+      <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+        Personal access token
+      </h1>
 
       <div className="mb-6">
         <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-1">
@@ -110,14 +93,18 @@ export default function TokensPage() {
           <span className="underline">SBX Management API</span>
         </h2>
         <p className="text-sm text-gray-400">
-          Personal access tokens work like ordinary OAuth access tokens. They can be used to authenticate yourself to have full access to the management API programmatically and should NEVER be exposed in public.
+          Personal access tokens work like ordinary OAuth access tokens. They can be used to
+          authenticate yourself to have full access to the management API programmatically and
+          should NEVER be exposed in public.
         </p>
       </div>
 
-      {/* Token list */}
       <div className="border-t border-gray-100 dark:border-gray-800">
         {tokens.map((token) => (
-          <div key={token.id} className="flex items-start justify-between py-4 border-b border-gray-100 dark:border-gray-800">
+          <div
+            key={token.id}
+            className="flex items-start justify-between py-4 border-b border-gray-100 dark:border-gray-800"
+          >
             <div>
               <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
                 {token.name} (••••••••••••{token.lastFour})
@@ -139,7 +126,7 @@ export default function TokensPage() {
                 <Pencil className="size-4" />
               </button>
               <button
-                onClick={() => setDeleteId(token.id)}
+                onClick={() => tokenDelete.confirm(token)}
                 className="text-gray-400 hover:text-red-500 p-1 transition-colors"
               >
                 <Trash2 className="size-4" />
@@ -149,7 +136,6 @@ export default function TokensPage() {
         ))}
       </div>
 
-      {/* Generate new token */}
       {!showForm && !newToken && (
         <button
           onClick={() => setShowForm(true)}
@@ -166,7 +152,9 @@ export default function TokensPage() {
           </h3>
 
           <div>
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-1.5">Name</label>
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-1.5">
+              Name
+            </label>
             <input
               type="text"
               placeholder="Enter your token name"
@@ -177,7 +165,9 @@ export default function TokensPage() {
           </div>
 
           <div>
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-1.5">Expiration</label>
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-1.5">
+              Expiration
+            </label>
             <div className="flex items-center gap-4">
               <SelectDropdown
                 value={String(expiryDays)}
@@ -186,9 +176,7 @@ export default function TokensPage() {
                 className="w-40"
               />
               {expiryDate && (
-                <span className="text-sm text-gray-400">
-                  The token will expire on {expiryDate}
-                </span>
+                <span className="text-sm text-gray-400">The token will expire on {expiryDate}</span>
               )}
             </div>
           </div>
@@ -224,16 +212,14 @@ export default function TokensPage() {
             <code className="flex-1 px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded text-sm text-gray-900 dark:text-gray-100 break-all">
               {newToken}
             </code>
-            <button
-              onClick={handleCopy}
-              className="px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm rounded transition-colors shrink-0"
-            >
-              {copied ? 'Copied!' : 'Copy'}
-            </button>
+            <CopyButton text={newToken} title="Copy token" className="shrink-0 rounded" />
           </div>
           <p className="text-xs text-gray-400">Save this token now — it will not be shown again.</p>
           <button
-            onClick={() => { setNewToken(null); setShowForm(false) }}
+            onClick={() => {
+              setNewToken(null);
+              setShowForm(false);
+            }}
             className="px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
           >
             Done
@@ -241,51 +227,32 @@ export default function TokensPage() {
         </div>
       )}
 
-      {/* Delete confirm modal */}
-      <ConfirmModal
-        open={deleteId !== null}
-        title="Delete token"
-        message="Are you sure you want to delete this token? This action cannot be undone."
-        confirmLabel="Delete"
-        onConfirm={handleDelete}
-        onCancel={() => setDeleteId(null)}
-      />
+      {tokenDelete.modal}
 
-      {/* Edit sidebar */}
-      <RightSidebar
+      <CrudSidebarForm
         open={editToken !== null}
         onClose={() => setEditToken(null)}
-        header={<span className="text-base font-semibold text-gray-900 dark:text-gray-100">Edit token</span>}
-        footer={
-          <div className="flex gap-3">
-            <button
-              onClick={handleSaveEdit}
-              disabled={saving || !editName.trim()}
-              className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-60"
-            >
-              {saving ? 'Saving...' : 'Save'}
-            </button>
-            <button
-              onClick={() => setEditToken(null)}
-              className="px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-            >
-              Cancel
-            </button>
-          </div>
-        }
+        title="Edit token"
+        isSubmitting={saving}
+        isDirty={editIsDirty}
+        onSubmit={handleSaveEdit}
+        noForm
       >
         <div>
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-1.5">Name</label>
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-1.5">
+            Name
+          </label>
           <input
             type="text"
             value={editName}
-            onChange={(e) => { setEditName(e.target.value); setEditIsDirty(true) }}
+            onChange={(e) => {
+              setEditName(e.target.value);
+              setEditIsDirty(true);
+            }}
             className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
           />
         </div>
-      </RightSidebar>
-
-      <UnsavedChangesModal open={showUnsavedModal} onConfirm={confirmUnsaved} onCancel={cancelUnsaved} />
+      </CrudSidebarForm>
     </div>
-  )
+  );
 }

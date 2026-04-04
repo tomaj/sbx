@@ -12,6 +12,7 @@ import {
   WORKFLOW_EVENTS_QUEUE,
 } from '@sbx/jobs';
 
+import { LoggingModule } from './logging/logging.module.js';
 import { DbModule } from './db/db.module.js';
 import { EmailModule } from './email/email.module.js';
 import { SchedulerModule } from './scheduler/scheduler.module.js';
@@ -25,7 +26,7 @@ import { WorkflowEventsProcessor } from './processors/workflow-events.processor.
 
 const redisConnection = {
   host: process.env.REDIS_HOST ?? 'localhost',
-  port: parseInt(process.env.REDIS_PORT ?? '6379'),
+  port: parseInt(process.env.REDIS_PORT ?? '6379', 10),
   password: process.env.REDIS_PASSWORD || undefined,
 };
 
@@ -33,6 +34,7 @@ const queues = [WEBHOOKS_QUEUE, STORIES_QUEUE, RELEASES_QUEUE, EMAILS_QUEUE, WOR
 
 @Module({
   imports: [
+    LoggingModule,
     JobsClientModule,
     DbModule,
     EmailModule,
@@ -45,9 +47,7 @@ const queues = [WEBHOOKS_QUEUE, STORIES_QUEUE, RELEASES_QUEUE, EMAILS_QUEUE, WOR
       route: '/ui',
       adapter: ExpressAdapter,
     }),
-    BullBoardModule.forFeature(
-      ...queues.map((name) => ({ name, adapter: BullMQAdapter })),
-    ),
+    BullBoardModule.forFeature(...queues.map((name) => ({ name, adapter: BullMQAdapter }))),
 
     SchedulerModule,
   ],

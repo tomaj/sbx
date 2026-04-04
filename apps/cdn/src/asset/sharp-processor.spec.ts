@@ -1,23 +1,33 @@
 import sharp from 'sharp';
 import { processImage } from './sharp-processor';
-import { ImageOps } from './url-parser';
+import type { ImageOps } from './url-parser';
 
 const ACCEPT_WEBP = 'image/webp,image/*';
 const ACCEPT_PLAIN = 'image/jpeg,image/*';
 
 /** Creates a solid-color JPEG buffer for testing (no disk I/O). */
-async function makeTestImage(width = 400, height = 300, format: 'jpeg' | 'png' = 'jpeg'): Promise<Buffer> {
+async function makeTestImage(
+  width = 400,
+  height = 300,
+  format: 'jpeg' | 'png' = 'jpeg',
+): Promise<Buffer> {
   return sharp({
     create: { width, height, channels: 3, background: { r: 100, g: 150, b: 200 } },
-  })[format]().toBuffer();
+  })
+    [format]()
+    .toBuffer();
 }
 
 function baseOps(overrides: Partial<ImageOps> = {}): ImageOps {
   return {
-    width: 0, height: 0,
-    flipH: false, flipV: false,
-    smart: false, fitIn: false,
-    noUpscale: false, grayscale: false,
+    width: 0,
+    height: 0,
+    flipH: false,
+    flipV: false,
+    smart: false,
+    fitIn: false,
+    noUpscale: false,
+    grayscale: false,
     ...overrides,
   };
 }
@@ -25,7 +35,11 @@ function baseOps(overrides: Partial<ImageOps> = {}): ImageOps {
 describe('processImage — resize', () => {
   it('resizes to exact dimensions', async () => {
     const input = await makeTestImage(400, 300);
-    const { buffer, contentType } = await processImage(input, baseOps({ width: 200, height: 150 }), ACCEPT_PLAIN);
+    const { buffer, contentType } = await processImage(
+      input,
+      baseOps({ width: 200, height: 150 }),
+      ACCEPT_PLAIN,
+    );
     const meta = await sharp(buffer).metadata();
     expect(meta.width).toBe(200);
     expect(meta.height).toBe(150);
@@ -50,7 +64,11 @@ describe('processImage — resize', () => {
 
   it('does not upscale when noUpscale is set', async () => {
     const input = await makeTestImage(100, 100);
-    const { buffer } = await processImage(input, baseOps({ width: 500, height: 500, noUpscale: true }), ACCEPT_PLAIN);
+    const { buffer } = await processImage(
+      input,
+      baseOps({ width: 500, height: 500, noUpscale: true }),
+      ACCEPT_PLAIN,
+    );
     const meta = await sharp(buffer).metadata();
     expect(meta.width).toBeLessThanOrEqual(100);
     expect(meta.height).toBeLessThanOrEqual(100);
@@ -59,7 +77,11 @@ describe('processImage — resize', () => {
   it('caps dimensions at 4000px', async () => {
     const input = await makeTestImage(100, 100);
     // sharp-processor clamps to MAX_DIMENSION=4000 before passing to sharp
-    const { buffer } = await processImage(input, baseOps({ width: 5000, height: 5000, noUpscale: false }), ACCEPT_PLAIN);
+    const { buffer } = await processImage(
+      input,
+      baseOps({ width: 5000, height: 5000, noUpscale: false }),
+      ACCEPT_PLAIN,
+    );
     const meta = await sharp(buffer).metadata();
     expect(meta.width).toBeLessThanOrEqual(4000);
   });
@@ -68,7 +90,11 @@ describe('processImage — resize', () => {
 describe('processImage — flip', () => {
   it('flips horizontally', async () => {
     const input = await makeTestImage(200, 100);
-    const { buffer } = await processImage(input, baseOps({ width: 200, height: 100, flipH: true }), ACCEPT_PLAIN);
+    const { buffer } = await processImage(
+      input,
+      baseOps({ width: 200, height: 100, flipH: true }),
+      ACCEPT_PLAIN,
+    );
     const meta = await sharp(buffer).metadata();
     // Dimensions unchanged after flip
     expect(meta.width).toBe(200);
@@ -77,7 +103,11 @@ describe('processImage — flip', () => {
 
   it('flips vertically', async () => {
     const input = await makeTestImage(200, 100);
-    const { buffer } = await processImage(input, baseOps({ width: 200, height: 100, flipV: true }), ACCEPT_PLAIN);
+    const { buffer } = await processImage(
+      input,
+      baseOps({ width: 200, height: 100, flipV: true }),
+      ACCEPT_PLAIN,
+    );
     const meta = await sharp(buffer).metadata();
     expect(meta.width).toBe(200);
     expect(meta.height).toBe(100);
@@ -185,8 +215,16 @@ describe('processImage — format / auto-WebP', () => {
 
   it('respects quality setting', async () => {
     const input = await makeTestImage(200, 200);
-    const { buffer: hq } = await processImage(input, baseOps({ quality: 100, format: 'jpeg' }), ACCEPT_PLAIN);
-    const { buffer: lq } = await processImage(input, baseOps({ quality: 10, format: 'jpeg' }), ACCEPT_PLAIN);
+    const { buffer: hq } = await processImage(
+      input,
+      baseOps({ quality: 100, format: 'jpeg' }),
+      ACCEPT_PLAIN,
+    );
+    const { buffer: lq } = await processImage(
+      input,
+      baseOps({ quality: 10, format: 'jpeg' }),
+      ACCEPT_PLAIN,
+    );
     expect(hq.length).toBeGreaterThan(lq.length);
   });
 });

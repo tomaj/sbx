@@ -1,9 +1,10 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
-import { createHash, randomUUID } from 'crypto';
+import { randomUUID } from 'crypto';
+import * as argon2 from 'argon2';
 import * as fs from 'fs';
 import * as path from 'path';
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import * as schema from './schema';
 import {
   spaces,
@@ -28,8 +29,7 @@ import {
 } from './schema';
 
 const pool = new Pool({
-  connectionString:
-    process.env.DATABASE_URL ?? 'postgresql://tomaj@localhost:5432/sbx',
+  connectionString: process.env.DATABASE_URL ?? 'postgresql://tomaj@localhost:5432/sbx',
 });
 const db = drizzle(pool, { schema });
 
@@ -53,7 +53,10 @@ async function seedSpaces() {
     }
 
     const languageCodes = (s.languages ?? []).map((l: any) => l.code);
-    const previewUrls = (s.environments ?? []).map((e: any) => ({ name: e.name, location: e.location }));
+    const previewUrls = (s.environments ?? []).map((e: any) => ({
+      name: e.name,
+      location: e.location,
+    }));
     const encodeUrl = s.options?.encode_preview_urls ?? false;
     const mobileWidth = s.options?.mobile_size ?? 360;
 
@@ -93,7 +96,17 @@ async function seedUsers() {
   console.log('Seeding users from collaborators...');
 
   // Collect unique users across all spaces
-  const userMap = new Map<string, { id: number; email: string; firstname: string; lastname: string; avatar: string | null; disabled: boolean }>();
+  const userMap = new Map<
+    string,
+    {
+      id: number;
+      email: string;
+      firstname: string;
+      lastname: string;
+      avatar: string | null;
+      disabled: boolean;
+    }
+  >();
 
   for (const spaceId of SPACE_IDS) {
     const filePath = path.join(GOLDEN, String(spaceId), 'collaborators.json');
@@ -122,12 +135,19 @@ async function seedUsers() {
       .values({ uuid: randomUUID(), ...userData })
       .onConflictDoUpdate({
         target: users.id,
-        set: { firstname: userData.firstname, lastname: userData.lastname, avatar: userData.avatar, disabled: userData.disabled },
+        set: {
+          firstname: userData.firstname,
+          lastname: userData.lastname,
+          avatar: userData.avatar,
+          disabled: userData.disabled,
+        },
       });
   }
 
   // Reset sequence so locally-created users get IDs above all imported IDs
-  await db.execute(sql`SELECT setval(pg_get_serial_sequence('users', 'id'), COALESCE((SELECT MAX(id) FROM users), 0))`);
+  await db.execute(
+    sql`SELECT setval(pg_get_serial_sequence('users', 'id'), COALESCE((SELECT MAX(id) FROM users), 0))`,
+  );
 
   console.log(`  ✓ ${userMap.size} unique users imported`);
 }
@@ -146,7 +166,8 @@ async function seedCollaborators() {
       const u = c.user;
       if (!u?.real_email) continue;
 
-      const [user] = await db.select({ id: users.id })
+      const [user] = await db
+        .select({ id: users.id })
         .from(users)
         .where(eq(users.email, u.real_email))
         .limit(1);
@@ -175,7 +196,9 @@ async function seedCollaborators() {
   }
 
   // Reset sequence so locally-created members get IDs above all imported IDs
-  await db.execute(sql`SELECT setval(pg_get_serial_sequence('space_members', 'id'), COALESCE((SELECT MAX(id) FROM space_members), 0))`);
+  await db.execute(
+    sql`SELECT setval(pg_get_serial_sequence('space_members', 'id'), COALESCE((SELECT MAX(id) FROM space_members), 0))`,
+  );
 }
 
 async function seedDatasources() {
@@ -189,8 +212,18 @@ async function seedDatasources() {
     for (const ds of dsList) {
       await db
         .insert(datasources)
-        .values({ id: BigInt(ds.id), uuid: randomUUID(), spaceId, name: ds.name, slug: ds.slug, dimensions: ds.dimensions ?? [] })
-        .onConflictDoUpdate({ target: datasources.id, set: { name: ds.name, slug: ds.slug, dimensions: ds.dimensions ?? [] } });
+        .values({
+          id: BigInt(ds.id),
+          uuid: randomUUID(),
+          spaceId,
+          name: ds.name,
+          slug: ds.slug,
+          dimensions: ds.dimensions ?? [],
+        })
+        .onConflictDoUpdate({
+          target: datasources.id,
+          set: { name: ds.name, slug: ds.slug, dimensions: ds.dimensions ?? [] },
+        });
     }
     console.log(`  ✓ Space ${spaceId}: ${dsList.length} datasources`);
   }
@@ -221,7 +254,12 @@ async function seedDatasourceEntries() {
         })
         .onConflictDoUpdate({
           target: datasourceEntries.id,
-          set: { name: e.name, value: e.value, dimensionValue: e.dimension_value ?? {}, position: e.position ?? 0 },
+          set: {
+            name: e.name,
+            value: e.value,
+            dimensionValue: e.dimension_value ?? {},
+            position: e.position ?? 0,
+          },
         });
     }
     console.log(`  ✓ Space ${spaceId}: ${entries.length} entries`);
@@ -268,7 +306,11 @@ async function seedInternalTags() {
     // Advance sequence past max imported ID to avoid future collisions
     if (list.length > 0) {
       const maxId = Math.max(...list.map((t: any) => t.id));
-      await db.execute(sql`SELECT setval(pg_get_serial_sequence('internal_tags', 'id'), GREATEST(nextval(pg_get_serial_sequence('internal_tags', 'id')), ${maxId + 1}))`).catch(() => {});
+      await db
+        .execute(
+          sql`SELECT setval(pg_get_serial_sequence('internal_tags', 'id'), GREATEST(nextval(pg_get_serial_sequence('internal_tags', 'id')), ${maxId + 1}))`,
+        )
+        .catch(() => {});
     }
     console.log(`  ✓ Space ${spaceId}: ${list.length} internal tags`);
   }
@@ -296,7 +338,11 @@ async function seedComponentGroups() {
         })
         .onConflictDoUpdate({
           target: componentGroups.id,
-          set: { name: g.name, parentId: g.parent_id ? BigInt(g.parent_id) : null, parentUuid: g.parent_uuid ?? null },
+          set: {
+            name: g.name,
+            parentId: g.parent_id ? BigInt(g.parent_id) : null,
+            parentUuid: g.parent_uuid ?? null,
+          },
         });
     }
     console.log(`  ✓ Space ${spaceId}: ${groups.length} component groups`);
@@ -420,7 +466,12 @@ async function seedPresets() {
         })
         .onConflictDoUpdate({
           target: presets.id,
-          set: { name: p.name, preset: p.preset ?? {}, image: p.image || null, icon: p.icon || null },
+          set: {
+            name: p.name,
+            preset: p.preset ?? {},
+            image: p.image || null,
+            icon: p.icon || null,
+          },
         });
     }
     console.log(`  ✓ Space ${spaceId}: ${items.length} presets`);
@@ -431,7 +482,8 @@ async function seedPresets() {
 function readChunks(spaceId: number, resource: string): any[] {
   const dir = path.join(GOLDEN, String(spaceId), resource);
   if (!fs.existsSync(dir)) return [];
-  const files = fs.readdirSync(dir)
+  const files = fs
+    .readdirSync(dir)
     .filter((f) => f.startsWith('chunk_') && f.endsWith('.json'))
     .sort();
   const items: any[] = [];
@@ -473,7 +525,9 @@ async function seedActivities() {
         };
       });
       await db.insert(activities).values(batch).onConflictDoNothing();
-      process.stdout.write(`\r  Space ${spaceId}: ${Math.min(i + BATCH, items.length)}/${items.length} activities...`);
+      process.stdout.write(
+        `\r  Space ${spaceId}: ${Math.min(i + BATCH, items.length)}/${items.length} activities...`,
+      );
     }
     process.stdout.write('\n');
     console.log(`  ✓ Space ${spaceId}: ${items.length} activities`);
@@ -521,26 +575,31 @@ async function seedStories() {
         updatedAt: new Date(s.updated_at),
         lastAuthorId: s.last_author_id ?? null,
       }));
-      await db.insert(stories).values(batch).onConflictDoUpdate({
-        target: stories.id,
-        set: {
-          name: sql`excluded.name`,
-          slug: sql`excluded.slug`,
-          fullSlug: sql`excluded.full_slug`,
-          published: sql`excluded.published`,
-          unpublishedChanges: sql`excluded.unpublished_changes`,
-          updatedAt: sql`excluded.updated_at`,
-          publishedAt: sql`excluded.published_at`,
-          tagList: sql`excluded.tag_list`,
-          // Only overwrite content if incoming has actual data — MAPI list endpoint
-          // sometimes omits content even with with_content=1, so we preserve existing.
-          content: sql`CASE WHEN excluded.content::text = '{}' THEN stories.content ELSE excluded.content END`,
-          position: sql`excluded.position`,
-          defaultFullSlug: sql`excluded.default_full_slug`,
-          translatedSlugs: sql`excluded.translated_slugs`,
-        },
-      });
-      process.stdout.write(`\r  Space ${spaceId}: ${Math.min(i + BATCH, items.length)}/${items.length} stories...`);
+      await db
+        .insert(stories)
+        .values(batch)
+        .onConflictDoUpdate({
+          target: stories.id,
+          set: {
+            name: sql`excluded.name`,
+            slug: sql`excluded.slug`,
+            fullSlug: sql`excluded.full_slug`,
+            published: sql`excluded.published`,
+            unpublishedChanges: sql`excluded.unpublished_changes`,
+            updatedAt: sql`excluded.updated_at`,
+            publishedAt: sql`excluded.published_at`,
+            tagList: sql`excluded.tag_list`,
+            // Only overwrite content if incoming has actual data — MAPI list endpoint
+            // sometimes omits content even with with_content=1, so we preserve existing.
+            content: sql`CASE WHEN excluded.content::text = '{}' THEN stories.content ELSE excluded.content END`,
+            position: sql`excluded.position`,
+            defaultFullSlug: sql`excluded.default_full_slug`,
+            translatedSlugs: sql`excluded.translated_slugs`,
+          },
+        });
+      process.stdout.write(
+        `\r  Space ${spaceId}: ${Math.min(i + BATCH, items.length)}/${items.length} stories...`,
+      );
     }
     process.stdout.write('\n');
     console.log(`  ✓ Space ${spaceId}: ${items.length} stories`);
@@ -624,7 +683,12 @@ async function seedWebhooks() {
         })
         .onConflictDoUpdate({
           target: webhookEndpoints.id,
-          set: { name: h.name, endpoint: h.endpoint, actions: h.actions ?? [], activated: h.activated ?? true },
+          set: {
+            name: h.name,
+            endpoint: h.endpoint,
+            actions: h.actions ?? [],
+            activated: h.activated ?? true,
+          },
         });
     }
     console.log(`  ✓ Space ${spaceId}: ${hooks.length} webhooks`);
@@ -657,7 +721,11 @@ async function seedBranches() {
         })
         .onConflictDoUpdate({
           target: branches.id,
-          set: { name: b.name, url: b.url ?? null, deployedAt: b.deployed_at ? new Date(b.deployed_at) : null },
+          set: {
+            name: b.name,
+            url: b.url ?? null,
+            deployedAt: b.deployed_at ? new Date(b.deployed_at) : null,
+          },
         });
     }
     console.log(`  ✓ Space ${spaceId}: ${items.length} branches`);
@@ -696,7 +764,11 @@ async function seedReleases() {
         })
         .onConflictDoUpdate({
           target: releases.id,
-          set: { name: r.name, released: r.released ?? false, releaseAt: r.release_at ? new Date(r.release_at) : null },
+          set: {
+            name: r.name,
+            released: r.released ?? false,
+            releaseAt: r.release_at ? new Date(r.release_at) : null,
+          },
         });
     }
     console.log(`  ✓ Space ${spaceId}: ${items.length} releases`);
@@ -785,7 +857,7 @@ async function seedAdminUser() {
       email: 'admin@sbx.local',
       firstname: 'Admin',
       lastname: 'SBX',
-      passwordHash: createHash('sha256').update('admin').digest('hex'),
+      passwordHash: await argon2.hash('admin'),
     })
     .onConflictDoUpdate({ target: users.email, set: { firstname: 'Admin' } })
     .returning();

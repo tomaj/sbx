@@ -1,8 +1,8 @@
 import { Injectable, Inject } from '@nestjs/common';
-import { HealthIndicator, HealthIndicatorResult, HealthCheckError } from '@nestjs/terminus';
+import { HealthIndicator, type HealthIndicatorResult, HealthCheckError } from '@nestjs/terminus';
 import { sql } from 'drizzle-orm';
 import { DB } from '../db/db.module';
-import type { DbType } from '../db/db.module';
+import { DbType } from '../db/db.module';
 
 @Injectable()
 export class DbHealthIndicator extends HealthIndicator {
@@ -14,7 +14,7 @@ export class DbHealthIndicator extends HealthIndicator {
     try {
       await this.db.execute(sql`SELECT 1`);
       return this.getStatus(key, true);
-    } catch (error) {
+    } catch (_error) {
       throw new HealthCheckError('Database check failed', this.getStatus(key, false));
     }
   }

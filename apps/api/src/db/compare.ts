@@ -6,17 +6,28 @@
 import * as https from 'https';
 import * as http from 'http';
 
-const MAPI_TOKEN = 'tN53d8vfG7VnXy596bgQZwtt-233927-7MxD9F_q4AHMddMv4p1y';
+const MAPI_TOKEN = process.env.STORYBLOK_MAPI_TOKEN;
+if (!MAPI_TOKEN) {
+  console.error('Missing STORYBLOK_MAPI_TOKEN env variable');
+  process.exit(1);
+}
 const OUR_BASE = 'http://localhost:3000';
 const SB_CDN_BASE = 'https://api.storyblok.com';
 const SB_MAPI_BASE = 'https://mapi.storyblok.com';
 
+const CDN_TOKENS = (process.env.STORYBLOK_CDN_TOKENS ?? '').split(',');
 const SPACES = [
-  { id: 285923, cdnToken: '1yIe1SmoT7RUDvQMzNlkGgtt', name: 'Live' },
-  { id: 285922, cdnToken: 'bWXPANeJ1q1X8fHLrw0o3Qtt', name: 'Development' },
-  { id: 293665, cdnToken: 'NLjjpZKtPrKfh8tHAhAdegtt', name: 'Magenta' },
-  { id: 327730, cdnToken: '9qgIKrXquXTWf9pvXxOvPgtt', name: 'Telekom Apps' },
+  { id: 285923, cdnToken: CDN_TOKENS[0] ?? '', name: 'Live' },
+  { id: 285922, cdnToken: CDN_TOKENS[1] ?? '', name: 'Development' },
+  { id: 293665, cdnToken: CDN_TOKENS[2] ?? '', name: 'Magenta' },
+  { id: 327730, cdnToken: CDN_TOKENS[3] ?? '', name: 'Telekom Apps' },
 ];
+if (SPACES.some((s) => !s.cdnToken)) {
+  console.error(
+    'Missing STORYBLOK_CDN_TOKENS env variable (comma-separated: Live,Dev,Magenta,TelekomApps)',
+  );
+  process.exit(1);
+}
 
 function fetch(url: string, headers: Record<string, string> = {}): Promise<any> {
   return new Promise((resolve, reject) => {
@@ -29,8 +40,11 @@ function fetch(url: string, headers: Record<string, string> = {}): Promise<any> 
       let data = '';
       res.on('data', (c) => (data += c));
       res.on('end', () => {
-        try { resolve(JSON.parse(data)); }
-        catch { resolve(data); }
+        try {
+          resolve(JSON.parse(data));
+        } catch {
+          resolve(data);
+        }
       });
     });
     req.on('error', reject);
@@ -65,7 +79,9 @@ async function compareSpacesMe() {
     // version changes over time - just check it's a number
     const vOurs = typeof ours.space?.version === 'number';
     const vLive = typeof live.space?.version === 'number';
-    console.log(`    ${vOurs && vLive ? '✅' : '❌'} version is number: ours=${ours.space?.version}  live=${live.space?.version}`);
+    console.log(
+      `    ${vOurs && vLive ? '✅' : '❌'} version is number: ours=${ours.space?.version}  live=${live.space?.version}`,
+    );
   }
 }
 
@@ -77,20 +93,22 @@ async function compareCollaborators() {
 
     const [ours, live] = await Promise.all([
       fetch(`${OUR_BASE}/v1/spaces/${sp.id}/collaborators?token=${sp.cdnToken}`),
-      fetch(`${SB_MAPI_BASE}/v1/spaces/${sp.id}/collaborators`, { Authorization: MAPI_TOKEN }),
+      fetch(`${SB_MAPI_BASE}/v1/spaces/${sp.id}/collaborators`, { Authorization: MAPI_TOKEN! }),
     ]);
 
     const ourCollabs = ours.collaborators ?? [];
     const liveCollabs = live.collaborators ?? [];
 
-    console.log(`    count: ours=${ourCollabs.length}  live=${liveCollabs.length} ${ourCollabs.length === liveCollabs.length ? '✅' : '❌'}`);
+    console.log(
+      `    count: ours=${ourCollabs.length}  live=${liveCollabs.length} ${ourCollabs.length === liveCollabs.length ? '✅' : '❌'}`,
+    );
 
     // Compare by email (sbId as anchor)
     const liveByEmail = new Map(liveCollabs.map((c: any) => [c.user.real_email, c]));
     const ourByEmail = new Map(ourCollabs.map((c: any) => [c.user.real_email, c]));
 
     let emailMismatches = 0;
-    for (const [email, liveC] of liveByEmail) {
+    for (const [email, _liveC] of liveByEmail) {
       if (!ourByEmail.has(email)) {
         console.log(`    ❌ missing user: ${email}`);
         emailMismatches++;
@@ -107,7 +125,12 @@ async function compareCollaborators() {
       const ourC = ourByEmail.get(firstEmail) as any;
       const liveC = liveByEmail.get(firstEmail) as any;
       if (ourC && liveC) {
-        diff('user fields', ourC.user, liveC.user, ['firstname', 'lastname', 'real_email', 'disabled']);
+        diff('user fields', ourC.user, liveC.user, [
+          'firstname',
+          'lastname',
+          'real_email',
+          'disabled',
+        ]);
       }
     }
   }
@@ -121,13 +144,15 @@ async function compareComponents() {
 
     const [ours, live] = await Promise.all([
       fetch(`${OUR_BASE}/v1/spaces/${sp.id}/components?token=${sp.cdnToken}`),
-      fetch(`${SB_MAPI_BASE}/v1/spaces/${sp.id}/components`, { Authorization: MAPI_TOKEN }),
+      fetch(`${SB_MAPI_BASE}/v1/spaces/${sp.id}/components`, { Authorization: MAPI_TOKEN! }),
     ]);
 
     const ourComps = ours.components ?? [];
     const liveComps = live.components ?? [];
 
-    console.log(`    count: ours=${ourComps.length}  live=${liveComps.length} ${ourComps.length === liveComps.length ? '✅' : '❌'}`);
+    console.log(
+      `    count: ours=${ourComps.length}  live=${liveComps.length} ${ourComps.length === liveComps.length ? '✅' : '❌'}`,
+    );
 
     const liveById = new Map(liveComps.map((c: any) => [c.id, c]));
     const ourById = new Map(ourComps.map((c: any) => [c.id, c]));
@@ -146,7 +171,15 @@ async function compareComponents() {
       const ourC = ourById.get(firstId) as any;
       const liveC = liveById.get(firstId) as any;
       if (ourC && liveC) {
-        diff('first component', ourC, liveC, ['id', 'name', 'is_root', 'is_nestable', 'color', 'icon', 'component_group_uuid']);
+        diff('first component', ourC, liveC, [
+          'id',
+          'name',
+          'is_root',
+          'is_nestable',
+          'color',
+          'icon',
+          'component_group_uuid',
+        ]);
       }
     }
 
@@ -164,19 +197,27 @@ async function compareComponentGroups() {
 
     const [ours, live] = await Promise.all([
       fetch(`${OUR_BASE}/v1/spaces/${sp.id}/component_groups?token=${sp.cdnToken}`),
-      fetch(`${SB_MAPI_BASE}/v1/spaces/${sp.id}/component_groups`, { Authorization: MAPI_TOKEN }),
+      fetch(`${SB_MAPI_BASE}/v1/spaces/${sp.id}/component_groups`, { Authorization: MAPI_TOKEN! }),
     ]);
 
     const ourGroups = ours.component_groups ?? [];
     const liveGroups = live.component_groups ?? [];
 
-    console.log(`    count: ours=${ourGroups.length}  live=${liveGroups.length} ${ourGroups.length === liveGroups.length ? '✅' : '❌'}`);
+    console.log(
+      `    count: ours=${ourGroups.length}  live=${liveGroups.length} ${ourGroups.length === liveGroups.length ? '✅' : '❌'}`,
+    );
 
     if (ourGroups.length > 0 && liveGroups.length > 0) {
       const liveFirst = liveGroups[0];
       const ourFirst = ourGroups.find((g: any) => g.id === liveFirst.id);
       if (ourFirst) {
-        diff('first group', ourFirst, liveFirst, ['id', 'uuid', 'name', 'parent_id', 'parent_uuid']);
+        diff('first group', ourFirst, liveFirst, [
+          'id',
+          'uuid',
+          'name',
+          'parent_id',
+          'parent_uuid',
+        ]);
       }
     }
   }
@@ -190,13 +231,15 @@ async function compareAccessTokens() {
 
     const [ours, live] = await Promise.all([
       fetch(`${OUR_BASE}/v1/spaces/${sp.id}/api_keys?token=${sp.cdnToken}`),
-      fetch(`${SB_MAPI_BASE}/v1/spaces/${sp.id}/api_keys/`, { Authorization: MAPI_TOKEN }),
+      fetch(`${SB_MAPI_BASE}/v1/spaces/${sp.id}/api_keys/`, { Authorization: MAPI_TOKEN! }),
     ]);
 
     const ourKeys: any[] = ours.api_keys ?? [];
     const liveKeys: any[] = live.api_keys ?? [];
 
-    console.log(`    count: ours=${ourKeys.length}  live=${liveKeys.length} ${ourKeys.length === liveKeys.length ? '✅' : '❌'}`);
+    console.log(
+      `    count: ours=${ourKeys.length}  live=${liveKeys.length} ${ourKeys.length === liveKeys.length ? '✅' : '❌'}`,
+    );
 
     const liveById = new Map(liveKeys.map((k) => [k.id, k]));
     const ourById = new Map(ourKeys.map((k) => [k.id, k]));
@@ -208,7 +251,13 @@ async function compareAccessTokens() {
         continue;
       }
       diff(`token ${id} (${liveK.name})`, ourK, liveK, [
-        'id', 'access', 'branch_id', 'name', 'space_id', 'token', 'min_cache',
+        'id',
+        'access',
+        'branch_id',
+        'name',
+        'space_id',
+        'token',
+        'min_cache',
       ]);
     }
   }
@@ -222,13 +271,15 @@ async function compareSpaceRoles() {
 
     const [ours, live] = await Promise.all([
       fetch(`${OUR_BASE}/v1/spaces/${sp.id}/space_roles?token=${sp.cdnToken}`),
-      fetch(`${SB_MAPI_BASE}/v1/spaces/${sp.id}/space_roles`, { Authorization: MAPI_TOKEN }),
+      fetch(`${SB_MAPI_BASE}/v1/spaces/${sp.id}/space_roles`, { Authorization: MAPI_TOKEN! }),
     ]);
 
     const ourRoles: any[] = ours.space_roles ?? [];
     const liveRoles: any[] = live.space_roles ?? [];
 
-    console.log(`    count: ours=${ourRoles.length}  live=${liveRoles.length} ${ourRoles.length === liveRoles.length ? '✅' : '❌'}`);
+    console.log(
+      `    count: ours=${ourRoles.length}  live=${liveRoles.length} ${ourRoles.length === liveRoles.length ? '✅' : '❌'}`,
+    );
 
     const liveById = new Map(liveRoles.map((r: any) => [r.id, r]));
     const ourById = new Map(ourRoles.map((r: any) => [r.id, r]));
@@ -239,7 +290,14 @@ async function compareSpaceRoles() {
         console.log(`    ❌ missing role id=${id} name="${liveR.role}"`);
         continue;
       }
-      diff(`role "${liveR.role}"`, ourR, liveR, ['id', 'role', 'subtitle', 'permissions', 'allowed_paths', 'blocked_paths']);
+      diff(`role "${liveR.role}"`, ourR, liveR, [
+        'id',
+        'role',
+        'subtitle',
+        'permissions',
+        'allowed_paths',
+        'blocked_paths',
+      ]);
     }
   }
 }
@@ -252,13 +310,15 @@ async function compareWebhooks() {
 
     const [ours, live] = await Promise.all([
       fetch(`${OUR_BASE}/v1/spaces/${sp.id}/webhook_endpoints?token=${sp.cdnToken}`),
-      fetch(`${SB_MAPI_BASE}/v1/spaces/${sp.id}/webhook_endpoints`, { Authorization: MAPI_TOKEN }),
+      fetch(`${SB_MAPI_BASE}/v1/spaces/${sp.id}/webhook_endpoints`, { Authorization: MAPI_TOKEN! }),
     ]);
 
     const ourHooks: any[] = ours.webhook_endpoints ?? [];
     const liveHooks: any[] = live.webhook_endpoints ?? [];
 
-    console.log(`    count: ours=${ourHooks.length}  live=${liveHooks.length} ${ourHooks.length === liveHooks.length ? '✅' : '❌'}`);
+    console.log(
+      `    count: ours=${ourHooks.length}  live=${liveHooks.length} ${ourHooks.length === liveHooks.length ? '✅' : '❌'}`,
+    );
 
     const liveById = new Map(liveHooks.map((h: any) => [h.id, h]));
     const ourById = new Map(ourHooks.map((h: any) => [h.id, h]));
@@ -269,7 +329,14 @@ async function compareWebhooks() {
         console.log(`    ❌ missing webhook id=${id} name="${liveH.name}"`);
         continue;
       }
-      diff(`webhook "${liveH.name}"`, ourH, liveH, ['id', 'name', 'endpoint', 'actions', 'activated', 'space_id']);
+      diff(`webhook "${liveH.name}"`, ourH, liveH, [
+        'id',
+        'name',
+        'endpoint',
+        'actions',
+        'activated',
+        'space_id',
+      ]);
     }
   }
 }
@@ -282,29 +349,54 @@ async function comparePresets() {
 
     const [ours, live] = await Promise.all([
       fetch(`${OUR_BASE}/v1/spaces/${sp.id}/presets?token=${sp.cdnToken}`),
-      fetch(`${SB_MAPI_BASE}/v1/spaces/${sp.id}/presets`, { Authorization: MAPI_TOKEN }),
+      fetch(`${SB_MAPI_BASE}/v1/spaces/${sp.id}/presets`, { Authorization: MAPI_TOKEN! }),
     ]);
 
     const ourItems: any[] = ours.presets ?? [];
     const liveItems: any[] = live.presets ?? [];
 
-    console.log(`    count: ours=${ourItems.length}  live=${liveItems.length} ${ourItems.length === liveItems.length ? '✅' : '❌'}`);
+    console.log(
+      `    count: ours=${ourItems.length}  live=${liveItems.length} ${ourItems.length === liveItems.length ? '✅' : '❌'}`,
+    );
 
     if (ourItems.length > 0 && liveItems.length > 0) {
       const liveFirst = liveItems[0];
       const ourFirst = ourItems.find((p: any) => p.id === liveFirst.id);
       if (ourFirst) {
-        diff('first preset', ourFirst, liveFirst, ['id', 'name', 'component_id', 'space_id', 'icon', 'color', 'description']);
+        diff('first preset', ourFirst, liveFirst, [
+          'id',
+          'name',
+          'component_id',
+          'space_id',
+          'icon',
+          'color',
+          'description',
+        ]);
       }
     }
   }
 }
 
 const CDN_STORY_FIELDS = [
-  'id', 'uuid', 'name', 'slug', 'full_slug', 'path', 'position', 'parent_id',
-  'group_id', 'is_startpage', 'sort_by_date', 'tag_list',
-  'published_at', 'first_published_at', 'lang',
-  'alternates', 'translated_slugs', 'release_id', 'default_full_slug',
+  'id',
+  'uuid',
+  'name',
+  'slug',
+  'full_slug',
+  'path',
+  'position',
+  'parent_id',
+  'group_id',
+  'is_startpage',
+  'sort_by_date',
+  'tag_list',
+  'published_at',
+  'first_published_at',
+  'lang',
+  'alternates',
+  'translated_slugs',
+  'release_id',
+  'default_full_slug',
 ];
 
 async function compareCdnStoriesList() {
@@ -322,11 +414,15 @@ async function compareCdnStoriesList() {
     const ourStories: any[] = ours.stories ?? [];
     const liveStories: any[] = live.stories ?? [];
 
-    console.log(`    count (page 1): ours=${ourStories.length}  live=${liveStories.length} ${ourStories.length === liveStories.length ? '✅' : '❌'}`);
+    console.log(
+      `    count (page 1): ours=${ourStories.length}  live=${liveStories.length} ${ourStories.length === liveStories.length ? '✅' : '❌'}`,
+    );
 
     // Check cv is a number
     const cvOk = typeof ours.cv === 'number' && typeof live.cv === 'number';
-    console.log(`    cv: ours=${ours.cv}  live=${live.cv} ${cvOk ? '✅' : '❌'} (values differ by design — just checking type)`);
+    console.log(
+      `    cv: ours=${ours.cv}  live=${live.cv} ${cvOk ? '✅' : '❌'} (values differ by design — just checking type)`,
+    );
 
     // Spot-check first story
     if (ourStories.length > 0 && liveStories.length > 0) {
@@ -336,7 +432,9 @@ async function compareCdnStoriesList() {
         diff(`story[0] uuid=${liveFirst.uuid}`, ourFirst, liveFirst, CDN_STORY_FIELDS);
         // content: just check it's an object with same component
         const contentOk = ourFirst.content?.component === liveFirst.content?.component;
-        console.log(`    content.component: ours=${ourFirst.content?.component}  live=${liveFirst.content?.component} ${contentOk ? '✅' : '❌'}`);
+        console.log(
+          `    content.component: ours=${ourFirst.content?.component}  live=${liveFirst.content?.component} ${contentOk ? '✅' : '❌'}`,
+        );
       } else {
         console.log(`    ❌ first live story uuid=${liveFirst.uuid} not found in our response`);
       }
@@ -372,13 +470,17 @@ async function compareCdnStory() {
     ]);
 
     if (!ours.story || !live.story) {
-      console.log(`    ❌ slug="${slug}" ours=${JSON.stringify(ours).slice(0, 80)}  live=${JSON.stringify(live).slice(0, 80)}`);
+      console.log(
+        `    ❌ slug="${slug}" ours=${JSON.stringify(ours).slice(0, 80)}  live=${JSON.stringify(live).slice(0, 80)}`,
+      );
       continue;
     }
 
     diff(`story "${slug}"`, ours.story, live.story, CDN_STORY_FIELDS);
     const contentOk = ours.story.content?.component === live.story.content?.component;
-    console.log(`    content.component: ours=${ours.story.content?.component}  live=${live.story.content?.component} ${contentOk ? '✅' : '❌'}`);
+    console.log(
+      `    content.component: ours=${ours.story.content?.component}  live=${live.story.content?.component} ${contentOk ? '✅' : '❌'}`,
+    );
   }
 }
 

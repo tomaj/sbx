@@ -1,43 +1,24 @@
-import { IsEmail, IsNumber, IsOptional, IsString } from 'class-validator';
+import { z } from 'zod';
+import { createZodDto } from 'nestjs-zod';
 
-export class AddCollaboratorDataDto {
-  @IsNumber()
-  @IsOptional()
-  user_id?: number;
+const CollaboratorDataSchema = z.object({
+  user_id: z.number().int().optional(),
+  email: z.string().email().optional(),
+  role: z.string().optional(),
+  space_role_id: z.number().int().nullable().optional(),
+});
 
-  @IsEmail()
-  @IsOptional()
-  email?: string;
+// Storyblok accepts both root-level fields and wrapped in "collaborator" key
+const AddCollaboratorSchema = z
+  .object({
+    collaborator: CollaboratorDataSchema.optional(),
+    user_id: z.number().int().optional(),
+    email: z.string().email().optional(),
+    role: z.string().optional(),
+    space_role_id: z.number().int().nullable().optional(),
+  })
+  .refine((d) => d.collaborator || d.user_id || d.email, {
+    message: 'Must provide collaborator, user_id, or email',
+  });
 
-  @IsString()
-  @IsOptional()
-  role?: string;
-
-  @IsNumber()
-  @IsOptional()
-  space_role_id?: number | null;
-}
-
-export class AddCollaboratorDto {
-  // Storyblok accepts both root-level fields and wrapped in "collaborator"
-  // We validate the wrapper; controller unwraps it
-  @IsOptional()
-  collaborator?: AddCollaboratorDataDto;
-
-  // Also allow root-level fields for backward compat
-  @IsNumber()
-  @IsOptional()
-  user_id?: number;
-
-  @IsEmail()
-  @IsOptional()
-  email?: string;
-
-  @IsString()
-  @IsOptional()
-  role?: string;
-
-  @IsNumber()
-  @IsOptional()
-  space_role_id?: number | null;
-}
+export class AddCollaboratorDto extends createZodDto(AddCollaboratorSchema) {}

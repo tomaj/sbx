@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { eq, max, count } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { DB } from '../db/db.module';
-import type { DbType } from '../db/db.module';
+import { DbType } from '../db/db.module';
 import { spaces, spaceMembers, users, stories, assets, apiTokens } from '../db/schema';
 
 @Injectable()
@@ -104,11 +104,7 @@ export class SpacesService {
   }
 
   async getSpaceById(spaceId: number) {
-    const [space] = await this.db
-      .select()
-      .from(spaces)
-      .where(eq(spaces.id, spaceId))
-      .limit(1);
+    const [space] = await this.db.select().from(spaces).where(eq(spaces.id, spaceId)).limit(1);
 
     if (!space) return null;
 
@@ -164,8 +160,12 @@ export class SpacesService {
         ...(previewUrls !== undefined && { previewUrls }),
         ...(data.encodeUrl !== undefined && { encodeUrl: data.encodeUrl }),
         ...(data.mobileWidth !== undefined && { mobileWidth: data.mobileWidth }),
-        ...(data.visualEditorDisabled !== undefined && { visualEditorDisabled: data.visualEditorDisabled }),
-        ...(data.assetLibrarySettings !== undefined && { assetLibrarySettings: data.assetLibrarySettings }),
+        ...(data.visualEditorDisabled !== undefined && {
+          visualEditorDisabled: data.visualEditorDisabled,
+        }),
+        ...(data.assetLibrarySettings !== undefined && {
+          assetLibrarySettings: data.assetLibrarySettings,
+        }),
         updatedAt: new Date(),
       })
       .where(eq(spaces.id, spaceId))
@@ -194,11 +194,7 @@ export class SpacesService {
   }
 
   async getSpaceMe(spaceId: number) {
-    const [space] = await this.db
-      .select()
-      .from(spaces)
-      .where(eq(spaces.id, spaceId))
-      .limit(1);
+    const [space] = await this.db.select().from(spaces).where(eq(spaces.id, spaceId)).limit(1);
 
     if (!space) return null;
 

@@ -1,4 +1,5 @@
-import { Controller, Get, Param, Query, Req } from '@nestjs/common';
+import { AuthenticatedRequest } from '../auth/authenticated-request.interface';
+import { Controller, Get, Param, ParseIntPipe, Query, Req } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Auth } from '../auth/auth.decorator';
 import { DatasourcesService } from './datasources.service';
@@ -12,27 +13,30 @@ export class DatasourcesController {
   constructor(private readonly datasourcesService: DatasourcesService) {}
 
   @Get('datasources')
-  async getDatasources(@Req() req: any) {
+  async getDatasources(@Req() req: AuthenticatedRequest) {
     return this.datasourcesService.findAllCdn(req.space.id);
   }
 
   @Get('datasources/:id')
-  async getDatasource(@Req() req: any, @Param('id') id: string) {
+  async getDatasource(@Req() req: AuthenticatedRequest, @Param('id', ParseIntPipe) id: number) {
     return ResultGuard.throwIfNotFound(
-      await this.datasourcesService.findOneCdn(req.space.id, parseInt(id)),
+      await this.datasourcesService.findOneCdn(req.space.id, id),
       'Datasource not found',
     );
   }
 
   @Get('datasource_entries')
   async getDatasourceEntries(
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
     @Query('datasource') datasourceSlug?: string,
     @Query('dimension') dimension?: string,
     @Query('per_page') perPage = '25',
     @Query('page') page = '1',
   ) {
-    const { page: parsedPage, perPage: parsedPerPage } = QueryParserUtil.parsePagination(page, perPage);
+    const { page: parsedPage, perPage: parsedPerPage } = QueryParserUtil.parsePagination(
+      page,
+      perPage,
+    );
     return this.datasourcesService.findEntriesCdn(req.space.id, {
       datasourceSlug,
       dimension,

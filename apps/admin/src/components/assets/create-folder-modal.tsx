@@ -1,15 +1,15 @@
-'use client'
+'use client';
 
-import { useState, useEffect } from 'react'
-import { X, Search, Folder, Home } from 'lucide-react'
-import type { AssetFolder } from './folder-tree'
+import { useState, useEffect } from 'react';
+import { X, Search, Folder, Home } from 'lucide-react';
+import type { AssetFolder } from './folder-tree';
 
 interface CreateFolderModalProps {
-  open: boolean
-  folders: AssetFolder[]
-  defaultParentId?: number | null
-  onConfirm: (name: string, parentId: number | null) => Promise<void>
-  onCancel: () => void
+  open: boolean;
+  folders: AssetFolder[];
+  defaultParentId?: number | null;
+  onConfirm: (name: string, parentId: number | null) => Promise<void>;
+  onCancel: () => void;
 }
 
 export function CreateFolderModal({
@@ -19,45 +19,48 @@ export function CreateFolderModal({
   onConfirm,
   onCancel,
 }: CreateFolderModalProps) {
-  const [name, setName] = useState('')
-  const [parentId, setParentId] = useState<number | null>(defaultParentId ?? null)
-  const [search, setSearch] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [name, setName] = useState('');
+  const [parentId, setParentId] = useState<number | null>(defaultParentId ?? null);
+  const [search, setSearch] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) {
-      setName('')
-      setParentId(defaultParentId ?? null)
-      setSearch('')
-      setError(null)
+      setName('');
+      setParentId(defaultParentId ?? null);
+      setSearch('');
+      setError(null);
     }
-  }, [open, defaultParentId])
+  }, [open, defaultParentId]);
 
   useEffect(() => {
-    if (!open) return
+    if (!open) return;
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onCancel()
+      if (e.key === 'Escape') onCancel();
     }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [open, onCancel])
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open, onCancel]);
 
-  if (!open) return null
+  if (!open) return null;
 
   const filteredFolders = search.trim()
-    ? folders.filter(f => f.name.toLowerCase().includes(search.toLowerCase()))
-    : folders
+    ? folders.filter((f) => f.name.toLowerCase().includes(search.toLowerCase()))
+    : folders;
 
   async function handleCreate() {
-    if (!name.trim()) { setError('Folder name is required'); return }
-    setSaving(true)
-    setError(null)
+    if (!name.trim()) {
+      setError('Folder name is required');
+      return;
+    }
+    setSaving(true);
+    setError(null);
     try {
-      await onConfirm(name.trim(), parentId)
+      await onConfirm(name.trim(), parentId);
     } catch (e: any) {
-      setError(e.message ?? 'Failed to create folder')
-      setSaving(false)
+      setError(e.message ?? 'Failed to create folder');
+      setSaving(false);
     }
   }
 
@@ -67,8 +70,13 @@ export function CreateFolderModal({
       <div className="relative bg-white dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-lg mx-4 flex flex-col max-h-[80vh]">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Create New Folder</h2>
-          <button onClick={onCancel} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+            Create New Folder
+          </h2>
+          <button
+            onClick={onCancel}
+            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+          >
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -81,11 +89,12 @@ export function CreateFolderModal({
               New name
             </label>
             <input
-              autoFocus
               type="text"
               value={name}
-              onChange={e => setName(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') handleCreate() }}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleCreate();
+              }}
               placeholder="e.g. Icons, Videos, Landing pages"
               className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500 placeholder-gray-400"
             />
@@ -102,7 +111,7 @@ export function CreateFolderModal({
               <input
                 type="text"
                 value={search}
-                onChange={e => setSearch(e.target.value)}
+                onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search folders..."
                 className="w-full pl-9 pr-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-teal-500"
               />
@@ -119,10 +128,12 @@ export function CreateFolderModal({
                     : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
                 }`}
               >
-                <Home className={`w-4 h-4 ${parentId === null ? 'text-teal-500' : 'text-gray-400'}`} />
+                <Home
+                  className={`w-4 h-4 ${parentId === null ? 'text-teal-500' : 'text-gray-400'}`}
+                />
                 Root
               </button>
-              {filteredFolders.map(f => (
+              {filteredFolders.map((f) => (
                 <button
                   key={f.id}
                   onClick={() => setParentId(f.id)}
@@ -132,16 +143,16 @@ export function CreateFolderModal({
                       : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
                   }`}
                 >
-                  <Folder className={`w-4 h-4 shrink-0 ${parentId === f.id ? 'text-teal-500' : 'text-gray-400'}`} />
+                  <Folder
+                    className={`w-4 h-4 shrink-0 ${parentId === f.id ? 'text-teal-500' : 'text-gray-400'}`}
+                  />
                   <span className="truncate">{f.name}</span>
                 </button>
               ))}
             </div>
           </div>
 
-          {error && (
-            <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
-          )}
+          {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
         </div>
 
         {/* Footer */}
@@ -162,5 +173,5 @@ export function CreateFolderModal({
         </div>
       </div>
     </div>
-  )
+  );
 }

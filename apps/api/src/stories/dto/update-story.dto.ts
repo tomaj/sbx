@@ -1,83 +1,27 @@
-import { Type } from 'class-transformer';
-import {
-  IsArray,
-  IsBoolean,
-  IsNumber,
-  IsObject,
-  IsOptional,
-  IsString,
-  ValidateNested,
-} from 'class-validator';
+import { z } from 'zod';
+import { createZodDto } from 'nestjs-zod';
 
-export class UpdateStoryDataDto {
-  @IsString()
-  @IsOptional()
-  name?: string;
+const UpdateStoryDataSchema = z.object({
+  name: z.string().min(1).optional(),
+  slug: z.string().min(1).optional(),
+  content: z.record(z.string(), z.unknown()).optional(),
+  tag_list: z.array(z.string()).optional(),
+  path: z.string().nullable().optional(),
+  sort_by_date: z.string().nullable().optional(),
+  first_published_at: z.string().nullable().optional(),
+  publish_at: z.string().nullable().optional(),
+  expire_at: z.string().nullable().optional(),
+  is_startpage: z.boolean().optional(),
+  disable_fe_editor: z.boolean().optional(),
+});
 
-  @IsString()
-  @IsOptional()
-  slug?: string;
+const UpdateStorySchema = z.object({
+  story: UpdateStoryDataSchema,
+  publish: z.boolean().optional(),
+  force_update: z.string().optional(),
+  release_id: z.number().int().optional(),
+  group_id: z.string().optional(),
+  lang: z.string().optional(),
+});
 
-  @IsObject()
-  @IsOptional()
-  content?: Record<string, any>;
-
-  @IsArray()
-  @IsString({ each: true })
-  @IsOptional()
-  tag_list?: string[];
-
-  @IsString()
-  @IsOptional()
-  path?: string | null;
-
-  @IsString()
-  @IsOptional()
-  sort_by_date?: string | null;
-
-  @IsString()
-  @IsOptional()
-  first_published_at?: string | null;
-
-  @IsString()
-  @IsOptional()
-  publish_at?: string | null;
-
-  @IsString()
-  @IsOptional()
-  expire_at?: string | null;
-
-  @IsBoolean()
-  @IsOptional()
-  is_startpage?: boolean;
-
-  @IsBoolean()
-  @IsOptional()
-  disable_fe_editor?: boolean;
-}
-
-export class UpdateStoryDto {
-  @ValidateNested()
-  @Type(() => UpdateStoryDataDto)
-  story!: UpdateStoryDataDto;
-
-  @IsBoolean()
-  @IsOptional()
-  publish?: boolean;
-
-  @IsString()
-  @IsOptional()
-  force_update?: string;
-
-  @IsNumber()
-  @IsOptional()
-  release_id?: number;
-
-  @IsString()
-  @IsOptional()
-  group_id?: string;
-
-  @IsString()
-  @IsOptional()
-  lang?: string;
-}
+export class UpdateStoryDto extends createZodDto(UpdateStorySchema) {}

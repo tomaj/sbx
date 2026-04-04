@@ -1,16 +1,10 @@
-import { IsArray, IsNumber, IsOptional, IsString } from 'class-validator';
+import { z } from 'zod';
+import { createZodDto } from 'nestjs-zod';
 
-export class UpdateMeDto {
-  @IsString()
-  @IsOptional()
-  firstname?: string;
+const UpdateMeSchema = z.object({
+  firstname: z.string().optional(),
+  lastname: z.string().optional(),
+  favourite_spaces: z.array(z.number().int()).optional(),
+});
 
-  @IsString()
-  @IsOptional()
-  lastname?: string;
-
-  @IsArray()
-  @IsNumber({}, { each: true })
-  @IsOptional()
-  favourite_spaces?: number[];
-}
+export class UpdateMeDto extends createZodDto(UpdateMeSchema) {}

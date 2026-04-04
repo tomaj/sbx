@@ -1,7 +1,9 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import { ResultGuard } from '../shared/result-guard.util';
+import { QueryParserUtil, escapeLike } from '../shared/query-parser.util';
 import { and, asc, desc, eq, ilike, sql } from 'drizzle-orm';
 import { DB } from '../db/db.module';
-import type { DbType } from '../db/db.module';
+import { DbType } from '../db/db.module';
 import { stories, tags } from '../db/schema';
 
 @Injectable()
@@ -33,7 +35,7 @@ export class TagsService {
       // When starts_with is given, derive tags from stories matching the prefix
       const storyConditions: any[] = [
         eq(stories.spaceId, spaceId),
-        ilike(stories.fullSlug, `${startsWith.trim()}%`),
+        ilike(stories.fullSlug, `${escapeLike(startsWith.trim())}%`),
         sql`${stories.deletedAt} IS NULL`,
         eq(stories.isFolder, false),
       ];
@@ -92,10 +94,10 @@ export class TagsService {
     const page = Math.max(1, opts.page ?? 1);
     const perPage = Math.min(100, Math.max(1, opts.perPage ?? 25));
 
-    const conditions: ReturnType<typeof eq>[] = [eq(tags.spaceId, spaceId)];
-    if (opts.search) {
-      conditions.push(ilike(tags.name, `%${opts.search}%`) as any);
-    }
+    const where = QueryParserUtil.buildWhere(
+      eq(tags.spaceId, spaceId),
+      opts.search ? ilike(tags.name, `%${escapeLike(opts.search)}%`) : null,
+    );
 
     let orderBy: ReturnType<typeof asc>;
     if (opts.sortBy === 'taggings_count:desc') {
@@ -111,7 +113,7 @@ export class TagsService {
     const rows = await this.db
       .select()
       .from(tags)
-      .where(and(...conditions))
+      .where(where)
       .orderBy(orderBy)
       .limit(perPage)
       .offset((page - 1) * perPage);
@@ -129,21 +131,15 @@ export class TagsService {
     spaceId: number,
     opts: { search?: string; sortField?: string; sortDir?: string },
   ) {
-    const conditions: ReturnType<typeof eq>[] = [eq(tags.spaceId, spaceId)];
-    if (opts.search) {
-      conditions.push(ilike(tags.name, `%${opts.search}%`) as any);
-    }
+    const where = QueryParserUtil.buildWhere(
+      eq(tags.spaceId, spaceId),
+      opts.search ? ilike(tags.name, `%${escapeLike(opts.search)}%`) : null,
+    );
 
-    const orderByCol =
-      opts.sortField === 'taggings_count' ? tags.taggingsCount : tags.name;
-    const orderBy =
-      opts.sortDir === 'desc' ? desc(orderByCol) : asc(orderByCol);
+    const orderByCol = opts.sortField === 'taggings_count' ? tags.taggingsCount : tags.name;
+    const orderBy = opts.sortDir === 'desc' ? desc(orderByCol) : asc(orderByCol);
 
-    const rows = await this.db
-      .select()
-      .from(tags)
-      .where(and(...conditions))
-      .orderBy(orderBy);
+    const rows = await this.db.select().from(tags).where(where).orderBy(orderBy);
 
     return {
       tags: rows.map((t) => ({
@@ -156,10 +152,7 @@ export class TagsService {
   }
 
   async createTag(spaceId: number, body: { name: string; storyId?: number }) {
-    const [row] = await this.db
-      .insert(tags)
-      .values({ spaceId, name: body.name })
-      .returning();
+    const [row] = await this.db.insert(tags).values({ spaceId, name: body.name }).returning();
 
     // If story_id provided, associate tag with story
     if (body.storyId) {
@@ -193,7 +186,7 @@ export class TagsService {
       .where(and(eq(tags.id, id), eq(tags.spaceId, spaceId)))
       .returning();
 
-    if (!row) throw new NotFoundException('Tag not found');
+    ResultGuard.throwIfNotFound(row, 'Tag not found');
 
     return { tag: { id: row.id, name: row.name, taggings_count: row.taggingsCount } };
   }
@@ -204,7 +197,7 @@ export class TagsService {
       .where(and(eq(tags.id, id), eq(tags.spaceId, spaceId)))
       .returning();
 
-    if (!row) throw new NotFoundException('Tag not found');
+    ResultGuard.throwIfNotFound(row, 'Tag not found');
 
     return {};
   }
@@ -215,6 +208,6 @@ export class TagsService {
       .where(and(eq(tags.name, name), eq(tags.spaceId, spaceId)))
       .returning();
 
-    if (!row) throw new NotFoundException('Tag not found');
+    ResultGuard.throwIfNotFound(row, 'Tag not found');
   }
 }

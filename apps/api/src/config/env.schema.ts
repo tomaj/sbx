@@ -10,7 +10,11 @@ export const envSchema = z.object({
   DATABASE_URL: z.string().url().default('postgresql://localhost:5432/sbx'),
 
   // Auth
-  JWT_SECRET: z.string().min(16, 'JWT_SECRET must be at least 16 characters'),
+  JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
+  PREVIEW_TOKEN_SECRET: z.string().min(32).optional(),
+
+  // Admin URL (used for links in emails and plugin HTML patching)
+  ADMIN_URL: z.string().url().default('http://localhost:3001'),
 
   // Redis
   REDIS_HOST: z.string().default('localhost'),

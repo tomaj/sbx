@@ -1,12 +1,8 @@
-'use client'
+'use client';
 
-import { SWRConfig } from 'swr'
-import { fetcher } from '@/lib/swr'
+import { SWRConfig } from 'swr';
+import { fetcher } from '@/lib/swr';
 
 export function SWRProvider({ children }: { children: React.ReactNode }) {
-  return (
-    <SWRConfig value={{ fetcher, revalidateOnFocus: false }}>
-      {children}
-    </SWRConfig>
-  )
+  return <SWRConfig value={{ fetcher, revalidateOnFocus: false }}>{children}</SWRConfig>;
 }

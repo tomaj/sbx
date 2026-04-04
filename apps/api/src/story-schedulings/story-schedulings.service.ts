@@ -1,7 +1,8 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import { ResultGuard } from '../shared/result-guard.util';
 import { and, eq } from 'drizzle-orm';
 import { DB } from '../db/db.module';
-import type { DbType } from '../db/db.module';
+import { DbType } from '../db/db.module';
 import { storySchedulings } from '../db/schema';
 
 @Injectable()
@@ -25,7 +26,7 @@ export class StorySchedulingsService {
       .select()
       .from(storySchedulings)
       .where(and(eq(storySchedulings.id, id), eq(storySchedulings.spaceId, spaceId)));
-    if (!row) throw new NotFoundException('Story scheduling not found');
+    ResultGuard.throwIfNotFound(row, 'Story scheduling not found');
     return { story_scheduling: this.format(row) };
   }
 
@@ -48,11 +49,7 @@ export class StorySchedulingsService {
     return { story_scheduling: this.format(row) };
   }
 
-  async update(
-    spaceId: number,
-    id: number,
-    data: { publish_at?: string; language?: string },
-  ) {
+  async update(spaceId: number, id: number, data: { publish_at?: string; language?: string }) {
     const updates: any = { updatedAt: new Date() };
     if (data.publish_at !== undefined) updates.publishAt = new Date(data.publish_at);
     if (data.language !== undefined) updates.language = data.language;
@@ -62,7 +59,7 @@ export class StorySchedulingsService {
       .set(updates)
       .where(and(eq(storySchedulings.id, id), eq(storySchedulings.spaceId, spaceId)))
       .returning();
-    if (!row) throw new NotFoundException('Story scheduling not found');
+    ResultGuard.throwIfNotFound(row, 'Story scheduling not found');
     return { story_scheduling: this.format(row) };
   }
 
@@ -71,7 +68,7 @@ export class StorySchedulingsService {
       .delete(storySchedulings)
       .where(and(eq(storySchedulings.id, id), eq(storySchedulings.spaceId, spaceId)))
       .returning();
-    if (!row) throw new NotFoundException('Story scheduling not found');
+    ResultGuard.throwIfNotFound(row, 'Story scheduling not found');
     return { story_scheduling: this.format(row) };
   }
 

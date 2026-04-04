@@ -1,7 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, eq, ilike, inArray } from 'drizzle-orm';
+import { escapeLike } from '../shared/query-parser.util';
 import { DB } from '../db/db.module';
-import type { DbType } from '../db/db.module';
+import { DbType } from '../db/db.module';
 import { spaceMembers, spaceRoles } from '../db/schema';
 
 @Injectable()
@@ -35,12 +36,13 @@ export class SpaceRolesService {
     const conditions = [eq(spaceRoles.spaceId, spaceId)];
 
     if (filters?.search) {
-      conditions.push(ilike(spaceRoles.role, `%${filters.search}%`));
+      conditions.push(ilike(spaceRoles.role, `%${escapeLike(filters.search)}%`));
     }
 
     if (filters?.by_ids) {
       const ids = filters.by_ids
         .split(',')
+        .slice(0, 1000)
         .map((s) => s.trim())
         .filter(Boolean)
         .map((s) => BigInt(s));
@@ -149,11 +151,7 @@ export class SpaceRolesService {
       blockedAssetFolderIds: body.blocked_asset_folder_ids ?? [],
     });
 
-    const [row] = await this.db
-      .select()
-      .from(spaceRoles)
-      .where(eq(spaceRoles.id, id))
-      .limit(1);
+    const [row] = await this.db.select().from(spaceRoles).where(eq(spaceRoles.id, id)).limit(1);
 
     return { space_role: { ...this.format(row), user_count: 0 } };
   }
@@ -206,7 +204,10 @@ export class SpaceRolesService {
       updates.blockedAssetFolderIds = body.blocked_asset_folder_ids;
 
     if (Object.keys(updates).length > 0) {
-      await this.db.update(spaceRoles).set(updates).where(eq(spaceRoles.id, BigInt(id)));
+      await this.db
+        .update(spaceRoles)
+        .set(updates)
+        .where(eq(spaceRoles.id, BigInt(id)));
     }
 
     return this.adminFindOne(spaceId, id);

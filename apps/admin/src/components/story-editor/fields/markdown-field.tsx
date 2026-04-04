@@ -1,12 +1,12 @@
-'use client'
+'use client';
 
-import type { MarkdownFieldDef } from '@/components/block-library/edit-block-modal/types'
+import type { MarkdownFieldDef } from '@/components/block-library/edit-block-modal/types';
 
 interface Props {
-  fieldKey: string
-  def: MarkdownFieldDef
-  value: string | undefined
-  onChange: (v: string) => void
+  fieldKey: string;
+  def: MarkdownFieldDef;
+  value: string | undefined;
+  onChange: (v: string) => void;
 }
 
 export function MarkdownField({ fieldKey, def, value, onChange }: Props) {
@@ -28,5 +28,5 @@ export function MarkdownField({ fieldKey, def, value, onChange }: Props) {
         placeholder="Markdown..."
       />
     </div>
-  )
+  );
 }

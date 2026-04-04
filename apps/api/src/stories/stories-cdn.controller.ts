@@ -1,3 +1,4 @@
+import { AuthenticatedRequest } from '../auth/authenticated-request.interface';
 import { Controller, Get, Param, Query, Req } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Auth } from '../auth/auth.decorator';
@@ -12,7 +13,7 @@ export class StoriesCdnController {
 
   @Get()
   list(
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
     @Query('version') version?: string,
     @Query('from_release') fromRelease?: string,
     @Query('page') page?: string,
@@ -43,10 +44,13 @@ export class StoriesCdnController {
     // so filter_query[field][op]=value arrives as flat keys. Parse them manually.
     const filterQuery = this.parseFilterQuery(req.query);
 
-    const { page: parsedPage, perPage: parsedPerPage } = QueryParserUtil.parsePagination(page, perPage);
+    const { page: parsedPage, perPage: parsedPerPage } = QueryParserUtil.parsePagination(
+      page,
+      perPage,
+    );
     return this.storiesCdnService.listStories(req.space.id, {
       version: resolvedVersion,
-      fromRelease: fromRelease ? parseInt(fromRelease) : undefined,
+      fromRelease: QueryParserUtil.parseOptionalInt(fromRelease),
       page: parsedPage,
       perPage: parsedPerPage,
       startsWith,
@@ -56,9 +60,10 @@ export class StoriesCdnController {
       excludingSlugs: QueryParserUtil.parseCsvToStrings(excludingSlugs),
       excludingIds: QueryParserUtil.parseCsvToInts(excludingIds),
       contentType,
-      level: level !== undefined ? parseInt(level) : undefined,
+      level: QueryParserUtil.parseOptionalInt(level),
       withTag,
-      isStartpage: isStartpage !== undefined ? isStartpage !== '0' && isStartpage !== 'false' : undefined,
+      isStartpage:
+        isStartpage !== undefined ? isStartpage !== '0' && isStartpage !== 'false' : undefined,
       searchTerm,
       sortBy,
       filterQuery,
@@ -90,7 +95,7 @@ export class StoriesCdnController {
 
   @Get('*slug')
   getOne(
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
     @Param('slug') slug: string | string[],
     @Query('version') version?: string,
     @Query('find_by') findBy?: string,
@@ -102,7 +107,7 @@ export class StoriesCdnController {
     return this.storiesCdnService.getStory(req.space.id, normalizedSlug, {
       version: resolvedVersion,
       findBy,
-      fromRelease: fromRelease ? parseInt(fromRelease) : undefined,
+      fromRelease: QueryParserUtil.parseOptionalInt(fromRelease),
     });
   }
 }

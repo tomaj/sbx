@@ -1,30 +1,29 @@
-'use client'
+'use client';
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { authClient } from '@/lib/auth-client'
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { login } from '@/lib/auth-client';
 
 export default function LoginPage() {
-  const router = useRouter()
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
+  const router = useRouter();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setLoading(true)
-    setError('')
+    e.preventDefault();
+    setLoading(true);
+    setError('');
 
-    const { error } = await authClient.signIn.email({ email, password })
-
-    setLoading(false)
-
-    if (error) {
-      setError(error.message ?? 'Invalid email or password')
-    } else {
-      router.push('/')
-      router.refresh()
+    try {
+      await login(email, password);
+      router.push('/');
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Invalid email or password');
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -43,13 +42,17 @@ export default function LoginPage() {
         {/* Headline */}
         <div className="flex-1 flex flex-col justify-start px-10 pt-14">
           <h1 className="text-white font-black text-[3.2rem] leading-[1.1] tracking-tight max-w-[520px]">
-            Your content.<br />Your rules.<br />Zero limits.
+            Your content.
+            <br />
+            Your rules.
+            <br />
+            Zero limits.
           </h1>
           <p className="mt-6 text-white/75 text-lg leading-relaxed max-w-[440px]">
-            A modern headless CMS that keeps your team moving — structured content, powerful workflows, and instant delivery at scale.
+            A modern headless CMS that keeps your team moving — structured content, powerful
+            workflows, and instant delivery at scale.
           </p>
         </div>
-
       </div>
 
       {/* ── Right panel ── */}
@@ -121,5 +124,5 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
-  )
+  );
 }

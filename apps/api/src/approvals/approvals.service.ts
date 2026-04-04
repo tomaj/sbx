@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, desc, eq, sql } from 'drizzle-orm';
 import { DB } from '../db/db.module';
-import type { DbType } from '../db/db.module';
+import { DbType } from '../db/db.module';
 import { approvals, stories } from '../db/schema';
 
 @Injectable()
@@ -28,7 +28,10 @@ export class ApprovalsService {
           storyFullSlug: stories.fullSlug,
         })
         .from(approvals)
-        .leftJoin(stories, and(sql`${stories.id} = ${approvals.storyId}`, eq(stories.spaceId, spaceId)))
+        .leftJoin(
+          stories,
+          and(sql`${stories.id} = ${approvals.storyId}`, eq(stories.spaceId, spaceId)),
+        )
         .where(and(...conditions))
         .orderBy(desc(approvals.createdAt));
 
@@ -61,7 +64,11 @@ export class ApprovalsService {
     return { approval: this.format(row) };
   }
 
-  async create(spaceId: number, data: { approver_id: number; story_id: number }, _releaseId?: number) {
+  async create(
+    spaceId: number,
+    data: { approver_id: number; story_id: number },
+    _releaseId?: number,
+  ) {
     const [created] = await this.db
       .insert(approvals)
       .values({

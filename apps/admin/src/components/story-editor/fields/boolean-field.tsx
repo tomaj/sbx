@@ -1,22 +1,26 @@
-'use client'
+'use client';
 
-import type { BooleanFieldDef } from '@/components/block-library/edit-block-modal/types'
-import { fieldLabel } from '../field-label'
-import { FieldLabel } from '../FieldLabel'
+import type { BooleanFieldDef } from '@/components/block-library/edit-block-modal/types';
+import { fieldLabel } from '../field-label';
+import { FieldLabel } from '../FieldLabel';
 
 interface Props {
-  fieldKey: string
-  def: BooleanFieldDef
-  value: boolean | undefined
-  onChange: (v: boolean) => void
+  fieldKey: string;
+  def: BooleanFieldDef;
+  value: boolean | undefined;
+  onChange: (v: boolean) => void;
 }
 
 export function BooleanField({ fieldKey, def, value, onChange }: Props) {
-  const checked = value ?? def.default_value ?? false
+  const checked = value ?? def.default_value ?? false;
 
   return (
     <div>
-      <FieldLabel label={fieldLabel(def.display_name, fieldKey)} required={def.required} description={def.description} />
+      <FieldLabel
+        label={fieldLabel(def.display_name, fieldKey)}
+        required={def.required}
+        description={def.description}
+      />
       <button
         type="button"
         role="switch"
@@ -33,5 +37,5 @@ export function BooleanField({ fieldKey, def, value, onChange }: Props) {
         />
       </button>
     </div>
-  )
+  );
 }

@@ -1,15 +1,13 @@
-'use client'
+'use client';
 
-import Link from 'next/link'
-import { useParams, usePathname } from 'next/navigation'
-import { cn } from '@/lib/utils'
+import Link from 'next/link';
+import { useParams, usePathname } from 'next/navigation';
+import { cn } from '@/lib/utils';
 
 const NAV_SECTIONS = [
   {
     label: 'General',
-    items: [
-      { label: 'Space', href: 'space' },
-    ],
+    items: [{ label: 'Space', href: 'space' }],
   },
   {
     label: 'Configuration',
@@ -32,16 +30,14 @@ const NAV_SECTIONS = [
   },
   {
     label: 'Apps',
-    items: [
-      { label: 'Pipelines', href: 'pipelines' },
-    ],
+    items: [{ label: 'Pipelines', href: 'pipelines' }],
   },
-]
+];
 
 export default function SettingsLayout({ children }: { children: React.ReactNode }) {
-  const params = useParams()
-  const spaceId = params.spaceId as string
-  const pathname = usePathname()
+  const params = useParams();
+  const spaceId = params.spaceId as string;
+  const pathname = usePathname();
 
   return (
     <div className="flex h-full min-h-0">
@@ -55,8 +51,8 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
               </p>
               <ul className="space-y-0.5">
                 {section.items.map((item) => {
-                  const href = `/spaces/${spaceId}/settings/${item.href}`
-                  const active = pathname === href || pathname.startsWith(href + '/')
+                  const href = `/spaces/${spaceId}/settings/${item.href}`;
+                  const active = pathname === href || pathname.startsWith(`${href}/`);
                   return (
                     <li key={item.href}>
                       <Link
@@ -71,7 +67,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
                         {item.label}
                       </Link>
                     </li>
-                  )
+                  );
                 })}
               </ul>
             </div>
@@ -80,9 +76,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
       </aside>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto">
-        {children}
-      </div>
+      <div className="flex-1 overflow-y-auto">{children}</div>
     </div>
-  )
+  );
 }

@@ -1,31 +1,31 @@
-'use client'
+'use client';
 
-import { AssetThumb } from './asset-thumb'
+import { AssetThumb } from './asset-thumb';
 
 export interface Asset {
-  id: number
-  filename: string
-  short_filename: string
-  content_type: string
-  content_length: number
-  alt: string | null
-  title: string | null
-  asset_folder_id: number | null
-  deleted_at: string | null
-  created_at: string
-  updated_at: string
+  id: number;
+  filename: string;
+  short_filename: string;
+  content_type: string;
+  content_length: number;
+  alt: string | null;
+  title: string | null;
+  asset_folder_id: number | null;
+  deleted_at: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 interface AssetGridProps {
-  assets: Asset[]
-  spaceId: string
-  isLoading?: boolean
-  onAssetClick?: (asset: Asset) => void
+  assets: Asset[];
+  spaceId: string;
+  isLoading?: boolean;
+  onAssetClick?: (asset: Asset) => void;
 }
 
 function formatExt(contentType: string): string {
-  const parts = contentType.split('/')
-  return parts[1] ?? parts[0] ?? ''
+  const parts = contentType.split('/');
+  return parts[1] ?? parts[0] ?? '';
 }
 
 export function AssetGrid({ assets, spaceId, isLoading, onAssetClick }: AssetGridProps) {
@@ -40,7 +40,7 @@ export function AssetGrid({ assets, spaceId, isLoading, onAssetClick }: AssetGri
           </div>
         ))}
       </div>
-    )
+    );
   }
 
   if (assets.length === 0) {
@@ -48,13 +48,17 @@ export function AssetGrid({ assets, spaceId, isLoading, onAssetClick }: AssetGri
       <div className="flex flex-col items-center justify-center py-16 text-gray-400">
         <p className="text-sm">No assets found</p>
       </div>
-    )
+    );
   }
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 gap-5 p-1">
-      {assets.map(asset => (
-        <div key={asset.id} className="flex flex-col gap-2 group cursor-pointer" onClick={() => onAssetClick?.(asset)}>
+      {assets.map((asset) => (
+        <div
+          key={asset.id}
+          className="flex flex-col gap-2 group cursor-pointer"
+          onClick={() => onAssetClick?.(asset)}
+        >
           {/* Image card — gray bg, image contained with padding */}
           <div className="aspect-[4/3] rounded-xl bg-gray-100 dark:bg-gray-800 overflow-hidden hover:ring-2 hover:ring-teal-500 transition-all flex items-center justify-center p-3">
             <AssetThumb
@@ -77,5 +81,5 @@ export function AssetGrid({ assets, spaceId, isLoading, onAssetClick }: AssetGri
         </div>
       ))}
     </div>
-  )
+  );
 }

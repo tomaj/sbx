@@ -1,146 +1,155 @@
-'use client'
+'use client';
 
-import { useState, useRef, useEffect } from 'react'
-import { ChevronDown, ChevronUp, Search, GripVertical, X } from 'lucide-react'
-import type { OptionsFieldDef } from '@/components/block-library/edit-block-modal/types'
-import { fieldLabel } from '../field-label'
-import { FieldLabel } from '../FieldLabel'
-import { StoryPickerMultiModal } from '../StoryPickerMultiModal'
+import { useState, useRef, useEffect } from 'react';
+import { useApi } from '@/lib/swr';
+import { ChevronDown, ChevronUp, Search, GripVertical, X } from 'lucide-react';
+import type { OptionsFieldDef } from '@/components/block-library/edit-block-modal/types';
+import { fieldLabel } from '../field-label';
+import { FieldLabel } from '../FieldLabel';
+import { StoryPickerMultiModal } from '../StoryPickerMultiModal';
 
 interface Props {
-  fieldKey: string
-  def: OptionsFieldDef
-  value: string[] | undefined
-  onChange: (v: string[]) => void
-  spaceId?: string
+  fieldKey: string;
+  def: OptionsFieldDef;
+  value: string[] | undefined;
+  onChange: (v: string[]) => void;
+  spaceId?: string;
 }
 
 export function OptionsField({ fieldKey, def, value, onChange, spaceId }: Props) {
-  const isInternalStories = def.source === 'internal_stories'
-  const staticOptions = def.options ?? []
+  const isInternalStories = def.source === 'internal_stories';
+  const staticOptions = def.options ?? [];
 
-  const selected = value ?? []
-  const [open, setOpen] = useState(false)
-  const [search, setSearch] = useState('')
-  const [pending, setPending] = useState<string[]>(selected)
-  const containerRef = useRef<HTMLDivElement>(null)
-  const dragIndex = useRef<number | null>(null)
+  const selected = value ?? [];
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [pending, setPending] = useState<string[]>(selected);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const dragIndex = useRef<number | null>(null);
 
   // For internal_stories: display names keyed by story id/uuid
-  const [selectedLabels, setSelectedLabels] = useState<Record<string, string>>({})
+  const [selectedLabels, setSelectedLabels] = useState<Record<string, string>>({});
 
-  useEffect(() => { setPending(value ?? []) }, [value])
+  useEffect(() => {
+    setPending(value ?? []);
+  }, [value]);
 
   // Fetch display names for already-selected story IDs
+  const missing = isInternalStories && spaceId ? selected.filter((v) => !selectedLabels[v]) : [];
+  const storyLabelsUrl =
+    missing.length > 0
+      ? `/api/admin/spaces/${spaceId}/stories?per_page=50&by_ids=${missing.join(',')}`
+      : null;
+  const { data: storyLabelsData } = useApi<{ stories: Array<{ id: number; name: string }> }>(
+    storyLabelsUrl,
+  );
   useEffect(() => {
-    if (!isInternalStories || !selected.length || !spaceId) return
-    const missing = selected.filter(v => !selectedLabels[v])
-    if (!missing.length) return
-    const params = new URLSearchParams({ per_page: '50', by_ids: missing.join(',') })
-    fetch(`/api/admin/spaces/${spaceId}/stories?${params}`)
-      .then(r => r.json())
-      .then(data => {
-        const map: Record<string, string> = {}
-        for (const s of (data.stories ?? [])) map[String(s.id)] = s.name
-        setSelectedLabels(prev => ({ ...prev, ...map }))
-      })
-      .catch(() => {})
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isInternalStories, spaceId, selected.join(',')])
+    if (!storyLabelsData?.stories?.length) return;
+    const map: Record<string, string> = {};
+    for (const s of storyLabelsData.stories) map[String(s.id)] = s.name;
+    setSelectedLabels((prev) => ({ ...prev, ...map }));
+  }, [storyLabelsData]);
 
   useEffect(() => {
-    if (!open) return
+    if (!open) return;
     function handler(e: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false)
-        setSearch('')
+        setOpen(false);
+        setSearch('');
       }
     }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [open])
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
 
-  const filtered = staticOptions.filter(o =>
-    !search.trim() || o.name.toLowerCase().includes(search.toLowerCase())
-  )
+  const filtered = staticOptions.filter(
+    (o) => !search.trim() || o.name.toLowerCase().includes(search.toLowerCase()),
+  );
 
   function togglePending(val: string) {
-    setPending(prev =>
-      prev.includes(val) ? prev.filter(v => v !== val) : [...prev, val]
-    )
+    setPending((prev) => (prev.includes(val) ? prev.filter((v) => v !== val) : [...prev, val]));
   }
 
   function handleAdd() {
-    onChange(pending)
-    setOpen(false)
-    setSearch('')
+    onChange(pending);
+    setOpen(false);
+    setSearch('');
   }
 
   function clearAll() {
-    onChange([])
-    setPending([])
-    setSelectedLabels({})
+    onChange([]);
+    setPending([]);
+    setSelectedLabels({});
   }
 
   function removeItem(val: string) {
-    const next = selected.filter(v => v !== val)
-    onChange(next)
-    setPending(next)
+    const next = selected.filter((v) => v !== val);
+    onChange(next);
+    setPending(next);
   }
 
   function moveUp(i: number) {
-    if (i === 0) return
-    const next = [...selected]
-    ;[next[i - 1], next[i]] = [next[i], next[i - 1]]
-    onChange(next)
+    if (i === 0) return;
+    const next = [...selected];
+    [next[i - 1], next[i]] = [next[i], next[i - 1]];
+    onChange(next);
   }
 
   function moveDown(i: number) {
-    if (i === selected.length - 1) return
-    const next = [...selected]
-    ;[next[i], next[i + 1]] = [next[i + 1], next[i]]
-    onChange(next)
+    if (i === selected.length - 1) return;
+    const next = [...selected];
+    [next[i], next[i + 1]] = [next[i + 1], next[i]];
+    onChange(next);
   }
 
   function onDragStart(i: number) {
-    dragIndex.current = i
+    dragIndex.current = i;
   }
 
   function onDragOver(e: React.DragEvent, i: number) {
-    e.preventDefault()
-    const from = dragIndex.current
-    if (from === null || from === i) return
-    const next = [...selected]
-    const [item] = next.splice(from, 1)
-    next.splice(i, 0, item)
-    dragIndex.current = i
-    onChange(next)
+    e.preventDefault();
+    const from = dragIndex.current;
+    if (from === null || from === i) return;
+    const next = [...selected];
+    const [item] = next.splice(from, 1);
+    next.splice(i, 0, item);
+    dragIndex.current = i;
+    onChange(next);
   }
 
   function onDragEnd() {
-    dragIndex.current = null
+    dragIndex.current = null;
   }
 
   const orderedSelected = isInternalStories
-    ? selected.map(val => ({ value: val, name: selectedLabels[val] ?? val }))
+    ? selected.map((val) => ({ value: val, name: selectedLabels[val] ?? val }))
     : selected
-        .map(val => staticOptions.find(o => o.value === val))
+        .map((val) => staticOptions.find((o) => o.value === val))
         .filter(Boolean)
-        .map(o => ({ value: o!.value, name: o!.name }))
+        .map((o) => ({ value: o!.value, name: o!.name }));
 
   // ── internal_stories: modal-based picker ────────────────────────────────────
   if (isInternalStories) {
     return (
       <>
         <div>
-          <FieldLabel label={fieldLabel(def.display_name, fieldKey)} required={def.required} description={def.description} />
+          <FieldLabel
+            label={fieldLabel(def.display_name, fieldKey)}
+            required={def.required}
+            description={def.description}
+          />
           <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
-
             {orderedSelected.length > 0 && (
               <div className="border-b border-gray-200 dark:border-gray-700">
                 <div className="flex items-center gap-3 px-3 py-2 text-xs text-gray-500 dark:text-gray-400">
-                  <span>{orderedSelected.length} item{orderedSelected.length !== 1 ? 's' : ''}</span>
-                  <button type="button" onClick={clearAll} className="text-teal-600 dark:text-teal-400 hover:underline">
+                  <span>
+                    {orderedSelected.length} item{orderedSelected.length !== 1 ? 's' : ''}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={clearAll}
+                    className="text-teal-600 dark:text-teal-400 hover:underline"
+                  >
                     Clear selected
                   </button>
                 </div>
@@ -149,23 +158,39 @@ export function OptionsField({ fieldKey, def, value, onChange, spaceId }: Props)
                     key={opt.value}
                     draggable
                     onDragStart={() => onDragStart(i)}
-                    onDragOver={e => onDragOver(e, i)}
+                    onDragOver={(e) => onDragOver(e, i)}
                     onDragEnd={onDragEnd}
                     className="group flex items-center gap-2 px-3 py-2.5 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-grab active:cursor-grabbing select-none"
                   >
                     <GripVertical className="w-4 h-4 text-gray-300 dark:text-gray-600 flex-shrink-0" />
-                    <span className="flex-1 text-sm text-gray-800 dark:text-gray-200">{opt.name}</span>
+                    <span className="flex-1 text-sm text-gray-800 dark:text-gray-200">
+                      {opt.name}
+                    </span>
                     <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button type="button" onClick={() => removeItem(opt.value)} title="Remove"
-                        className="p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                      <button
+                        type="button"
+                        onClick={() => removeItem(opt.value)}
+                        title="Remove"
+                        className="p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                      >
                         <X className="w-3.5 h-3.5" />
                       </button>
-                      <button type="button" onClick={() => moveUp(i)} disabled={i === 0} title="Move up"
-                        className="p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-30">
+                      <button
+                        type="button"
+                        onClick={() => moveUp(i)}
+                        disabled={i === 0}
+                        title="Move up"
+                        className="p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-30"
+                      >
                         <ChevronUp className="w-3.5 h-3.5" />
                       </button>
-                      <button type="button" onClick={() => moveDown(i)} disabled={i === orderedSelected.length - 1} title="Move down"
-                        className="p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-30">
+                      <button
+                        type="button"
+                        onClick={() => moveDown(i)}
+                        disabled={i === orderedSelected.length - 1}
+                        title="Move down"
+                        className="p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-30"
+                      >
                         <ChevronDown className="w-3.5 h-3.5" />
                       </button>
                     </div>
@@ -193,27 +218,39 @@ export function OptionsField({ fieldKey, def, value, onChange, spaceId }: Props)
             useUuid={def.use_uuid}
             value={selected}
             onSelect={(values, names) => {
-              setSelectedLabels(prev => ({ ...prev, ...names }))
-              onChange(values)
+              setSelectedLabels((prev) => ({ ...prev, ...names }));
+              onChange(values);
             }}
             onClose={() => setOpen(false)}
           />
         )}
       </>
-    )
+    );
   }
 
   // ── static options: inline dropdown ─────────────────────────────────────────
   return (
     <div>
-      <FieldLabel label={fieldLabel(def.display_name, fieldKey)} required={def.required} description={def.description} />
-      <div ref={containerRef} className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
-
+      <FieldLabel
+        label={fieldLabel(def.display_name, fieldKey)}
+        required={def.required}
+        description={def.description}
+      />
+      <div
+        ref={containerRef}
+        className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden"
+      >
         {orderedSelected.length > 0 && (
           <div className="border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center gap-3 px-3 py-2 text-xs text-gray-500 dark:text-gray-400">
-              <span>{orderedSelected.length} item{orderedSelected.length !== 1 ? 's' : ''}</span>
-              <button type="button" onClick={clearAll} className="text-teal-600 dark:text-teal-400 hover:underline">
+              <span>
+                {orderedSelected.length} item{orderedSelected.length !== 1 ? 's' : ''}
+              </span>
+              <button
+                type="button"
+                onClick={clearAll}
+                className="text-teal-600 dark:text-teal-400 hover:underline"
+              >
                 Clear selected
               </button>
             </div>
@@ -222,23 +259,37 @@ export function OptionsField({ fieldKey, def, value, onChange, spaceId }: Props)
                 key={opt.value}
                 draggable
                 onDragStart={() => onDragStart(i)}
-                onDragOver={e => onDragOver(e, i)}
+                onDragOver={(e) => onDragOver(e, i)}
                 onDragEnd={onDragEnd}
                 className="group flex items-center gap-2 px-3 py-2.5 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-grab active:cursor-grabbing select-none"
               >
                 <GripVertical className="w-4 h-4 text-gray-300 dark:text-gray-600 flex-shrink-0" />
                 <span className="flex-1 text-sm text-gray-800 dark:text-gray-200">{opt.name}</span>
                 <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button type="button" onClick={() => removeItem(opt.value)} title="Remove"
-                    className="p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                  <button
+                    type="button"
+                    onClick={() => removeItem(opt.value)}
+                    title="Remove"
+                    className="p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  >
                     <X className="w-3.5 h-3.5" />
                   </button>
-                  <button type="button" onClick={() => moveUp(i)} disabled={i === 0} title="Move up"
-                    className="p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-30">
+                  <button
+                    type="button"
+                    onClick={() => moveUp(i)}
+                    disabled={i === 0}
+                    title="Move up"
+                    className="p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-30"
+                  >
                     <ChevronUp className="w-3.5 h-3.5" />
                   </button>
-                  <button type="button" onClick={() => moveDown(i)} disabled={i === orderedSelected.length - 1} title="Move down"
-                    className="p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-30">
+                  <button
+                    type="button"
+                    onClick={() => moveDown(i)}
+                    disabled={i === orderedSelected.length - 1}
+                    title="Move down"
+                    className="p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-30"
+                  >
                     <ChevronDown className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -250,7 +301,10 @@ export function OptionsField({ fieldKey, def, value, onChange, spaceId }: Props)
         {!open ? (
           <button
             type="button"
-            onClick={() => { setPending(selected); setOpen(true) }}
+            onClick={() => {
+              setPending(selected);
+              setOpen(true);
+            }}
             className="w-full flex items-center justify-between px-3 py-2.5 text-sm text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
           >
             <span>Choose one or more...</span>
@@ -261,10 +315,9 @@ export function OptionsField({ fieldKey, def, value, onChange, spaceId }: Props)
             <div className="relative border-b border-gray-200 dark:border-gray-700 ring-2 ring-teal-500 ring-inset">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
               <input
-                autoFocus
                 type="text"
                 value={search}
-                onChange={e => setSearch(e.target.value)}
+                onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search..."
                 className="w-full pl-9 pr-4 py-2.5 text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-400 outline-none"
               />
@@ -272,20 +325,22 @@ export function OptionsField({ fieldKey, def, value, onChange, spaceId }: Props)
             <div className="max-h-56 overflow-y-auto">
               {filtered.length === 0 ? (
                 <p className="px-3 py-3 text-sm text-gray-400">No options found</p>
-              ) : filtered.map(opt => (
-                <label
-                  key={opt._uid ?? opt.value}
-                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer"
-                >
-                  <input
-                    type="checkbox"
-                    checked={pending.includes(opt.value)}
-                    onChange={() => togglePending(opt.value)}
-                    className="w-4 h-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500"
-                  />
-                  <span className="text-sm text-gray-700 dark:text-gray-300">{opt.name}</span>
-                </label>
-              ))}
+              ) : (
+                filtered.map((opt) => (
+                  <label
+                    key={opt._uid ?? opt.value}
+                    className="flex items-center gap-3 px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={pending.includes(opt.value)}
+                      onChange={() => togglePending(opt.value)}
+                      className="w-4 h-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                    />
+                    <span className="text-sm text-gray-700 dark:text-gray-300">{opt.name}</span>
+                  </label>
+                ))
+              )}
             </div>
             <div className="border-t border-gray-200 dark:border-gray-700">
               <button
@@ -300,5 +355,5 @@ export function OptionsField({ fieldKey, def, value, onChange, spaceId }: Props)
         )}
       </div>
     </div>
-  )
+  );
 }

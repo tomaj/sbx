@@ -1,8 +1,9 @@
-'use client'
+'use client';
 
-import { useState, useRef, useEffect } from 'react'
-import { Pencil, GripVertical, Trash2, Plus, ChevronDown, Lock, Unlock } from 'lucide-react'
-import { FieldIcon } from './field-icon'
+import { useState, useRef } from 'react';
+import { Pencil, GripVertical, Trash2, Plus, ChevronDown, Lock, Unlock } from 'lucide-react';
+import { useApi } from '@/lib/swr';
+import { FieldIcon } from './field-icon';
 import {
   type AnyFieldDef,
   type FieldType,
@@ -14,14 +15,14 @@ import {
   type BloksFieldDef,
   ADDABLE_FIELD_TYPES,
   FIELD_TYPE_LABELS,
-} from './types'
-import type { ComponentGroup } from '../group-tree'
-import { SelectDropdown } from '@/components/ui/select-dropdown'
+} from './types';
+import type { ComponentGroup } from '../group-tree';
+import { SelectDropdown } from '@/components/ui/select-dropdown';
 
 // ─── Shared form helpers ──────────────────────────────────────────────────────
 
 function FormRow({ children }: { children: React.ReactNode }) {
-  return <div className="mb-4">{children}</div>
+  return <div className="mb-4">{children}</div>;
 }
 
 function Label({ children }: { children: React.ReactNode }) {
@@ -29,7 +30,7 @@ function Label({ children }: { children: React.ReactNode }) {
     <label className="block text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">
       {children}
     </label>
-  )
+  );
 }
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
@@ -37,12 +38,11 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
     <p className="text-sm font-semibold text-teal-600 dark:text-teal-400 mb-3 mt-5 pb-2 border-b border-gray-100 dark:border-gray-800">
       {children}
     </p>
-  )
+  );
 }
 
-
 function TooltipHint({ text }: { text: string }) {
-  const [show, setShow] = useState(false)
+  const [show, setShow] = useState(false);
   return (
     <div
       className="relative inline-flex flex-shrink-0"
@@ -59,7 +59,7 @@ function TooltipHint({ text }: { text: string }) {
         </div>
       )}
     </div>
-  )
+  );
 }
 
 function CheckboxRow({
@@ -68,10 +68,10 @@ function CheckboxRow({
   onChange,
   tooltip,
 }: {
-  label: string
-  checked: boolean
-  onChange: (v: boolean) => void
-  tooltip?: string
+  label: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  tooltip?: string;
 }) {
   return (
     <label className="flex items-center gap-2 cursor-pointer mb-2.5">
@@ -84,7 +84,7 @@ function CheckboxRow({
       <span className="text-sm text-gray-700 dark:text-gray-300">{label}</span>
       {tooltip && <TooltipHint text={tooltip} />}
     </label>
-  )
+  );
 }
 
 function NumberStepper({
@@ -92,18 +92,18 @@ function NumberStepper({
   onChange,
   min,
 }: {
-  value: number | undefined
-  onChange: (v: number | undefined) => void
-  min?: number
+  value: number | undefined;
+  onChange: (v: number | undefined) => void;
+  min?: number;
 }) {
-  const minVal = min ?? 0
+  const minVal = min ?? 0;
   return (
     <div className="flex items-center border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden w-44">
       <button
         type="button"
         onClick={() => {
-          const v = (value ?? 0) - 1
-          onChange(v < minVal ? undefined : v)
+          const v = (value ?? 0) - 1;
+          onChange(v < minVal ? undefined : v);
         }}
         className="px-3 py-2 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 border-r border-gray-200 dark:border-gray-700 text-sm font-medium flex-shrink-0"
       >
@@ -114,10 +114,13 @@ function NumberStepper({
         inputMode="numeric"
         value={value ?? ''}
         onChange={(e) => {
-          const raw = e.target.value
-          if (raw === '') { onChange(undefined); return }
-          const n = parseInt(raw, 10)
-          if (!isNaN(n)) onChange(n < minVal ? minVal : n)
+          const raw = e.target.value;
+          if (raw === '') {
+            onChange(undefined);
+            return;
+          }
+          const n = parseInt(raw, 10);
+          if (!Number.isNaN(n)) onChange(n < minVal ? minVal : n);
         }}
         className="flex-1 text-center text-sm text-gray-700 dark:text-gray-300 py-2 bg-transparent focus:outline-none min-w-0"
       />
@@ -129,46 +132,46 @@ function NumberStepper({
         +
       </button>
     </div>
-  )
+  );
 }
 
 // ─── Option list editor (for single-option / multi-options) ──────────────────
 
-type SimpleOption = { name: string; value: string; _uid?: string }
+type SimpleOption = { name: string; value: string; _uid?: string };
 
 function OptionsList({
   options,
   onChange,
 }: {
-  options: SimpleOption[]
-  onChange: (opts: SimpleOption[]) => void
+  options: SimpleOption[];
+  onChange: (opts: SimpleOption[]) => void;
 }) {
-  const dragIdx = useRef<number | null>(null)
-  const dragOverIdx = useRef<number | null>(null)
+  const dragIdx = useRef<number | null>(null);
+  const dragOverIdx = useRef<number | null>(null);
 
   function update(idx: number, field: 'name' | 'value', val: string) {
-    const next = options.map((o, i) => (i === idx ? { ...o, [field]: val } : o))
-    onChange(next)
+    const next = options.map((o, i) => (i === idx ? { ...o, [field]: val } : o));
+    onChange(next);
   }
 
   function remove(idx: number) {
-    onChange(options.filter((_, i) => i !== idx))
+    onChange(options.filter((_, i) => i !== idx));
   }
 
   function add() {
-    onChange([...options, { name: '', value: '', _uid: `uid_${Date.now()}` }])
+    onChange([...options, { name: '', value: '', _uid: `uid_${Date.now()}` }]);
   }
 
   function handleDrop() {
-    const from = dragIdx.current
-    const to = dragOverIdx.current
-    if (from === null || to === null || from === to) return
-    const next = [...options]
-    const [moved] = next.splice(from, 1)
-    next.splice(to, 0, moved)
-    onChange(next)
-    dragIdx.current = null
-    dragOverIdx.current = null
+    const from = dragIdx.current;
+    const to = dragOverIdx.current;
+    if (from === null || to === null || from === to) return;
+    const next = [...options];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    onChange(next);
+    dragIdx.current = null;
+    dragOverIdx.current = null;
   }
 
   return (
@@ -184,8 +187,13 @@ function OptionsList({
         <div
           key={opt._uid ?? idx}
           draggable
-          onDragStart={() => { dragIdx.current = idx }}
-          onDragOver={(e) => { e.preventDefault(); dragOverIdx.current = idx }}
+          onDragStart={() => {
+            dragIdx.current = idx;
+          }}
+          onDragOver={(e) => {
+            e.preventDefault();
+            dragOverIdx.current = idx;
+          }}
           onDrop={handleDrop}
           className="flex items-center gap-1 px-2 py-1.5 border-b border-gray-100 dark:border-gray-800/60 last:border-0"
         >
@@ -224,7 +232,7 @@ function OptionsList({
         </button>
       </div>
     </div>
-  )
+  );
 }
 
 // ─── Type-specific options ────────────────────────────────────────────────────
@@ -233,7 +241,12 @@ function TextOptions({ def, onChange }: { def: any; onChange: (patch: any) => vo
   return (
     <>
       <SectionTitle>Text Field Options</SectionTitle>
-      <CheckboxRow label="Enable RTL" checked={!!def.rtl} onChange={(v) => onChange({ rtl: v })} tooltip="Writing starts from the right of the page and continues to the left." />
+      <CheckboxRow
+        label="Enable RTL"
+        checked={!!def.rtl}
+        onChange={(v) => onChange({ rtl: v })}
+        tooltip="Writing starts from the right of the page and continues to the left."
+      />
       <FormRow>
         <Label>Default value</Label>
         <textarea
@@ -245,7 +258,11 @@ function TextOptions({ def, onChange }: { def: any; onChange: (patch: any) => vo
       </FormRow>
       <FormRow>
         <Label>Maximum characters</Label>
-        <NumberStepper value={def.max_length} onChange={(v) => onChange({ max_length: v })} min={0} />
+        <NumberStepper
+          value={def.max_length}
+          onChange={(v) => onChange({ max_length: v })}
+          min={0}
+        />
       </FormRow>
       <FormRow>
         <Label>Regex validation</Label>
@@ -256,20 +273,31 @@ function TextOptions({ def, onChange }: { def: any; onChange: (patch: any) => vo
           placeholder="^[a-z]+$"
           className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-mono bg-white dark:bg-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
         />
-        <p className="mt-1 text-xs text-gray-400">Validates the field value against this regular expression</p>
+        <p className="mt-1 text-xs text-gray-400">
+          Validates the field value against this regular expression
+        </p>
       </FormRow>
     </>
-  )
+  );
 }
 
 function TextareaOptions({ def, onChange }: { def: any; onChange: (patch: any) => void }) {
   return (
     <>
       <SectionTitle>Textarea Field Options</SectionTitle>
-      <CheckboxRow label="Enable RTL" checked={!!def.rtl} onChange={(v) => onChange({ rtl: v })} tooltip="Writing starts from the right of the page and continues to the left." />
+      <CheckboxRow
+        label="Enable RTL"
+        checked={!!def.rtl}
+        onChange={(v) => onChange({ rtl: v })}
+        tooltip="Writing starts from the right of the page and continues to the left."
+      />
       <FormRow>
         <Label>Maximum characters</Label>
-        <NumberStepper value={def.max_length} onChange={(v) => onChange({ max_length: v })} min={0} />
+        <NumberStepper
+          value={def.max_length}
+          onChange={(v) => onChange({ max_length: v })}
+          min={0}
+        />
       </FormRow>
       <FormRow>
         <Label>Default value</Label>
@@ -289,10 +317,12 @@ function TextareaOptions({ def, onChange }: { def: any; onChange: (patch: any) =
           placeholder="^[a-z]+$"
           className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-mono bg-white dark:bg-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
         />
-        <p className="mt-1 text-xs text-gray-400">Validates the field value against this regular expression</p>
+        <p className="mt-1 text-xs text-gray-400">
+          Validates the field value against this regular expression
+        </p>
       </FormRow>
     </>
-  )
+  );
 }
 
 function RichtextOptions({ def, onChange }: { def: any; onChange: (patch: any) => void }) {
@@ -301,7 +331,11 @@ function RichtextOptions({ def, onChange }: { def: any; onChange: (patch: any) =
       <SectionTitle>Richtext Field Options</SectionTitle>
       <FormRow>
         <Label>Maximum characters</Label>
-        <NumberStepper value={def.max_length} onChange={(v) => onChange({ max_length: v })} min={0} />
+        <NumberStepper
+          value={def.max_length}
+          onChange={(v) => onChange({ max_length: v })}
+          min={0}
+        />
       </FormRow>
       <FormRow>
         <Label>Default value</Label>
@@ -322,20 +356,44 @@ function RichtextOptions({ def, onChange }: { def: any; onChange: (patch: any) =
         />
       </FormRow>
     </>
-  )
+  );
 }
 
 function MarkdownOptions({ def, onChange }: { def: any; onChange: (patch: any) => void }) {
   return (
     <>
       <SectionTitle>Markdown Field Options</SectionTitle>
-      <CheckboxRow label="Enable RTL" checked={!!def.rtl} onChange={(v) => onChange({ rtl: v })} tooltip="Writing starts from the right of the page and continues to the left." />
-      <CheckboxRow label="Rich-text as default" checked={!!def.rich_text_as_default} onChange={(v) => onChange({ rich_text_as_default: v })} tooltip="When enabled, the editor opens in rich-text mode by default instead of markdown mode." />
-      <CheckboxRow label="Allow empty paragraphs" checked={!!def.allow_empty_paragraphs} onChange={(v) => onChange({ allow_empty_paragraphs: v })} tooltip="Allows the field to contain paragraphs with no content." />
-      <CheckboxRow label="Customize toolbar items" checked={!!def.customize_toolbar} onChange={(v) => onChange({ customize_toolbar: v })} tooltip="Select which toolbar buttons are available in the editor." />
+      <CheckboxRow
+        label="Enable RTL"
+        checked={!!def.rtl}
+        onChange={(v) => onChange({ rtl: v })}
+        tooltip="Writing starts from the right of the page and continues to the left."
+      />
+      <CheckboxRow
+        label="Rich-text as default"
+        checked={!!def.rich_text_as_default}
+        onChange={(v) => onChange({ rich_text_as_default: v })}
+        tooltip="When enabled, the editor opens in rich-text mode by default instead of markdown mode."
+      />
+      <CheckboxRow
+        label="Allow empty paragraphs"
+        checked={!!def.allow_empty_paragraphs}
+        onChange={(v) => onChange({ allow_empty_paragraphs: v })}
+        tooltip="Allows the field to contain paragraphs with no content."
+      />
+      <CheckboxRow
+        label="Customize toolbar items"
+        checked={!!def.customize_toolbar}
+        onChange={(v) => onChange({ customize_toolbar: v })}
+        tooltip="Select which toolbar buttons are available in the editor."
+      />
       <FormRow>
         <Label>Maximum characters</Label>
-        <NumberStepper value={def.max_length} onChange={(v) => onChange({ max_length: v })} min={0} />
+        <NumberStepper
+          value={def.max_length}
+          onChange={(v) => onChange({ max_length: v })}
+          min={0}
+        />
       </FormRow>
       <FormRow>
         <Label>Default value</Label>
@@ -347,7 +405,7 @@ function MarkdownOptions({ def, onChange }: { def: any; onChange: (patch: any) =
         />
       </FormRow>
     </>
-  )
+  );
 }
 
 function NumberOptions({ def, onChange }: { def: any; onChange: (patch: any) => void }) {
@@ -373,7 +431,9 @@ function NumberOptions({ def, onChange }: { def: any; onChange: (patch: any) => 
       </FormRow>
       <FormRow>
         <div className="flex items-center gap-1.5 mb-1">
-          <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">Number of decimals</span>
+          <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+            Number of decimals
+          </span>
           <TooltipHint text="The number of decimal places is the number of digits that appear after the decimal point." />
         </div>
         <NumberStepper value={def.decimals} onChange={(v) => onChange({ decimals: v })} min={0} />
@@ -385,17 +445,23 @@ function NumberOptions({ def, onChange }: { def: any; onChange: (patch: any) => 
           <TooltipHint text="Specifies the interval between numbers in the input field." />
         </div>
         <NumberStepper value={def.steps} onChange={(v) => onChange({ steps: v })} min={0} />
-        <p className="mt-1 text-xs text-gray-400">{def.steps != null ? def.steps : '1, 2, 3, ...'}</p>
+        <p className="mt-1 text-xs text-gray-400">
+          {def.steps != null ? def.steps : '1, 2, 3, ...'}
+        </p>
       </FormRow>
     </>
-  )
+  );
 }
 
 function DatetimeOptions({ def, onChange }: { def: any; onChange: (patch: any) => void }) {
   return (
     <>
       <SectionTitle>Date/Time Field Options</SectionTitle>
-      <CheckboxRow label="Disable time selection" checked={!!def.disable_time} onChange={(v) => onChange({ disable_time: v })} />
+      <CheckboxRow
+        label="Disable time selection"
+        checked={!!def.disable_time}
+        onChange={(v) => onChange({ disable_time: v })}
+      />
       <FormRow>
         <Label>Default value</Label>
         <input
@@ -407,14 +473,18 @@ function DatetimeOptions({ def, onChange }: { def: any; onChange: (patch: any) =
         />
       </FormRow>
     </>
-  )
+  );
 }
 
 function BooleanOptions({ def, onChange }: { def: any; onChange: (patch: any) => void }) {
   return (
     <>
       <SectionTitle>Boolean Field Options</SectionTitle>
-      <CheckboxRow label="Inline label" checked={!!def.inline_label} onChange={(v) => onChange({ inline_label: v })} />
+      <CheckboxRow
+        label="Inline label"
+        checked={!!def.inline_label}
+        onChange={(v) => onChange({ inline_label: v })}
+      />
       <FormRow>
         <Label>Default value</Label>
         <button
@@ -432,7 +502,7 @@ function BooleanOptions({ def, onChange }: { def: any; onChange: (patch: any) =>
         </button>
       </FormRow>
     </>
-  )
+  );
 }
 
 const SOURCE_OPTIONS = [
@@ -441,14 +511,12 @@ const SOURCE_OPTIONS = [
   { value: 'internal', label: 'Datasource' },
   { value: 'external_datasource', label: 'External JSON' },
   { value: 'internal_languages', label: 'Internal languages' },
-]
+];
 
 function SourceSubCard({ children }: { children: React.ReactNode }) {
   return (
-    <div className="bg-gray-50 dark:bg-gray-800/60 rounded-xl p-4 mb-4 space-y-3">
-      {children}
-    </div>
-  )
+    <div className="bg-gray-50 dark:bg-gray-800/60 rounded-xl p-4 mb-4 space-y-3">{children}</div>
+  );
 }
 
 function OptionSourceConfig({
@@ -456,58 +524,49 @@ function OptionSourceConfig({
   onChange,
   spaceId,
 }: {
-  def: OptionFieldDef | OptionsFieldDef
-  onChange: (patch: any) => void
-  spaceId?: string
+  def: OptionFieldDef | OptionsFieldDef;
+  onChange: (patch: any) => void;
+  spaceId?: string;
 }) {
-  const source = def.source ?? 'self'
-  const [datasources, setDatasources] = useState<Array<{ slug: string; name: string }>>([])
-  const [components, setComponents] = useState<Array<{ name: string }>>([])
-  const [loadingDS, setLoadingDS] = useState(false)
-  const [loadingCT, setLoadingCT] = useState(false)
+  const source = def.source ?? 'self';
 
-  useEffect(() => {
-    if (source !== 'internal' || !spaceId) return
-    setLoadingDS(true)
-    fetch(`/api/admin/spaces/${spaceId}/datasources`)
-      .then((r) => r.json())
-      .then((data) => setDatasources(data.datasources ?? []))
-      .finally(() => setLoadingDS(false))
-  }, [source, spaceId])
+  const { data: datasourcesData, isLoading: loadingDS } = useApi<{
+    datasources: Array<{ slug: string; name: string }>;
+  }>(source === 'internal' && spaceId ? `/api/admin/spaces/${spaceId}/datasources` : null);
 
-  useEffect(() => {
-    if (source !== 'internal_stories' || !spaceId) return
-    setLoadingCT(true)
-    fetch(`/api/admin/spaces/${spaceId}/components?per_page=500`)
-      .then((r) => r.json())
-      .then((data) => setComponents(data.components ?? []))
-      .finally(() => setLoadingCT(false))
-  }, [source, spaceId])
+  const { data: componentsData, isLoading: loadingCT } = useApi<{
+    components: Array<{ name: string }>;
+  }>(
+    source === 'internal_stories' && spaceId
+      ? `/api/admin/spaces/${spaceId}/components?per_page=500`
+      : null,
+  );
 
-  const selectedCT: string[] = def.filter_content_type ?? []
-  const ctItems = components.map((c) => ({ id: c.name, label: c.name }))
+  const datasources = datasourcesData?.datasources ?? [];
+  const components = componentsData?.components ?? [];
+  const selectedCT: string[] = def.filter_content_type ?? [];
+  const ctItems = components.map((c) => ({ id: c.name, label: c.name }));
 
   if (source === 'self') {
     return (
       <SourceSubCard>
         <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">Add options</p>
-        <OptionsList
-          options={def.options ?? []}
-          onChange={(opts) => onChange({ options: opts })}
-        />
+        <OptionsList options={def.options ?? []} onChange={(opts) => onChange({ options: opts })} />
         <CheckboxRow
           label="Hide empty option"
           checked={!!def.exclude_empty_option}
           onChange={(v) => onChange({ exclude_empty_option: v })}
         />
       </SourceSubCard>
-    )
+    );
   }
 
   if (source === 'internal') {
     return (
       <SourceSubCard>
-        <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">Internal datasource</p>
+        <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+          Internal datasource
+        </p>
         <SelectDropdown
           value={def.datasource_slug ?? null}
           onChange={(v) => onChange({ datasource_slug: v ?? undefined })}
@@ -516,7 +575,7 @@ function OptionSourceConfig({
           loading={loadingDS}
         />
       </SourceSubCard>
-    )
+    );
   }
 
   if (source === 'internal_stories') {
@@ -524,7 +583,9 @@ function OptionSourceConfig({
       <SourceSubCard>
         <div>
           <div className="flex items-center gap-1.5 mb-1">
-            <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">Path to folder of stories</p>
+            <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+              Path to folder of stories
+            </p>
             <TooltipHint text="Restrict which stories can be selected by specifying a folder path. Example: categories/" />
           </div>
           <input
@@ -536,13 +597,21 @@ function OptionSourceConfig({
           />
         </div>
         <div>
-          <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-1">Restrict to content type</p>
+          <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-1">
+            Restrict to content type
+          </p>
           <MultiSelectPicker
             placeholder="Choose..."
             selectedIds={selectedCT}
             items={ctItems}
             loading={loadingCT}
-            onToggle={(id) => onChange({ filter_content_type: selectedCT.includes(id) ? selectedCT.filter((x) => x !== id) : [...selectedCT, id] })}
+            onToggle={(id) =>
+              onChange({
+                filter_content_type: selectedCT.includes(id)
+                  ? selectedCT.filter((x) => x !== id)
+                  : [...selectedCT, id],
+              })
+            }
             onClearAll={() => onChange({ filter_content_type: [] })}
           />
         </div>
@@ -558,23 +627,33 @@ function OptionSourceConfig({
             <TooltipHint text="Controls how stories are displayed in the selection dropdown." />
           </div>
           <div className="grid grid-cols-2 gap-3">
-            {([
-              { value: 'link', label: 'Entry link', icon: (
-                <svg viewBox="0 0 80 48" className="w-full h-8 mb-1" fill="none">
-                  <rect x="4" y="8" width="72" height="32" rx="4" fill="#e5e7eb" />
-                  <rect x="10" y="16" width="40" height="4" rx="2" fill="#9ca3af" />
-                  <rect x="10" y="24" width="28" height="3" rx="1.5" fill="#d1d5db" />
-                </svg>
-              )},
-              { value: 'card', label: 'Entry card', icon: (
-                <svg viewBox="0 0 80 48" className="w-full h-8 mb-1" fill="none">
-                  <rect x="4" y="4" width="72" height="40" rx="4" fill="#e5e7eb" />
-                  <rect x="10" y="10" width="35" height="4" rx="2" fill="#9ca3af" />
-                  <rect x="10" y="18" width="25" height="3" rx="1.5" fill="#d1d5db" />
-                  <rect x="50" y="10" width="18" height="22" rx="2" fill="#d1d5db" />
-                </svg>
-              )},
-            ] as const).map(({ value, label, icon }) => (
+            {(
+              [
+                {
+                  value: 'link',
+                  label: 'Entry link',
+                  icon: (
+                    <svg viewBox="0 0 80 48" className="w-full h-8 mb-1" fill="none">
+                      <rect x="4" y="8" width="72" height="32" rx="4" fill="#e5e7eb" />
+                      <rect x="10" y="16" width="40" height="4" rx="2" fill="#9ca3af" />
+                      <rect x="10" y="24" width="28" height="3" rx="1.5" fill="#d1d5db" />
+                    </svg>
+                  ),
+                },
+                {
+                  value: 'card',
+                  label: 'Entry card',
+                  icon: (
+                    <svg viewBox="0 0 80 48" className="w-full h-8 mb-1" fill="none">
+                      <rect x="4" y="4" width="72" height="40" rx="4" fill="#e5e7eb" />
+                      <rect x="10" y="10" width="35" height="4" rx="2" fill="#9ca3af" />
+                      <rect x="10" y="18" width="25" height="3" rx="1.5" fill="#d1d5db" />
+                      <rect x="50" y="10" width="18" height="22" rx="2" fill="#d1d5db" />
+                    </svg>
+                  ),
+                },
+              ] as const
+            ).map(({ value, label, icon }) => (
               <button
                 key={value}
                 type="button"
@@ -586,7 +665,9 @@ function OptionSourceConfig({
                 }`}
               >
                 {icon}
-                <span className={`text-sm font-medium ${(def.appearance ?? 'link') === value ? 'text-gray-900 dark:text-gray-100' : 'text-gray-400'}`}>
+                <span
+                  className={`text-sm font-medium ${(def.appearance ?? 'link') === value ? 'text-gray-900 dark:text-gray-100' : 'text-gray-400'}`}
+                >
                   {label}
                 </span>
               </button>
@@ -594,7 +675,7 @@ function OptionSourceConfig({
           </div>
         </div>
       </SourceSubCard>
-    )
+    );
   }
 
   if (source === 'external_datasource') {
@@ -615,10 +696,10 @@ function OptionSourceConfig({
           onChange={(v) => onChange({ exclude_empty_option: v })}
         />
       </SourceSubCard>
-    )
+    );
   }
 
-  return null
+  return null;
 }
 
 function SourceSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
@@ -632,7 +713,7 @@ function SourceSelect({ value, onChange }: { value: string; onChange: (v: string
         placeholder=""
       />
     </FormRow>
-  )
+  );
 }
 
 function SingleOptionOptions({
@@ -640,9 +721,9 @@ function SingleOptionOptions({
   onChange,
   spaceId,
 }: {
-  def: OptionFieldDef
-  onChange: (patch: any) => void
-  spaceId?: string
+  def: OptionFieldDef;
+  onChange: (patch: any) => void;
+  spaceId?: string;
 }) {
   return (
     <>
@@ -659,7 +740,7 @@ function SingleOptionOptions({
         />
       </FormRow>
     </>
-  )
+  );
 }
 
 function MultiOptionsOptions({
@@ -667,9 +748,9 @@ function MultiOptionsOptions({
   onChange,
   spaceId,
 }: {
-  def: OptionsFieldDef
-  onChange: (patch: any) => void
-  spaceId?: string
+  def: OptionsFieldDef;
+  onChange: (patch: any) => void;
+  spaceId?: string;
 }) {
   return (
     <>
@@ -685,7 +766,7 @@ function MultiOptionsOptions({
         <NumberStepper value={def.max} onChange={(v) => onChange({ max: v })} min={0} />
       </FormRow>
     </>
-  )
+  );
 }
 
 function ReferencesOptions({
@@ -693,24 +774,17 @@ function ReferencesOptions({
   onChange,
   spaceId,
 }: {
-  def: any
-  onChange: (patch: any) => void
-  spaceId?: string
+  def: any;
+  onChange: (patch: any) => void;
+  spaceId?: string;
 }) {
-  const [components, setComponents] = useState<Array<{ name: string }>>([])
-  const [loading, setLoading] = useState(false)
+  const { data: componentsData, isLoading: loading } = useApi<{
+    components: Array<{ name: string }>;
+  }>(spaceId ? `/api/admin/spaces/${spaceId}/components?per_page=500` : null);
 
-  useEffect(() => {
-    if (!spaceId) return
-    setLoading(true)
-    fetch(`/api/admin/spaces/${spaceId}/components?per_page=500`)
-      .then((r) => r.json())
-      .then((data) => setComponents(data.components ?? []))
-      .finally(() => setLoading(false))
-  }, [spaceId])
-
-  const componentItems = components.map((c) => ({ id: c.name, label: c.name }))
-  const selected: string[] = def.component_whitelist ?? []
+  const components = componentsData?.components ?? [];
+  const componentItems = components.map((c) => ({ id: c.name, label: c.name }));
+  const selected: string[] = def.component_whitelist ?? [];
 
   return (
     <>
@@ -734,7 +808,13 @@ function ReferencesOptions({
             selectedIds={selected}
             items={componentItems}
             loading={loading}
-            onToggle={(id) => onChange({ component_whitelist: selected.includes(id) ? selected.filter((x: string) => x !== id) : [...selected, id] })}
+            onToggle={(id) =>
+              onChange({
+                component_whitelist: selected.includes(id)
+                  ? selected.filter((x: string) => x !== id)
+                  : [...selected, id],
+              })
+            }
             onClearAll={() => onChange({ component_whitelist: [] })}
           />
         </FormRow>
@@ -759,7 +839,7 @@ function ReferencesOptions({
         </p>
       </FormRow>
     </>
-  )
+  );
 }
 
 const FILETYPES = [
@@ -767,47 +847,49 @@ const FILETYPES = [
   { value: 'videos', label: 'Videos' },
   { value: 'audio', label: 'Audio' },
   { value: 'text_documents', label: 'Text-Documents' },
-]
+];
 
 function AssetOptions({
   def,
   onChange,
   spaceId,
 }: {
-  def: any
-  onChange: (patch: any) => void
-  spaceId?: string
+  def: any;
+  onChange: (patch: any) => void;
+  spaceId?: string;
 }) {
-  const filetypes: string[] = def.filetypes ?? []
-  const isAny = filetypes.length === 0
-  const [folders, setFolders] = useState<Array<{ id: number; name: string }>>([])
-  const [loadingFolders, setLoadingFolders] = useState(false)
+  const filetypes: string[] = def.filetypes ?? [];
+  const isAny = filetypes.length === 0;
 
-  useEffect(() => {
-    if (!spaceId) return
-    setLoadingFolders(true)
-    fetch(`/api/admin/spaces/${spaceId}/assets/folders`)
-      .then((r) => r.json())
-      .then((data) => setFolders(data.asset_folders ?? data.folders ?? []))
-      .finally(() => setLoadingFolders(false))
-  }, [spaceId])
+  const { data: foldersData, isLoading: loadingFolders } = useApi<{
+    asset_folders?: Array<{ id: number; name: string }>;
+    folders?: Array<{ id: number; name: string }>;
+  }>(spaceId ? `/api/admin/spaces/${spaceId}/assets/folders` : null);
+
+  const folders = foldersData?.asset_folders ?? foldersData?.folders ?? [];
 
   function toggleFiletype(value: string) {
     if (filetypes.includes(value)) {
-      onChange({ filetypes: filetypes.filter((f: string) => f !== value) })
+      onChange({ filetypes: filetypes.filter((f: string) => f !== value) });
     } else {
-      onChange({ filetypes: [...filetypes, value] })
+      onChange({ filetypes: [...filetypes, value] });
     }
   }
 
   return (
     <>
       <SectionTitle>Asset Field Options</SectionTitle>
-      <CheckboxRow label="Allow external URL" checked={!!def.allow_external_url} onChange={(v) => onChange({ allow_external_url: v })} />
+      <CheckboxRow
+        label="Allow external URL"
+        checked={!!def.allow_external_url}
+        onChange={(v) => onChange({ allow_external_url: v })}
+      />
       <FormRow>
         <Label>Filetypes</Label>
         <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-          <label className={`flex items-center gap-2 px-3 py-2 cursor-pointer ${isAny ? 'bg-gray-50 dark:bg-gray-800' : ''}`}>
+          <label
+            className={`flex items-center gap-2 px-3 py-2 cursor-pointer ${isAny ? 'bg-gray-50 dark:bg-gray-800' : ''}`}
+          >
             <input
               type="checkbox"
               checked={isAny}
@@ -817,7 +899,10 @@ function AssetOptions({
             <span className="text-sm text-gray-700 dark:text-gray-300">Any filetype</span>
           </label>
           {FILETYPES.map((ft) => (
-            <label key={ft.value} className="flex items-center gap-2 px-3 py-2 cursor-pointer border-t border-gray-100 dark:border-gray-800">
+            <label
+              key={ft.value}
+              className="flex items-center gap-2 px-3 py-2 cursor-pointer border-t border-gray-100 dark:border-gray-800"
+            >
               <input
                 type="checkbox"
                 checked={filetypes.includes(ft.value)}
@@ -840,7 +925,7 @@ function AssetOptions({
         />
       </FormRow>
     </>
-  )
+  );
 }
 
 function LinkOptions({
@@ -848,33 +933,46 @@ function LinkOptions({
   onChange,
   spaceId,
 }: {
-  def: any
-  onChange: (patch: any) => void
-  spaceId?: string
+  def: any;
+  onChange: (patch: any) => void;
+  spaceId?: string;
 }) {
-  const [components, setComponents] = useState<Array<{ name: string }>>([])
-  const [loading, setLoading] = useState(false)
+  const { data: componentsData, isLoading: loading } = useApi<{
+    components: Array<{ name: string }>;
+  }>(spaceId ? `/api/admin/spaces/${spaceId}/components?per_page=500` : null);
 
-  useEffect(() => {
-    if (!spaceId) return
-    setLoading(true)
-    fetch(`/api/admin/spaces/${spaceId}/components?per_page=500`)
-      .then((r) => r.json())
-      .then((data) => setComponents(data.components ?? []))
-      .finally(() => setLoading(false))
-  }, [spaceId])
-
-  const componentItems = components.map((c) => ({ id: c.name, label: c.name }))
-  const selected: string[] = def.component_whitelist ?? []
+  const components = componentsData?.components ?? [];
+  const componentItems = components.map((c) => ({ id: c.name, label: c.name }));
+  const selected: string[] = def.component_whitelist ?? [];
 
   return (
     <>
       <SectionTitle>Link Field Options</SectionTitle>
-      <CheckboxRow label="Enable email field" checked={!!def.email_link_type} onChange={(v) => onChange({ email_link_type: v })} />
-      <CheckboxRow label="Enable asset selection" checked={!!def.asset_link_type} onChange={(v) => onChange({ asset_link_type: v })} />
-      <CheckboxRow label="Enable anchor field on internal link" checked={!!def.show_anchor} onChange={(v) => onChange({ show_anchor: v })} />
-      <CheckboxRow label="Allow links to be open in a new tab" checked={!!def.allow_target_blank} onChange={(v) => onChange({ allow_target_blank: v })} />
-      <CheckboxRow label="Enable custom attributes" checked={!!def.allow_custom_attributes} onChange={(v) => onChange({ allow_custom_attributes: v })} />
+      <CheckboxRow
+        label="Enable email field"
+        checked={!!def.email_link_type}
+        onChange={(v) => onChange({ email_link_type: v })}
+      />
+      <CheckboxRow
+        label="Enable asset selection"
+        checked={!!def.asset_link_type}
+        onChange={(v) => onChange({ asset_link_type: v })}
+      />
+      <CheckboxRow
+        label="Enable anchor field on internal link"
+        checked={!!def.show_anchor}
+        onChange={(v) => onChange({ show_anchor: v })}
+      />
+      <CheckboxRow
+        label="Allow links to be open in a new tab"
+        checked={!!def.allow_target_blank}
+        onChange={(v) => onChange({ allow_target_blank: v })}
+      />
+      <CheckboxRow
+        label="Enable custom attributes"
+        checked={!!def.allow_custom_attributes}
+        onChange={(v) => onChange({ allow_custom_attributes: v })}
+      />
       <CheckboxRow
         label="Restrict to content types"
         checked={!!def.restrict_content_types}
@@ -888,7 +986,13 @@ function LinkOptions({
             selectedIds={selected}
             items={componentItems}
             loading={loading}
-            onToggle={(id) => onChange({ component_whitelist: selected.includes(id) ? selected.filter((x: string) => x !== id) : [...selected, id] })}
+            onToggle={(id) =>
+              onChange({
+                component_whitelist: selected.includes(id)
+                  ? selected.filter((x: string) => x !== id)
+                  : [...selected, id],
+              })
+            }
             onClearAll={() => onChange({ component_whitelist: [] })}
           />
         </FormRow>
@@ -913,7 +1017,7 @@ function LinkOptions({
         </p>
       </FormRow>
     </>
-  )
+  );
 }
 
 function GroupOptions({
@@ -922,19 +1026,19 @@ function GroupOptions({
   currentKey,
   onChange,
 }: {
-  def: any
-  allFields: WorkingField[]
-  currentKey: string
-  onChange: (patch: any) => void
+  def: any;
+  allFields: WorkingField[];
+  currentKey: string;
+  onChange: (patch: any) => void;
 }) {
-  const selectedKeys: string[] = def.keys ?? []
-  const availableFields = allFields.filter((f) => f.key !== currentKey && f.def.type !== 'tab')
+  const selectedKeys: string[] = def.keys ?? [];
+  const availableFields = allFields.filter((f) => f.key !== currentKey && f.def.type !== 'tab');
 
   function toggle(key: string) {
     if (selectedKeys.includes(key)) {
-      onChange({ keys: selectedKeys.filter((k) => k !== key) })
+      onChange({ keys: selectedKeys.filter((k) => k !== key) });
     } else {
-      onChange({ keys: [...selectedKeys, key] })
+      onChange({ keys: [...selectedKeys, key] });
     }
   }
 
@@ -965,19 +1069,23 @@ function GroupOptions({
         </div>
       )}
     </>
-  )
+  );
 }
 
 // ─── Field Conditions ─────────────────────────────────────────────────────────
 
-const VALIDATION_OPTIONS: Array<{ value: FieldConditionRule['validation']; label: string; hasValue: boolean }> = [
+const VALIDATION_OPTIONS: Array<{
+  value: FieldConditionRule['validation'];
+  label: string;
+  hasValue: boolean;
+}> = [
   { value: 'empty', label: 'Is empty', hasValue: false },
   { value: 'not_empty', label: 'Is not empty', hasValue: false },
   { value: 'equal', label: 'Is equal to', hasValue: true },
   { value: 'not_equal', label: 'Is not equal to', hasValue: true },
   { value: 'greater', label: 'Is greater than', hasValue: true },
   { value: 'less', label: 'Is less than', hasValue: true },
-]
+];
 
 function FieldConditionsSection({
   conditions,
@@ -985,29 +1093,31 @@ function FieldConditionsSection({
   currentKey,
   onChange,
 }: {
-  conditions: FieldConditions | undefined
-  allFields: WorkingField[]
-  currentKey: string
-  onChange: (c: FieldConditions | undefined) => void
+  conditions: FieldConditions | undefined;
+  allFields: WorkingField[];
+  currentKey: string;
+  onChange: (c: FieldConditions | undefined) => void;
 }) {
-  const availableFields = allFields.filter((f) => f.key !== currentKey && f.def.type !== 'tab' && f.def.type !== 'section')
-  const rules = conditions?.rule_conditions ?? []
+  const availableFields = allFields.filter(
+    (f) => f.key !== currentKey && f.def.type !== 'tab' && f.def.type !== 'section',
+  );
+  const rules = conditions?.rule_conditions ?? [];
 
   function addRule() {
-    const firstField = availableFields[0]?.key ?? ''
-    const newRule: FieldConditionRule = { field: firstField, validation: 'not_empty' }
+    const firstField = availableFields[0]?.key ?? '';
+    const newRule: FieldConditionRule = { field: firstField, validation: 'not_empty' };
     onChange({
       validation: conditions?.validation ?? 'any',
       rule_conditions: [...rules, newRule],
-    })
+    });
   }
 
   function removeRule(idx: number) {
-    const next = rules.filter((_, i) => i !== idx)
+    const next = rules.filter((_, i) => i !== idx);
     if (next.length === 0) {
-      onChange(undefined)
+      onChange(undefined);
     } else {
-      onChange({ validation: conditions!.validation, rule_conditions: next })
+      onChange({ validation: conditions!.validation, rule_conditions: next });
     }
   }
 
@@ -1015,11 +1125,11 @@ function FieldConditionsSection({
     onChange({
       validation: conditions!.validation,
       rule_conditions: rules.map((r, i) => (i === idx ? { ...r, ...patch } : r)),
-    })
+    });
   }
 
   function setMode(v: 'any' | 'all') {
-    onChange({ validation: v, rule_conditions: rules })
+    onChange({ validation: v, rule_conditions: rules });
   }
 
   return (
@@ -1034,7 +1144,10 @@ function FieldConditionsSection({
               compact
               value={conditions!.validation}
               onChange={(v) => setMode((v ?? 'any') as 'any' | 'all')}
-              options={[{ value: 'any', label: 'any' }, { value: 'all', label: 'all' }]}
+              options={[
+                { value: 'any', label: 'any' },
+                { value: 'all', label: 'all' },
+              ]}
             />
             <span>of the following conditions are true</span>
           </div>
@@ -1043,7 +1156,7 @@ function FieldConditionsSection({
 
       <div className="space-y-2 mb-2">
         {rules.map((rule, idx) => {
-          const valOpt = VALIDATION_OPTIONS.find((o) => o.value === rule.validation)
+          const valOpt = VALIDATION_OPTIONS.find((o) => o.value === rule.validation);
           return (
             <div key={idx} className="flex items-start gap-2">
               <span className="text-xs text-gray-400 w-5 pt-2.5 flex-shrink-0 text-right">
@@ -1056,12 +1169,20 @@ function FieldConditionsSection({
                   options={
                     availableFields.length === 0
                       ? [{ value: '', label: 'No fields available' }]
-                      : availableFields.map((f) => ({ value: f.key, label: (f.def as any).display_name || f.key }))
+                      : availableFields.map((f) => ({
+                          value: f.key,
+                          label: (f.def as any).display_name || f.key,
+                        }))
                   }
                 />
                 <SelectDropdown
                   value={rule.validation}
-                  onChange={(v) => updateRule(idx, { validation: (v ?? 'empty') as FieldConditionRule['validation'], value: undefined })}
+                  onChange={(v) =>
+                    updateRule(idx, {
+                      validation: (v ?? 'empty') as FieldConditionRule['validation'],
+                      value: undefined,
+                    })
+                  }
                   options={VALIDATION_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
                 />
                 {valOpt?.hasValue && (
@@ -1082,7 +1203,7 @@ function FieldConditionsSection({
                 <Trash2 className="w-4 h-4" />
               </button>
             </div>
-          )
+          );
         })}
       </div>
 
@@ -1095,12 +1216,12 @@ function FieldConditionsSection({
         Add a condition
       </button>
     </>
-  )
+  );
 }
 
 // ─── Bloks options ────────────────────────────────────────────────────────────
 
-type BloksTab = 'blocks' | 'folders' | 'tags'
+type BloksTab = 'blocks' | 'folders' | 'tags';
 
 function MultiSelectPicker({
   placeholder,
@@ -1111,28 +1232,33 @@ function MultiSelectPicker({
   onClearAll,
   renderItem,
 }: {
-  placeholder: string
-  selectedIds: string[]
-  items: Array<{ id: string; label: string; sublabel?: string }>
-  loading?: boolean
-  onToggle: (id: string) => void
-  onClearAll: () => void
-  renderItem?: (item: { id: string; label: string; sublabel?: string }) => React.ReactNode
+  placeholder: string;
+  selectedIds: string[];
+  items: Array<{ id: string; label: string; sublabel?: string }>;
+  loading?: boolean;
+  onToggle: (id: string) => void;
+  onClearAll: () => void;
+  renderItem?: (item: { id: string; label: string; sublabel?: string }) => React.ReactNode;
 }) {
-  const [open, setOpen] = useState(false)
-  const [filter, setFilter] = useState('')
+  const [open, setOpen] = useState(false);
+  const [filter, setFilter] = useState('');
   const filtered = items.filter(
     (i) =>
       i.label.toLowerCase().includes(filter.toLowerCase()) ||
-      (i.sublabel ?? '').toLowerCase().includes(filter.toLowerCase())
-  )
+      (i.sublabel ?? '').toLowerCase().includes(filter.toLowerCase()),
+  );
 
   return (
     <div className="flex-1 relative min-w-0">
       <div
-        onClick={() => { setOpen((v) => !v); setFilter('') }}
+        onClick={() => {
+          setOpen((v) => !v);
+          setFilter('');
+        }}
         className={`flex items-center gap-1.5 px-3 py-2 border rounded-r-lg cursor-pointer min-h-[40px] ${
-          open ? 'border-teal-500 ring-2 ring-teal-200 dark:ring-teal-900' : 'border-gray-200 dark:border-gray-700'
+          open
+            ? 'border-teal-500 ring-2 ring-teal-200 dark:ring-teal-900'
+            : 'border-gray-200 dark:border-gray-700'
         } bg-white dark:bg-gray-900`}
       >
         <div className="flex flex-wrap gap-1 flex-1 min-w-0">
@@ -1140,7 +1266,7 @@ function MultiSelectPicker({
             <span className="text-sm text-teal-500 dark:text-teal-400">{placeholder}</span>
           ) : (
             selectedIds.map((id) => {
-              const item = items.find((i) => i.id === id)
+              const item = items.find((i) => i.id === id);
               return (
                 <span
                   key={id}
@@ -1149,13 +1275,16 @@ function MultiSelectPicker({
                   {item?.label ?? id}
                   <button
                     type="button"
-                    onClick={(e) => { e.stopPropagation(); onToggle(id) }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onToggle(id);
+                    }}
                     className="text-gray-400 hover:text-red-500"
                   >
                     ×
                   </button>
                 </span>
-              )
+              );
             })
           )}
         </div>
@@ -1163,12 +1292,20 @@ function MultiSelectPicker({
           {selectedIds.length > 0 && (
             <button
               type="button"
-              onClick={(e) => { e.stopPropagation(); onClearAll() }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onClearAll();
+              }}
               className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
             >
               <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
                 <circle cx="10" cy="10" r="9" fill="none" stroke="currentColor" strokeWidth="1.5" />
-                <path d="M7 7l6 6M13 7l-6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                <path
+                  d="M7 7l6 6M13 7l-6 6"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
               </svg>
             </button>
           )}
@@ -1183,7 +1320,6 @@ function MultiSelectPicker({
             {items.length > 5 && (
               <div className="sticky top-0 bg-white dark:bg-gray-900 px-3 pt-2 pb-1 border-b border-gray-100 dark:border-gray-800">
                 <input
-                  autoFocus
                   type="text"
                   value={filter}
                   onChange={(e) => setFilter(e.target.value)}
@@ -1223,17 +1359,17 @@ function MultiSelectPicker({
         </>
       )}
     </div>
-  )
+  );
 }
 
 function ModeDropdown({
   mode,
   onChange,
 }: {
-  mode: 'allow' | 'deny'
-  onChange: (m: 'allow' | 'deny') => void
+  mode: 'allow' | 'deny';
+  onChange: (m: 'allow' | 'deny') => void;
 }) {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(false);
   return (
     <div className="relative flex-shrink-0">
       <button
@@ -1241,10 +1377,11 @@ function ModeDropdown({
         onClick={() => setOpen((v) => !v)}
         className="flex items-center gap-1.5 px-3 py-2 border border-r-0 border-gray-200 dark:border-gray-700 rounded-l-lg bg-white dark:bg-gray-900 h-full min-w-[80px]"
       >
-        {mode === 'allow'
-          ? <Unlock className="w-4 h-4 text-teal-600" />
-          : <Lock className="w-4 h-4 text-gray-500" />
-        }
+        {mode === 'allow' ? (
+          <Unlock className="w-4 h-4 text-teal-600" />
+        ) : (
+          <Lock className="w-4 h-4 text-gray-500" />
+        )}
         <ChevronDown className="w-3 h-3 text-gray-400" />
       </button>
       {open && (
@@ -1255,23 +1392,31 @@ function ModeDropdown({
               <button
                 key={m}
                 type="button"
-                onClick={() => { onChange(m); setOpen(false) }}
+                onClick={() => {
+                  onChange(m);
+                  setOpen(false);
+                }}
                 className={`w-full flex items-center gap-2 px-3 py-2 text-sm ${
-                  mode === m ? 'bg-gray-50 dark:bg-gray-800 font-medium' : 'hover:bg-gray-50 dark:hover:bg-gray-800'
+                  mode === m
+                    ? 'bg-gray-50 dark:bg-gray-800 font-medium'
+                    : 'hover:bg-gray-50 dark:hover:bg-gray-800'
                 }`}
               >
-                {m === 'allow'
-                  ? <Unlock className="w-3.5 h-3.5 text-teal-600" />
-                  : <Lock className="w-3.5 h-3.5 text-gray-500" />
-                }
-                <span className="capitalize text-gray-700 dark:text-gray-300">{m === 'allow' ? 'Allow' : 'Deny'}</span>
+                {m === 'allow' ? (
+                  <Unlock className="w-3.5 h-3.5 text-teal-600" />
+                ) : (
+                  <Lock className="w-3.5 h-3.5 text-gray-500" />
+                )}
+                <span className="capitalize text-gray-700 dark:text-gray-300">
+                  {m === 'allow' ? 'Allow' : 'Deny'}
+                </span>
               </button>
             ))}
           </div>
         </>
       )}
     </div>
-  )
+  );
 }
 
 function BloksOptions({
@@ -1280,44 +1425,50 @@ function BloksOptions({
   spaceId,
   groups,
 }: {
-  def: BloksFieldDef
-  onChange: (patch: Partial<BloksFieldDef>) => void
-  spaceId?: string
-  groups: ComponentGroup[]
+  def: BloksFieldDef;
+  onChange: (patch: Partial<BloksFieldDef>) => void;
+  spaceId?: string;
+  groups: ComponentGroup[];
 }) {
-  const [activeTab, setActiveTab] = useState<BloksTab>('blocks')
-  const [components, setComponents] = useState<Array<{ name: string; display_name?: string; component_group_uuid?: string }>>([])
-  const [tags, setTags] = useState<string[]>([])
-  const [loadingComponents, setLoadingComponents] = useState(false)
-  const [loadingTags, setLoadingTags] = useState(false)
+  const [activeTab, setActiveTab] = useState<BloksTab>('blocks');
 
-  useEffect(() => {
-    if (!def.restrict_components || !spaceId) return
-    setLoadingComponents(true)
-    fetch(`/api/admin/spaces/${spaceId}/components?per_page=500`)
-      .then((r) => r.json())
-      .then((data) => setComponents(data.components ?? []))
-      .finally(() => setLoadingComponents(false))
-    setLoadingTags(true)
-    fetch(`/api/admin/spaces/${spaceId}/tags`)
-      .then((r) => r.json())
-      .then((data) => setTags((data.tags ?? []).map((t: any) => t.name ?? t)))
-      .finally(() => setLoadingTags(false))
-  }, [def.restrict_components, spaceId])
+  const { data: componentsData, isLoading: loadingComponents } = useApi<{
+    components: Array<{ name: string; display_name?: string; component_group_uuid?: string }>;
+  }>(
+    def.restrict_components && spaceId
+      ? `/api/admin/spaces/${spaceId}/components?per_page=500`
+      : null,
+  );
+
+  const { data: tagsData, isLoading: loadingTags } = useApi<{ tags: Array<any> }>(
+    def.restrict_components && spaceId ? `/api/admin/spaces/${spaceId}/tags` : null,
+  );
+
+  const components = componentsData?.components ?? [];
+  const tags = (tagsData?.tags ?? []).map((t: any) => t.name ?? t);
 
   // Derive mode from which list has content (default: allow)
-  const blocksMode: 'allow' | 'deny' = (def.component_denylist?.length ?? 0) > 0 && !(def.component_whitelist?.length) ? 'deny' : 'allow'
-  const foldersMode: 'allow' | 'deny' = (def.component_group_denylist?.length ?? 0) > 0 && !(def.component_group_whitelist?.length) ? 'deny' : 'allow'
-  const tagsMode: 'allow' | 'deny' = (def.component_tag_denylist?.length ?? 0) > 0 && !(def.component_tag_whitelist?.length) ? 'deny' : 'allow'
+  const blocksMode: 'allow' | 'deny' =
+    (def.component_denylist?.length ?? 0) > 0 && !def.component_whitelist?.length
+      ? 'deny'
+      : 'allow';
+  const foldersMode: 'allow' | 'deny' =
+    (def.component_group_denylist?.length ?? 0) > 0 && !def.component_group_whitelist?.length
+      ? 'deny'
+      : 'allow';
+  const tagsMode: 'allow' | 'deny' =
+    (def.component_tag_denylist?.length ?? 0) > 0 && !def.component_tag_whitelist?.length
+      ? 'deny'
+      : 'allow';
 
   // Compute component items with group path
   const componentItems = components.map((c) => {
-    const group = groups.find((g) => g.uuid === c.component_group_uuid)
-    return { id: c.name, label: c.name, sublabel: group ? `/${group.name}` : undefined }
-  })
+    const group = groups.find((g) => g.uuid === c.component_group_uuid);
+    return { id: c.name, label: c.name, sublabel: group ? `/${group.name}` : undefined };
+  });
 
-  const groupItems = groups.map((g) => ({ id: g.uuid, label: g.name, sublabel: `/${g.name}` }))
-  const tagItems = tags.map((t) => ({ id: t, label: t }))
+  const groupItems = groups.map((g) => ({ id: g.uuid, label: g.name, sublabel: `/${g.name}` }));
+  const tagItems = tags.map((t) => ({ id: t, label: t }));
 
   return (
     <>
@@ -1351,7 +1502,9 @@ function BloksOptions({
             ))}
           </div>
 
-          <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Access management</p>
+          <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+            Access management
+          </p>
 
           {/* Blocks tab */}
           {activeTab === 'blocks' && (
@@ -1359,24 +1512,36 @@ function BloksOptions({
               <ModeDropdown
                 mode={blocksMode}
                 onChange={(m) => {
-                  const current = m === 'allow' ? (def.component_denylist ?? []) : (def.component_whitelist ?? [])
-                  if (m === 'allow') onChange({ component_whitelist: current, component_denylist: [] })
-                  else onChange({ component_denylist: current, component_whitelist: [] })
+                  const current =
+                    m === 'allow'
+                      ? (def.component_denylist ?? [])
+                      : (def.component_whitelist ?? []);
+                  if (m === 'allow')
+                    onChange({ component_whitelist: current, component_denylist: [] });
+                  else onChange({ component_denylist: current, component_whitelist: [] });
                 }}
               />
               <MultiSelectPicker
                 placeholder="Select blocks"
-                selectedIds={blocksMode === 'allow' ? (def.component_whitelist ?? []) : (def.component_denylist ?? [])}
+                selectedIds={
+                  blocksMode === 'allow'
+                    ? (def.component_whitelist ?? [])
+                    : (def.component_denylist ?? [])
+                }
                 items={componentItems}
                 loading={loadingComponents}
                 onToggle={(id) => {
-                  const key = blocksMode === 'allow' ? 'component_whitelist' : 'component_denylist'
-                  const current = (def[key] ?? []) as string[]
-                  onChange({ [key]: current.includes(id) ? current.filter((x) => x !== id) : [...current, id] })
+                  const key = blocksMode === 'allow' ? 'component_whitelist' : 'component_denylist';
+                  const current = (def[key] ?? []) as string[];
+                  onChange({
+                    [key]: current.includes(id)
+                      ? current.filter((x) => x !== id)
+                      : [...current, id],
+                  });
                 }}
                 onClearAll={() => {
-                  const key = blocksMode === 'allow' ? 'component_whitelist' : 'component_denylist'
-                  onChange({ [key]: [] })
+                  const key = blocksMode === 'allow' ? 'component_whitelist' : 'component_denylist';
+                  onChange({ [key]: [] });
                 }}
               />
             </div>
@@ -1388,23 +1553,42 @@ function BloksOptions({
               <ModeDropdown
                 mode={foldersMode}
                 onChange={(m) => {
-                  const current = m === 'allow' ? (def.component_group_denylist ?? []) : (def.component_group_whitelist ?? [])
-                  if (m === 'allow') onChange({ component_group_whitelist: current, component_group_denylist: [] })
-                  else onChange({ component_group_denylist: current, component_group_whitelist: [] })
+                  const current =
+                    m === 'allow'
+                      ? (def.component_group_denylist ?? [])
+                      : (def.component_group_whitelist ?? []);
+                  if (m === 'allow')
+                    onChange({ component_group_whitelist: current, component_group_denylist: [] });
+                  else
+                    onChange({ component_group_denylist: current, component_group_whitelist: [] });
                 }}
               />
               <MultiSelectPicker
                 placeholder="Select folders"
-                selectedIds={foldersMode === 'allow' ? (def.component_group_whitelist ?? []) : (def.component_group_denylist ?? [])}
+                selectedIds={
+                  foldersMode === 'allow'
+                    ? (def.component_group_whitelist ?? [])
+                    : (def.component_group_denylist ?? [])
+                }
                 items={groupItems}
                 onToggle={(id) => {
-                  const key = foldersMode === 'allow' ? 'component_group_whitelist' : 'component_group_denylist'
-                  const current = (def[key] ?? []) as string[]
-                  onChange({ [key]: current.includes(id) ? current.filter((x) => x !== id) : [...current, id] })
+                  const key =
+                    foldersMode === 'allow'
+                      ? 'component_group_whitelist'
+                      : 'component_group_denylist';
+                  const current = (def[key] ?? []) as string[];
+                  onChange({
+                    [key]: current.includes(id)
+                      ? current.filter((x) => x !== id)
+                      : [...current, id],
+                  });
                 }}
                 onClearAll={() => {
-                  const key = foldersMode === 'allow' ? 'component_group_whitelist' : 'component_group_denylist'
-                  onChange({ [key]: [] })
+                  const key =
+                    foldersMode === 'allow'
+                      ? 'component_group_whitelist'
+                      : 'component_group_denylist';
+                  onChange({ [key]: [] });
                 }}
               />
             </div>
@@ -1416,24 +1600,38 @@ function BloksOptions({
               <ModeDropdown
                 mode={tagsMode}
                 onChange={(m) => {
-                  const current = m === 'allow' ? (def.component_tag_denylist ?? []) : (def.component_tag_whitelist ?? [])
-                  if (m === 'allow') onChange({ component_tag_whitelist: current, component_tag_denylist: [] })
-                  else onChange({ component_tag_denylist: current, component_tag_whitelist: [] })
+                  const current =
+                    m === 'allow'
+                      ? (def.component_tag_denylist ?? [])
+                      : (def.component_tag_whitelist ?? []);
+                  if (m === 'allow')
+                    onChange({ component_tag_whitelist: current, component_tag_denylist: [] });
+                  else onChange({ component_tag_denylist: current, component_tag_whitelist: [] });
                 }}
               />
               <MultiSelectPicker
                 placeholder="Select tags"
-                selectedIds={tagsMode === 'allow' ? (def.component_tag_whitelist ?? []) : (def.component_tag_denylist ?? [])}
+                selectedIds={
+                  tagsMode === 'allow'
+                    ? (def.component_tag_whitelist ?? [])
+                    : (def.component_tag_denylist ?? [])
+                }
                 items={tagItems}
                 loading={loadingTags}
                 onToggle={(id) => {
-                  const key = tagsMode === 'allow' ? 'component_tag_whitelist' : 'component_tag_denylist'
-                  const current = (def[key] ?? []) as string[]
-                  onChange({ [key]: current.includes(id) ? current.filter((x) => x !== id) : [...current, id] })
+                  const key =
+                    tagsMode === 'allow' ? 'component_tag_whitelist' : 'component_tag_denylist';
+                  const current = (def[key] ?? []) as string[];
+                  onChange({
+                    [key]: current.includes(id)
+                      ? current.filter((x) => x !== id)
+                      : [...current, id],
+                  });
                 }}
                 onClearAll={() => {
-                  const key = tagsMode === 'allow' ? 'component_tag_whitelist' : 'component_tag_denylist'
-                  onChange({ [key]: [] })
+                  const key =
+                    tagsMode === 'allow' ? 'component_tag_whitelist' : 'component_tag_denylist';
+                  onChange({ [key]: [] });
                 }}
               />
             </div>
@@ -1443,11 +1641,19 @@ function BloksOptions({
           <div className="mt-4 grid grid-cols-2 gap-4">
             <FormRow>
               <Label>Minimum blocks</Label>
-              <NumberStepper value={def.minimum} onChange={(v) => onChange({ minimum: v })} min={0} />
+              <NumberStepper
+                value={def.minimum}
+                onChange={(v) => onChange({ minimum: v })}
+                min={0}
+              />
             </FormRow>
             <FormRow>
               <Label>Maximum blocks</Label>
-              <NumberStepper value={def.maximum} onChange={(v) => onChange({ maximum: v })} min={0} />
+              <NumberStepper
+                value={def.maximum}
+                onChange={(v) => onChange({ maximum: v })}
+                min={0}
+              />
             </FormRow>
           </div>
         </>
@@ -1466,7 +1672,7 @@ function BloksOptions({
         </div>
       )}
     </>
-  )
+  );
 }
 
 // ─── Field type selector ──────────────────────────────────────────────────────
@@ -1477,27 +1683,36 @@ function FieldTypePicker({
   selected,
   onSelect,
 }: {
-  filter: string
-  setFilter: (v: string) => void
-  selected: FieldType
-  onSelect: (t: FieldType) => void
+  filter: string;
+  setFilter: (v: string) => void;
+  selected: FieldType;
+  onSelect: (t: FieldType) => void;
 }) {
   const filtered = ADDABLE_FIELD_TYPES.filter((ft) =>
-    ft.label.toLowerCase().includes(filter.toLowerCase())
-  )
+    ft.label.toLowerCase().includes(filter.toLowerCase()),
+  );
   return (
     <div className="p-3">
       <div className="relative mb-2">
         <input
-          autoFocus
           type="text"
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           placeholder="Filter field types"
           className="w-full pl-8 pr-3 py-1.5 border border-teal-400 rounded-lg text-sm bg-white dark:bg-gray-800 dark:text-gray-200 focus:outline-none"
         />
-        <svg className="absolute left-2.5 top-2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        <svg
+          className="absolute left-2.5 top-2 w-4 h-4 text-gray-400"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+          />
         </svg>
       </div>
       <div className="grid grid-cols-4 gap-1 max-h-52 overflow-y-auto">
@@ -1507,11 +1722,15 @@ function FieldTypePicker({
             type="button"
             onClick={() => onSelect(ft.type)}
             className={`flex flex-col items-center gap-1 p-1.5 rounded-lg transition-colors ${
-              selected === ft.type ? 'bg-gray-100 dark:bg-gray-800' : 'hover:bg-gray-50 dark:hover:bg-gray-800/60'
+              selected === ft.type
+                ? 'bg-gray-100 dark:bg-gray-800'
+                : 'hover:bg-gray-50 dark:hover:bg-gray-800/60'
             }`}
           >
             <FieldIcon type={ft.type} size={24} />
-            <span className="text-[9px] text-gray-600 dark:text-gray-400 leading-tight text-center">{ft.label}</span>
+            <span className="text-[9px] text-gray-600 dark:text-gray-400 leading-tight text-center">
+              {ft.label}
+            </span>
           </button>
         ))}
         {filtered.length === 0 && (
@@ -1519,13 +1738,19 @@ function FieldTypePicker({
         )}
       </div>
     </div>
-  )
+  );
 }
 
-function FieldTypeSelector({ value, onChange }: { value: FieldType; onChange: (t: FieldType) => void }) {
-  const [open, setOpen] = useState(false)
-  const [filter, setFilter] = useState('')
-  const label = FIELD_TYPE_LABELS[value] ?? value
+function FieldTypeSelector({
+  value,
+  onChange,
+}: {
+  value: FieldType;
+  onChange: (t: FieldType) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [filter, setFilter] = useState('');
+  const label = FIELD_TYPE_LABELS[value] ?? value;
 
   return (
     <FormRow>
@@ -1533,7 +1758,10 @@ function FieldTypeSelector({ value, onChange }: { value: FieldType; onChange: (t
       <div className="relative">
         <button
           type="button"
-          onClick={() => { setOpen((v) => !v); setFilter('') }}
+          onClick={() => {
+            setOpen((v) => !v);
+            setFilter('');
+          }}
           className="w-full flex items-center gap-2 px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
         >
           <FieldIcon type={value} size={20} />
@@ -1548,52 +1776,59 @@ function FieldTypeSelector({ value, onChange }: { value: FieldType; onChange: (t
                 filter={filter}
                 setFilter={setFilter}
                 selected={value}
-                onSelect={(t) => { onChange(t); setOpen(false) }}
+                onSelect={(t) => {
+                  onChange(t);
+                  setOpen(false);
+                }}
               />
             </div>
           </>
         )}
       </div>
     </FormRow>
-  )
+  );
 }
 
 // ─── Main FieldEditor component ───────────────────────────────────────────────
 
 interface FieldEditorProps {
-  field: WorkingField
-  allFields: WorkingField[]
-  spaceId?: string
-  groups?: ComponentGroup[]
-  onSave: (key: string, updatedDef: AnyFieldDef) => void
-  onBack: () => void
+  field: WorkingField;
+  allFields: WorkingField[];
+  spaceId?: string;
+  groups?: ComponentGroup[];
+  onSave: (key: string, updatedDef: AnyFieldDef) => void;
+  onBack: () => void;
 }
 
-export function FieldEditor({ field, allFields, spaceId, groups = [], onSave, onBack }: FieldEditorProps) {
-  const [def, setDef] = useState<AnyFieldDef>({ ...field.def })
-  const [editingKey, setEditingKey] = useState(false)
-  const [keyValue, setKeyValue] = useState(field.key)
+export function FieldEditor({
+  field,
+  allFields,
+  spaceId,
+  groups = [],
+  onSave,
+  onBack,
+}: FieldEditorProps) {
+  const [def, setDef] = useState<AnyFieldDef>({ ...field.def });
+  const [editingKey, setEditingKey] = useState(false);
+  const [keyValue, setKeyValue] = useState(field.key);
 
   function patch(updates: any) {
-    setDef((prev) => ({ ...prev, ...updates }))
+    setDef((prev) => ({ ...prev, ...updates }));
   }
 
   function handleSave() {
-    onSave(keyValue, def)
+    onSave(keyValue, def);
   }
 
-  const type = def.type as FieldType
+  const type = def.type as FieldType;
 
-  const commonHasRequired = !['table', 'section', 'boolean'].includes(type)
+  const commonHasRequired = !['table', 'section', 'boolean'].includes(type);
 
   return (
     <div className="flex flex-col h-full">
       <div className="flex-1 overflow-y-auto px-8 py-6">
         {/* Field type */}
-        <FieldTypeSelector
-          value={type}
-          onChange={(t) => setDef({ type: t } as AnyFieldDef)}
-        />
+        <FieldTypeSelector value={type} onChange={(t) => setDef({ type: t } as AnyFieldDef)} />
 
         {/* Display name */}
         <FormRow>
@@ -1610,23 +1845,30 @@ export function FieldEditor({ field, allFields, spaceId, groups = [], onSave, on
         {/* Field name (technical key, mostly read-only) */}
         <FormRow>
           <div className="flex items-center gap-1.5 mb-1">
-            <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">Field name</span>
+            <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+              Field name
+            </span>
             <TooltipHint text="Technical name used in the API response JSON. Cannot contain spaces. Example: news_items, hero_title." />
           </div>
           {editingKey ? (
             <input
-              autoFocus
               type="text"
               value={keyValue}
               onChange={(e) => setKeyValue(e.target.value.replace(/\s/g, '_').toLowerCase())}
               onBlur={() => setEditingKey(false)}
-              onKeyDown={(e) => { if (e.key === 'Enter') setEditingKey(false) }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') setEditingKey(false);
+              }}
               className="w-full px-3 py-2 border border-teal-400 rounded-lg text-sm bg-white dark:bg-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500"
             />
           ) : (
             <div className="flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
               <span className="text-sm font-mono text-gray-500 dark:text-gray-400">{keyValue}</span>
-              <button type="button" onClick={() => setEditingKey(true)} className="text-gray-400 hover:text-gray-600">
+              <button
+                type="button"
+                onClick={() => setEditingKey(true)}
+                className="text-gray-400 hover:text-gray-600"
+              >
                 <Pencil className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -1670,7 +1912,14 @@ export function FieldEditor({ field, allFields, spaceId, groups = [], onSave, on
         />
 
         {/* Type-specific options */}
-        {type === 'bloks' && <BloksOptions def={def as BloksFieldDef} onChange={patch} spaceId={spaceId} groups={groups} />}
+        {type === 'bloks' && (
+          <BloksOptions
+            def={def as BloksFieldDef}
+            onChange={patch}
+            spaceId={spaceId}
+            groups={groups}
+          />
+        )}
         {type === 'text' && <TextOptions def={def} onChange={patch} />}
         {type === 'textarea' && <TextareaOptions def={def} onChange={patch} />}
         {type === 'richtext' && <RichtextOptions def={def} onChange={patch} />}
@@ -1678,10 +1927,16 @@ export function FieldEditor({ field, allFields, spaceId, groups = [], onSave, on
         {type === 'number' && <NumberOptions def={def} onChange={patch} />}
         {type === 'datetime' && <DatetimeOptions def={def} onChange={patch} />}
         {type === 'boolean' && <BooleanOptions def={def} onChange={patch} />}
-        {type === 'option' && <SingleOptionOptions def={def as OptionFieldDef} onChange={patch} spaceId={spaceId} />}
-        {type === 'options' && <MultiOptionsOptions def={def as OptionsFieldDef} onChange={patch} spaceId={spaceId} />}
+        {type === 'option' && (
+          <SingleOptionOptions def={def as OptionFieldDef} onChange={patch} spaceId={spaceId} />
+        )}
+        {type === 'options' && (
+          <MultiOptionsOptions def={def as OptionsFieldDef} onChange={patch} spaceId={spaceId} />
+        )}
         {type === 'multilink' && <ReferencesOptions def={def} onChange={patch} spaceId={spaceId} />}
-        {(type === 'asset' || type === 'multiasset') && <AssetOptions def={def} onChange={patch} spaceId={spaceId} />}
+        {(type === 'asset' || type === 'multiasset') && (
+          <AssetOptions def={def} onChange={patch} spaceId={spaceId} />
+        )}
         {type === 'link' && <LinkOptions def={def} onChange={patch} spaceId={spaceId} />}
         {type === 'section' && (
           <GroupOptions def={def} allFields={allFields} currentKey={keyValue} onChange={patch} />
@@ -1707,5 +1962,5 @@ export function FieldEditor({ field, allFields, spaceId, groups = [], onSave, on
         </button>
       </div>
     </div>
-  )
+  );
 }

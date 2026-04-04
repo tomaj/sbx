@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { DbModule } from './db/db.module';
+import { RedisModule } from './redis/redis.module';
 import { StorageModule } from './storage/storage.module';
 import { DatasourcesModule } from './datasources/datasources.module';
 import { SpacesModule } from './spaces/spaces.module';
@@ -36,6 +37,43 @@ import { TelemetryModule } from './telemetry/telemetry.module';
 import { AiConfigurationsModule } from './ai-configurations/ai-configurations.module';
 
 @Module({
-  imports: [ConfigModule, LoggingModule, ThrottlerModule, JobsModule, DbModule, StorageModule, AuthModule, DatasourcesModule, SpacesModule, UsersModule, TagsModule, ComponentsModule, AccessTokensModule, SpaceRolesModule, WebhooksModule, PresetsModule, ActivitiesModule, PersonalTokensModule, AssetsModule, BranchesModule, ReleasesModule, StoriesModule, TasksModule, WorkflowsModule, FieldTypesModule, BridgeModule, WorkflowStageChangesModule, ApprovalsModule, DiscussionsModule, InternalTagsModule, StorySchedulingsModule, StatisticsModule, HealthModule, TelemetryModule, AiConfigurationsModule],
+  imports: [
+    ConfigModule,
+    LoggingModule,
+    ThrottlerModule,
+    RedisModule,
+    JobsModule,
+    DbModule,
+    StorageModule,
+    AuthModule,
+    DatasourcesModule,
+    SpacesModule,
+    UsersModule,
+    TagsModule,
+    ComponentsModule,
+    AccessTokensModule,
+    SpaceRolesModule,
+    WebhooksModule,
+    PresetsModule,
+    ActivitiesModule,
+    PersonalTokensModule,
+    AssetsModule,
+    BranchesModule,
+    ReleasesModule,
+    StoriesModule,
+    TasksModule,
+    WorkflowsModule,
+    FieldTypesModule,
+    BridgeModule,
+    WorkflowStageChangesModule,
+    ApprovalsModule,
+    DiscussionsModule,
+    InternalTagsModule,
+    StorySchedulingsModule,
+    StatisticsModule,
+    HealthModule,
+    TelemetryModule,
+    AiConfigurationsModule,
+  ],
 })
 export class AppModule {}

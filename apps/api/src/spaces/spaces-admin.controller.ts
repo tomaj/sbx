@@ -1,20 +1,32 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  ParseIntPipe,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Auth } from '../auth/auth.decorator';
 import { SpacesService } from './spaces.service';
 import { UsersService } from '../users/users.service';
 import { SpaceRolesService } from '../space-roles/space-roles.service';
-import { QueryParserUtil } from '../shared/query-parser.util';
+import { BaseAdminController } from '../shared/base-admin.controller';
 
 @ApiTags('Spaces - Admin')
 @Controller('v1/admin')
 @Auth('session')
-export class SpacesAdminController {
+export class SpacesAdminController extends BaseAdminController {
   constructor(
     private readonly spacesService: SpacesService,
     private readonly usersService: UsersService,
     private readonly spaceRolesService: SpaceRolesService,
-  ) {}
+  ) {
+    super();
+  }
 
   @Get('spaces')
   getAllSpaces() {
@@ -27,13 +39,13 @@ export class SpacesAdminController {
   }
 
   @Get('spaces/:id/roles')
-  getSpaceRoles(@Param('id') id: string) {
-    return this.spaceRolesService.findAll(parseInt(id));
+  getSpaceRoles(@Param('id', ParseIntPipe) id: number) {
+    return this.spaceRolesService.findAll(id);
   }
 
   @Get('spaces/:id/users/search')
-  searchUsersForSpace(@Param('id') id: string, @Query('q') q: string) {
-    return this.usersService.searchUsersForSpace(parseInt(id), q ?? '');
+  searchUsersForSpace(@Param('id', ParseIntPipe) id: number, @Query('q') q: string) {
+    return this.usersService.searchUsersForSpace(id, q ?? '');
   }
 
   @Post('users')
@@ -42,16 +54,16 @@ export class SpacesAdminController {
   }
 
   @Delete('users/:id')
-  deleteUser(@Param('id') id: string) {
-    return this.usersService.deleteUser(parseInt(id));
+  deleteUser(@Param('id', ParseIntPipe) id: number) {
+    return this.usersService.deleteUser(id);
   }
 
   @Patch('users/:id')
   updateUser(
-    @Param('id') id: string,
+    @Param('id', ParseIntPipe) id: number,
     @Body() body: { firstname?: string; lastname?: string; disabled?: boolean },
   ) {
-    return this.usersService.updateUser(parseInt(id), body);
+    return this.usersService.updateUser(id, body);
   }
 
   @Get('users')
@@ -63,7 +75,7 @@ export class SpacesAdminController {
     @Query('sort_by') sortBy?: string,
     @Query('sort_dir') sortDir?: string,
   ) {
-    const { page: parsedPage, perPage: parsedPerPage } = QueryParserUtil.parsePagination(page, perPage);
+    const { page: parsedPage, perPage: parsedPerPage } = this.parsePagination(page, perPage);
     return this.usersService.getAllUsers({
       page: parsedPage,
       perPage: parsedPerPage,

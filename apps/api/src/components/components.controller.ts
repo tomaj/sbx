@@ -1,3 +1,4 @@
+import { AuthenticatedRequest, extractAuthorInfo } from '../auth/authenticated-request.interface';
 import {
   Body,
   Controller,
@@ -5,6 +6,7 @@ import {
   Get,
   HttpCode,
   Param,
+  ParseIntPipe,
   Post,
   Put,
   Query,
@@ -32,7 +34,7 @@ export class ComponentsController {
 
   @Get('component_groups')
   async getComponentGroups(
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
     @Query('search') search?: string,
     @Query('with_parent') withParent?: string,
   ) {
@@ -40,30 +42,33 @@ export class ComponentsController {
   }
 
   @Get('component_groups/:id')
-  async getComponentGroup(@Req() req: any, @Param('id') id: string) {
+  async getComponentGroup(@Req() req: AuthenticatedRequest, @Param('id', ParseIntPipe) id: number) {
     return ResultGuard.throwIfNotFound(
-      await this.componentsService.findOneComponentGroup(req.space.id, parseInt(id)),
+      await this.componentsService.findOneComponentGroup(req.space.id, id),
     );
   }
 
   @Post('component_groups')
   async createComponentGroup(
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
     @Body() body: CreateComponentGroupDto,
   ) {
-    const group = await this.componentsService.createComponentGroup(req.space.id, body.component_group);
+    const group = await this.componentsService.createComponentGroup(
+      req.space.id,
+      body.component_group,
+    );
     return { component_group: group };
   }
 
   @Put('component_groups/:id')
   async updateComponentGroup(
-    @Req() req: any,
-    @Param('id') id: string,
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseIntPipe) id: number,
     @Body() body: UpdateComponentGroupDto,
   ) {
     const group = await this.componentsService.updateComponentGroup(
       req.space.id,
-      parseInt(id),
+      id,
       body.component_group,
     );
     return { component_group: group };
@@ -71,8 +76,11 @@ export class ComponentsController {
 
   @Delete('component_groups/:id')
   @HttpCode(200)
-  async deleteComponentGroup(@Req() req: any, @Param('id') id: string) {
-    await this.componentsService.deleteComponentGroup(req.space.id, parseInt(id));
+  async deleteComponentGroup(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    await this.componentsService.deleteComponentGroup(req.space.id, id);
     return {};
   }
 
@@ -80,7 +88,7 @@ export class ComponentsController {
 
   @Get('components')
   async getComponents(
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
     @Query('search') search?: string,
     @Query('in_group') inGroup?: string,
     @Query('is_root') isRoot?: string,
@@ -97,42 +105,51 @@ export class ComponentsController {
   }
 
   @Post('components/:id/duplicate')
-  async duplicateComponent(@Req() req: any, @Param('id') id: string) {
-    return this.componentsService.duplicateComponent(req.space.id, parseInt(id));
+  async duplicateComponent(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    return this.componentsService.duplicateComponent(req.space.id, id);
   }
 
   @Get('components/:id')
-  async getComponent(@Req() req: any, @Param('id') id: string) {
+  async getComponent(@Req() req: AuthenticatedRequest, @Param('id', ParseIntPipe) id: number) {
     return ResultGuard.throwIfNotFound(
-      await this.componentsService.findOneComponent(req.space.id, parseInt(id)),
+      await this.componentsService.findOneComponent(req.space.id, id),
     );
   }
 
   @Post('components')
-  async createComponent(
-    @Req() req: any,
-    @Body() body: CreateComponentDto,
-  ) {
-    const u1 = req.adminUser;
-    const authorName1 = u1 ? ([u1.firstname, u1.lastname].filter(Boolean).join(' ') || u1.email || null) : null;
-    return this.componentsService.createComponent(req.space.id, body.component, u1?.id ?? null, authorName1);
+  async createComponent(@Req() req: AuthenticatedRequest, @Body() body: CreateComponentDto) {
+    const { id: authorId, name: authorName } = extractAuthorInfo(req);
+    return this.componentsService.createComponent(
+      req.space.id,
+      body.component,
+      authorId,
+      authorName,
+    );
   }
 
   @Put('components/:id')
   async updateComponent(
-    @Req() req: any,
-    @Param('id') id: string,
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseIntPipe) id: number,
     @Body() body: UpdateComponentDto,
   ) {
-    const u2 = req.adminUser;
-    const authorName2 = u2 ? ([u2.firstname, u2.lastname].filter(Boolean).join(' ') || u2.email || null) : null;
-    return this.componentsService.updateComponent(req.space.id, parseInt(id), body.component, u2?.id ?? null, authorName2);
+    const { id: authorId, name: authorName } = extractAuthorInfo(req);
+    return this.componentsService.updateComponent(
+      req.space.id,
+      id,
+      body.component,
+      authorId,
+      authorName,
+    );
   }
 
   @Delete('components/:id')
   @HttpCode(200)
-  async deleteComponent(@Req() req: any, @Param('id') id: string) {
-    return this.componentsService.deleteComponent(req.space.id, parseInt(id));
+  async deleteComponent(@Req() req: AuthenticatedRequest, @Param('id', ParseIntPipe) id: number) {
+    return this.componentsService.deleteComponent(req.space.id, id);
   }
 
   // ─── Component Versions ───────────────────────────────────────────────────
@@ -140,17 +157,20 @@ export class ComponentsController {
   /** Unified versions endpoint: GET /v1/spaces/:spaceId/versions?model=components&model_id=:id */
   @Get('versions')
   async listVersions(
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
     @Query('model') model: string,
     @Query('model_id') modelId: string,
     @Query('page') page = '1',
     @Query('per_page') perPage = '25',
   ) {
     if (model === 'components') {
-      const { page: parsedPage, perPage: parsedPerPage } = QueryParserUtil.parsePagination(page, perPage);
+      const { page: parsedPage, perPage: parsedPerPage } = QueryParserUtil.parsePagination(
+        page,
+        perPage,
+      );
       return this.componentVersionsService.listVersions({
         spaceId: req.space.id,
-        componentId: parseInt(modelId),
+        componentId: QueryParserUtil.parseOptionalInt(modelId) ?? 0,
         page: parsedPage,
         perPage: parsedPerPage,
       });
@@ -160,24 +180,24 @@ export class ComponentsController {
 
   @Get('components/:id/component_versions/:versionId')
   async getComponentVersion(
-    @Req() req: any,
-    @Param('id') id: string,
-    @Param('versionId') versionId: string,
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseIntPipe) id: number,
+    @Param('versionId', ParseIntPipe) versionId: number,
   ) {
-    return this.componentVersionsService.getVersion(req.space.id, parseInt(id), parseInt(versionId));
+    return this.componentVersionsService.getVersion(req.space.id, id, versionId);
   }
 
   @Put('components/:id/versions/:versionId/restore')
   async restoreComponentVersion(
-    @Req() req: any,
-    @Param('id') id: string,
-    @Param('versionId') versionId: string,
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseIntPipe) id: number,
+    @Param('versionId', ParseIntPipe) versionId: number,
   ) {
     return this.componentsService.restoreComponentVersion(
       req.space.id,
-      parseInt(id),
-      parseInt(versionId),
-      req.adminUser?.id ?? null,
+      id,
+      versionId,
+      req.adminUser?.sbxUserId ?? null,
     );
   }
 }

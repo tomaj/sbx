@@ -7,11 +7,7 @@ import {
 import { DiscussionsService } from './discussions.service';
 
 @Module({
-  controllers: [
-    StoryDiscussionsController,
-    MentionedDiscussionsController,
-    DiscussionsController,
-  ],
+  controllers: [StoryDiscussionsController, MentionedDiscussionsController, DiscussionsController],
   providers: [DiscussionsService],
 })
 export class DiscussionsModule {}

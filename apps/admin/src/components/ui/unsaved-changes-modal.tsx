@@ -1,25 +1,25 @@
-'use client'
+'use client';
 
-import { useEffect } from 'react'
-import { X, TriangleAlert } from 'lucide-react'
+import { useEffect } from 'react';
+import { X, TriangleAlert } from 'lucide-react';
 
 interface UnsavedChangesModalProps {
-  open: boolean
-  onConfirm: () => void
-  onCancel: () => void
+  open: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
 }
 
 export function UnsavedChangesModal({ open, onConfirm, onCancel }: UnsavedChangesModalProps) {
   useEffect(() => {
-    if (!open) return
+    if (!open) return;
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onCancel()
+      if (e.key === 'Escape') onCancel();
     }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [open, onCancel])
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open, onCancel]);
 
-  if (!open) return null
+  if (!open) return null;
 
   return (
     <div
@@ -43,9 +43,7 @@ export function UnsavedChangesModal({ open, onConfirm, onCancel }: UnsavedChange
           </div>
         </div>
 
-        <h2 className="text-xl font-bold text-white text-center mb-3">
-          Discard changes?
-        </h2>
+        <h2 className="text-xl font-bold text-white text-center mb-3">Discard changes?</h2>
 
         <p className="text-sm text-gray-400 text-center mb-8">
           There are some changes which are not saved. Are you sure you want to discard the changes?
@@ -67,5 +65,5 @@ export function UnsavedChangesModal({ open, onConfirm, onCancel }: UnsavedChange
         </div>
       </div>
     </div>
-  )
+  );
 }

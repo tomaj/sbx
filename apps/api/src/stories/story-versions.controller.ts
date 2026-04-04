@@ -1,7 +1,7 @@
-import { Controller, Get, Param, Query, Res } from '@nestjs/common';
+import { Controller, Get, Param, ParseIntPipe, Query, Res } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Auth } from '../auth/auth.decorator';
-import type { Response } from 'express';
+import { Response } from 'express';
 import { StoryVersionsService } from './story-versions.service';
 import { QueryParserUtil } from '../shared/query-parser.util';
 
@@ -13,7 +13,7 @@ export class StoryVersionsController {
 
   @Get()
   async list(
-    @Param('spaceId') spaceId: string,
+    @Param('spaceId', ParseIntPipe) spaceId: number,
     @Query('by_story_id') byStoryId: string,
     @Query('by_release_id') byReleaseId?: string,
     @Query('page') page = '1',
@@ -21,12 +21,15 @@ export class StoryVersionsController {
     @Query('show_content') showContent?: string,
     @Res() res?: Response,
   ) {
-    const { page: parsedPage, perPage: parsedPerPage } = QueryParserUtil.parsePagination(page, perPage);
+    const { page: parsedPage, perPage: parsedPerPage } = QueryParserUtil.parsePagination(
+      page,
+      perPage,
+    );
     const resolvedPerPage = parsedPerPage;
     const result = await this.storyVersionsService.listVersions({
-      spaceId: parseInt(spaceId),
-      storyId: parseInt(byStoryId),
-      releaseId: byReleaseId !== undefined ? parseInt(byReleaseId) : undefined,
+      spaceId: spaceId,
+      storyId: QueryParserUtil.parseOptionalInt(byStoryId) ?? 0,
+      releaseId: QueryParserUtil.parseOptionalInt(byReleaseId),
       page: parsedPage,
       perPage: resolvedPerPage,
       showContent: showContent === 'true',

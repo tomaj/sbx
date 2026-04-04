@@ -3,6 +3,5 @@ import { BridgeController } from './bridge.controller';
 
 @Module({
   controllers: [BridgeController],
-  providers: [],
 })
 export class BridgeModule {}

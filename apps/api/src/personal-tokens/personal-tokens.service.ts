@@ -2,14 +2,14 @@ import { Inject, Injectable } from '@nestjs/common';
 import { eq, and } from 'drizzle-orm';
 import { randomBytes } from 'crypto';
 import { DB } from '../db/db.module';
-import type { DbType } from '../db/db.module';
+import { DbType } from '../db/db.module';
 import { personalAccessTokens } from '../db/schema';
 
 @Injectable()
 export class PersonalTokensService {
   constructor(@Inject(DB) private db: DbType) {}
 
-  async getTokens(userId: string) {
+  async getTokens(userId: number) {
     const tokens = await this.db
       .select()
       .from(personalAccessTokens)
@@ -26,7 +26,7 @@ export class PersonalTokensService {
     };
   }
 
-  async createToken(userId: string, name: string, expiresInDays?: number) {
+  async createToken(userId: number, name: string, expiresInDays?: number) {
     const token = randomBytes(24).toString('hex');
     const expiresAt = expiresInDays
       ? new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000)
@@ -47,7 +47,7 @@ export class PersonalTokensService {
     };
   }
 
-  async updateToken(userId: string, id: number, name: string) {
+  async updateToken(userId: number, id: number, name: string) {
     await this.db
       .update(personalAccessTokens)
       .set({ name })
@@ -55,7 +55,7 @@ export class PersonalTokensService {
     return { success: true };
   }
 
-  async deleteToken(userId: string, id: number) {
+  async deleteToken(userId: number, id: number) {
     await this.db
       .delete(personalAccessTokens)
       .where(and(eq(personalAccessTokens.id, id), eq(personalAccessTokens.userId, userId)));

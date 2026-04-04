@@ -1,15 +1,15 @@
-'use client'
+'use client';
 
-import { useState, useMemo } from 'react'
-import { X, ChevronDown, ChevronRight, Folder, Search } from 'lucide-react'
-import type { ComponentMeta, ComponentGroup } from './types'
+import { useState, useMemo } from 'react';
+import { X, ChevronDown, ChevronRight, Folder, Search } from 'lucide-react';
+import type { ComponentMeta, ComponentGroup } from './types';
 
 interface Props {
-  open: boolean
-  allowedComponents: ComponentMeta[]
-  allGroups: ComponentGroup[]
-  onAdd: (componentName: string) => void
-  onClose: () => void
+  open: boolean;
+  allowedComponents: ComponentMeta[];
+  allGroups: ComponentGroup[];
+  onAdd: (componentName: string) => void;
+  onClose: () => void;
 }
 
 function initials(name: string): string {
@@ -18,12 +18,12 @@ function initials(name: string): string {
     .filter(Boolean)
     .slice(0, 2)
     .map((w) => w[0].toUpperCase())
-    .join('')
+    .join('');
 }
 
 function ComponentIcon({ component }: { component: ComponentMeta }) {
-  const bg = component.color ?? '#94a3b8'
-  const label = initials(component.display_name || component.name)
+  const bg = component.color ?? '#94a3b8';
+  const label = initials(component.display_name || component.name);
   return (
     <div
       className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 text-white text-xs font-bold"
@@ -31,20 +31,20 @@ function ComponentIcon({ component }: { component: ComponentMeta }) {
     >
       {label}
     </div>
-  )
+  );
 }
 
 interface FolderSectionProps {
-  groupName: string
-  components: ComponentMeta[]
-  onAdd: (name: string) => void
-  forceOpen?: boolean
+  groupName: string;
+  components: ComponentMeta[];
+  onAdd: (name: string) => void;
+  forceOpen?: boolean;
 }
 
 function FolderSection({ groupName, components, onAdd, forceOpen }: FolderSectionProps) {
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = useState(true);
 
-  const isOpen = forceOpen !== undefined ? forceOpen : open
+  const isOpen = forceOpen !== undefined ? forceOpen : open;
 
   return (
     <div>
@@ -85,48 +85,48 @@ function FolderSection({ groupName, components, onAdd, forceOpen }: FolderSectio
         </div>
       )}
     </div>
-  )
+  );
 }
 
 export function InsertBlockPanel({ open, allowedComponents, allGroups, onAdd, onClose }: Props) {
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState('');
 
   const filtered = useMemo(() => {
-    if (!search.trim()) return allowedComponents
-    const q = search.toLowerCase()
+    if (!search.trim()) return allowedComponents;
+    const q = search.toLowerCase();
     return allowedComponents.filter(
       (c) =>
         c.name.toLowerCase().includes(q) ||
         (c.display_name ?? '').toLowerCase().includes(q) ||
         (c.description ?? '').toLowerCase().includes(q),
-    )
-  }, [allowedComponents, search])
+    );
+  }, [allowedComponents, search]);
 
   // Group components
   const grouped = useMemo(() => {
-    const groupMap = new Map<string, { name: string; components: ComponentMeta[] }>()
+    const groupMap = new Map<string, { name: string; components: ComponentMeta[] }>();
 
     // Build group name lookup
-    const groupNames = new Map(allGroups.map((g) => [g.uuid, g.name]))
+    const groupNames = new Map(allGroups.map((g) => [g.uuid, g.name]));
 
     for (const c of filtered) {
-      const key = c.component_group_uuid ?? '__ungrouped'
+      const key = c.component_group_uuid ?? '__ungrouped';
       const name = c.component_group_uuid
         ? (groupNames.get(c.component_group_uuid) ?? c.component_group_uuid)
-        : 'Other'
-      if (!groupMap.has(key)) groupMap.set(key, { name, components: [] })
-      groupMap.get(key)!.components.push(c)
+        : 'Other';
+      if (!groupMap.has(key)) groupMap.set(key, { name, components: [] });
+      groupMap.get(key)!.components.push(c);
     }
 
     // Sort groups alphabetically
     return Array.from(groupMap.entries())
       .sort(([, a], [, b]) => a.name.localeCompare(b.name))
-      .map(([, v]) => v)
-  }, [filtered, allGroups])
+      .map(([, v]) => v);
+  }, [filtered, allGroups]);
 
-  if (!open) return null
+  if (!open) return null;
 
-  const isSearching = search.trim().length > 0
+  const isSearching = search.trim().length > 0;
 
   return (
     <>
@@ -153,7 +153,6 @@ export function InsertBlockPanel({ open, allowedComponents, allGroups, onAdd, on
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               type="text"
-              autoFocus
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={`Filter ${allowedComponents.length} component blocks`}
@@ -175,12 +174,15 @@ export function InsertBlockPanel({ open, allowedComponents, allGroups, onAdd, on
               key={group.name}
               groupName={group.name}
               components={group.components}
-              onAdd={(name) => { onAdd(name); onClose() }}
+              onAdd={(name) => {
+                onAdd(name);
+                onClose();
+              }}
               forceOpen={isSearching ? true : undefined}
             />
           ))}
         </div>
       </div>
     </>
-  )
+  );
 }

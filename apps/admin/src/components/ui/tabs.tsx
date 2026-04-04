@@ -1,23 +1,25 @@
-'use client'
+'use client';
 
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/utils';
 
 export interface Tab {
-  id: string
-  label: string
-  count?: number
+  id: string;
+  label: string;
+  count?: number;
 }
 
 interface TabsProps {
-  tabs: Tab[]
-  activeTab: string
-  onChange: (id: string) => void
-  className?: string
+  tabs: Tab[];
+  activeTab: string;
+  onChange: (id: string) => void;
+  className?: string;
 }
 
 export function Tabs({ tabs, activeTab, onChange, className }: TabsProps) {
   return (
-    <div className={cn('flex items-center border-b border-gray-200 dark:border-gray-700', className)}>
+    <div
+      className={cn('flex items-center border-b border-gray-200 dark:border-gray-700', className)}
+    >
       {tabs.map((tab) => (
         <button
           key={tab.id}
@@ -45,5 +47,5 @@ export function Tabs({ tabs, activeTab, onChange, className }: TabsProps) {
         </button>
       ))}
     </div>
-  )
+  );
 }

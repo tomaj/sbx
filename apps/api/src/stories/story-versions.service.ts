@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, count, desc, eq, inArray, isNull } from 'drizzle-orm';
 import { DB } from '../db/db.module';
-import type { DbType } from '../db/db.module';
+import { DbType } from '../db/db.module';
 import { storyVersions, users } from '../db/schema';
 
 @Injectable()
@@ -19,10 +19,7 @@ export class StoryVersionsService {
     const { spaceId, storyId, releaseId, page, perPage, showContent } = opts;
     const offset = (page - 1) * perPage;
 
-    const conditions = [
-      eq(storyVersions.spaceId, spaceId),
-      eq(storyVersions.storyId, storyId),
-    ];
+    const conditions = [eq(storyVersions.spaceId, spaceId), eq(storyVersions.storyId, storyId)];
 
     // by_release_id=0 means "no release" (main branch only)
     if (releaseId !== undefined) {
@@ -35,10 +32,7 @@ export class StoryVersionsService {
 
     const where = and(...conditions);
 
-    const [{ total }] = await this.db
-      .select({ total: count() })
-      .from(storyVersions)
-      .where(where);
+    const [{ total }] = await this.db.select({ total: count() }).from(storyVersions).where(where);
 
     const rows = await this.db
       .select({
@@ -66,11 +60,20 @@ export class StoryVersionsService {
 
     // Fetch user info for all unique userIds
     const userIds = [...new Set(rows.map((r) => r.userId).filter(Boolean))] as number[];
-    const userMap = new Map<number, { id: number; name: string; email: string; avatar_url: string | null }>();
+    const userMap = new Map<
+      number,
+      { id: number; name: string; email: string; avatar_url: string | null }
+    >();
 
     if (userIds.length > 0) {
       const userRows = await this.db
-        .select({ id: users.id, firstname: users.firstname, lastname: users.lastname, email: users.email, avatar: users.avatar })
+        .select({
+          id: users.id,
+          firstname: users.firstname,
+          lastname: users.lastname,
+          email: users.email,
+          avatar: users.avatar,
+        })
         .from(users)
         .where(inArray(users.id, userIds));
       for (const u of userRows) {
@@ -87,8 +90,8 @@ export class StoryVersionsService {
         user_id: r.userId ?? null,
         user: userObj ?? null,
         story_id: r.storyId,
-        meta_data: {},                        // Storyblok compat
-        parent_id: null,                      // Storyblok compat
+        meta_data: {}, // Storyblok compat
+        parent_id: null, // Storyblok compat
         release_id: r.releaseId ?? null,
         status: r.status,
         // Extended fields (beyond Storyblok)
@@ -121,11 +124,13 @@ export class StoryVersionsService {
     const [latest] = await this.db
       .select()
       .from(storyVersions)
-      .where(and(
-        eq(storyVersions.spaceId, spaceId),
-        eq(storyVersions.storyId, storyId),
-        isNull(storyVersions.releaseId),
-      ))
+      .where(
+        and(
+          eq(storyVersions.spaceId, spaceId),
+          eq(storyVersions.storyId, storyId),
+          isNull(storyVersions.releaseId),
+        ),
+      )
       .orderBy(desc(storyVersions.createdAt))
       .limit(1);
 
@@ -168,7 +173,11 @@ function formatVersion(v: any) {
 }
 
 /** Recursively diff two content objects, returning changed field paths */
-function diffContent(a: Record<string, any>, b: Record<string, any>, prefix = ''): Array<{ path: string; old: any; new: any }> {
+function diffContent(
+  a: Record<string, any>,
+  b: Record<string, any>,
+  prefix = '',
+): Array<{ path: string; old: any; new: any }> {
   const changes: Array<{ path: string; old: any; new: any }> = [];
   const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
 
@@ -179,9 +188,12 @@ function diffContent(a: Record<string, any>, b: Record<string, any>, prefix = ''
 
     if (JSON.stringify(valA) !== JSON.stringify(valB)) {
       if (
-        valA && valB &&
-        typeof valA === 'object' && typeof valB === 'object' &&
-        !Array.isArray(valA) && !Array.isArray(valB)
+        valA &&
+        valB &&
+        typeof valA === 'object' &&
+        typeof valB === 'object' &&
+        !Array.isArray(valA) &&
+        !Array.isArray(valB)
       ) {
         changes.push(...diffContent(valA, valB, path));
       } else {

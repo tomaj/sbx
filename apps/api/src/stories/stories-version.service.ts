@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import { DB } from '../db/db.module';
-import type { DbType } from '../db/db.module';
+import { DbType } from '../db/db.module';
 import { storyVersions } from '../db/schema';
 
 export interface LogVersionParams {
@@ -53,9 +53,7 @@ export class StoriesVersionService {
         });
       })
       .catch((err) => {
-        this.logger.warn(
-          `Failed to log story version for story ${params.storyId}: ${err.message}`,
-        );
+        this.logger.warn(`Failed to log story version for story ${params.storyId}: ${err.message}`);
       });
   }
 }

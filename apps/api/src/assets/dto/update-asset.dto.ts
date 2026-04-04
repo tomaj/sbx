@@ -1,171 +1,89 @@
-import { Type } from 'class-transformer';
-import {
-  IsArray,
-  IsBoolean,
-  IsNumber,
-  IsObject,
-  IsOptional,
-  IsString,
-  ValidateNested,
-} from 'class-validator';
+import { z } from 'zod';
+import { createZodDto } from 'nestjs-zod';
 
 // ─── MAPI asset update (wrapped in "asset" key) ─────────────────────────────
 
-export class AssetDataDto {
-  @IsString()
-  @IsOptional()
-  title?: string | null;
+const AssetDataSchema = z.object({
+  title: z.string().nullable().optional(),
+  alt: z.string().nullable().optional(),
+  copyright: z.string().nullable().optional(),
+  focus: z.string().nullable().optional(),
+  expire_at: z.string().nullable().optional(),
+  locked: z.boolean().optional(),
+  asset_folder_id: z.number().int().nullable().optional(),
+  is_private: z.boolean().optional(),
+  meta_data: z.record(z.string(), z.unknown()).optional(),
+  internal_tag_ids: z.array(z.number().int()).optional(),
+  publish_at: z.string().nullable().optional(),
+});
 
-  @IsString()
-  @IsOptional()
-  alt?: string | null;
+const UpdateAssetSchema = z.object({
+  asset: AssetDataSchema.optional(),
+});
 
-  @IsString()
-  @IsOptional()
-  copyright?: string | null;
-
-  @IsString()
-  @IsOptional()
-  focus?: string | null;
-
-  @IsString()
-  @IsOptional()
-  expire_at?: string | null;
-
-  @IsBoolean()
-  @IsOptional()
-  locked?: boolean;
-
-  @IsNumber()
-  @IsOptional()
-  asset_folder_id?: number | null;
-
-  @IsBoolean()
-  @IsOptional()
-  is_private?: boolean;
-
-  @IsObject()
-  @IsOptional()
-  meta_data?: Record<string, any>;
-
-  @IsArray()
-  @IsNumber({}, { each: true })
-  @IsOptional()
-  internal_tag_ids?: number[];
-
-  @IsString()
-  @IsOptional()
-  publish_at?: string | null;
-}
-
-export class UpdateAssetDto {
-  @ValidateNested()
-  @Type(() => AssetDataDto)
-  @IsOptional()
-  asset?: AssetDataDto;
-}
+export class UpdateAssetDto extends createZodDto(UpdateAssetSchema) {}
 
 // ─── Admin asset update (flat body, no wrapper) ──────────────────────────────
 
-export class UpdateAssetAdminDto {
-  @IsString()
-  @IsOptional()
-  title?: string | null;
+const UpdateAssetAdminSchema = z.object({
+  title: z.string().nullable().optional(),
+  alt: z.string().nullable().optional(),
+  copyright: z.string().nullable().optional(),
+  focus: z.string().nullable().optional(),
+  expire_at: z.string().nullable().optional(),
+  locked: z.boolean().optional(),
+  folder_id: z.number().int().nullable().optional(),
+  meta_data: z.record(z.string(), z.unknown()).optional(),
+  internal_tag_ids: z.array(z.number().int()).optional(),
+});
 
-  @IsString()
-  @IsOptional()
-  alt?: string | null;
-
-  @IsString()
-  @IsOptional()
-  copyright?: string | null;
-
-  @IsString()
-  @IsOptional()
-  focus?: string | null;
-
-  @IsString()
-  @IsOptional()
-  expire_at?: string | null;
-
-  @IsBoolean()
-  @IsOptional()
-  locked?: boolean;
-
-  @IsNumber()
-  @IsOptional()
-  folder_id?: number | null;
-
-  @IsObject()
-  @IsOptional()
-  meta_data?: Record<string, any>;
-
-  @IsArray()
-  @IsNumber({}, { each: true })
-  @IsOptional()
-  internal_tag_ids?: number[];
-}
+export class UpdateAssetAdminDto extends createZodDto(UpdateAssetAdminSchema) {}
 
 // ─── Sign upload ─────────────────────────────────────────────────────────────
 
-export class SignUploadDto {
-  @IsString()
-  filename!: string;
+const SignUploadSchema = z.object({
+  filename: z.string().min(1),
+  size: z.number().int().positive(),
+  content_type: z.string().optional(),
+});
 
-  @IsNumber()
-  size!: number;
-
-  @IsString()
-  @IsOptional()
-  content_type?: string;
-}
+export class SignUploadDto extends createZodDto(SignUploadSchema) {}
 
 // ─── Bulk operations ─────────────────────────────────────────────────────────
 
-export class BulkUpdateDto {
-  @IsNumber()
-  asset_folder_id!: number;
+const BulkUpdateSchema = z.object({
+  asset_folder_id: z.number().int(),
+  ids: z.array(z.number().int()),
+});
 
-  @IsArray()
-  @IsNumber({}, { each: true })
-  ids!: number[];
-}
+export class BulkUpdateDto extends createZodDto(BulkUpdateSchema) {}
 
-export class BulkIdsDto {
-  @IsArray()
-  @IsNumber({}, { each: true })
-  ids!: number[];
-}
+const BulkIdsSchema = z.object({
+  ids: z.array(z.number().int()),
+});
+
+export class BulkIdsDto extends createZodDto(BulkIdsSchema) {}
 
 // ─── Asset folder ────────────────────────────────────────────────────────────
 
-export class CreateAssetFolderDataDto {
-  @IsString()
-  name!: string;
+const CreateAssetFolderDataSchema = z.object({
+  name: z.string().min(1),
+  parent_id: z.number().int().nullable().optional(),
+});
 
-  @IsNumber()
-  @IsOptional()
-  parent_id?: number | null;
-}
+const CreateAssetFolderSchema = z.object({
+  asset_folder: CreateAssetFolderDataSchema,
+});
 
-export class CreateAssetFolderDto {
-  @ValidateNested()
-  @Type(() => CreateAssetFolderDataDto)
-  asset_folder!: CreateAssetFolderDataDto;
-}
+export class CreateAssetFolderDto extends createZodDto(CreateAssetFolderSchema) {}
 
-export class UpdateAssetFolderDataDto {
-  @IsString()
-  @IsOptional()
-  name?: string;
+const UpdateAssetFolderDataSchema = z.object({
+  name: z.string().min(1).optional(),
+  parent_id: z.number().int().nullable().optional(),
+});
 
-  @IsNumber()
-  @IsOptional()
-  parent_id?: number | null;
-}
+const UpdateAssetFolderSchema = z.object({
+  asset_folder: UpdateAssetFolderDataSchema,
+});
 
-export class UpdateAssetFolderDto {
-  @ValidateNested()
-  @Type(() => UpdateAssetFolderDataDto)
-  asset_folder!: UpdateAssetFolderDataDto;
-}
+export class UpdateAssetFolderDto extends createZodDto(UpdateAssetFolderSchema) {}

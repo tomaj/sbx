@@ -1,34 +1,34 @@
-'use client'
+'use client';
 
-import { useState, useEffect } from 'react'
-import { Building2 } from 'lucide-react'
-import { RightSidebar } from '@/components/ui/right-sidebar'
+import { useState, useEffect } from 'react';
+import { Building2 } from 'lucide-react';
+import { RightSidebar } from '@/components/ui/right-sidebar';
 
 interface CreateSpacePanelProps {
-  open: boolean
-  onClose: () => void
-  onCreated: (spaceId: number) => void
+  open: boolean;
+  onClose: () => void;
+  onCreated: (spaceId: number) => void;
 }
 
 export function CreateSpacePanel({ open, onClose, onCreated }: CreateSpacePanelProps) {
-  const [name, setName] = useState('')
-  const [domain, setDomain] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [name, setName] = useState('');
+  const [domain, setDomain] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!open) return
-    setName('')
-    setDomain('')
-    setError(null)
-  }, [open])
+    if (!open) return;
+    setName('');
+    setDomain('');
+    setError(null);
+  }, [open]);
 
-  const canCreate = name.trim().length > 0
+  const canCreate = name.trim().length > 0;
 
   async function handleCreate() {
-    if (!canCreate) return
-    setSaving(true)
-    setError(null)
+    if (!canCreate) return;
+    setSaving(true);
+    setError(null);
     try {
       const res = await fetch('/api/admin/spaces', {
         method: 'POST',
@@ -37,16 +37,16 @@ export function CreateSpacePanel({ open, onClose, onCreated }: CreateSpacePanelP
           name: name.trim(),
           domain: domain.trim() || null,
         }),
-      })
+      });
       if (!res.ok) {
-        const d = await res.json()
-        setError(d.message ?? 'Failed to create space')
-        return
+        const d = await res.json();
+        setError(d.message ?? 'Failed to create space');
+        return;
       }
-      const data = await res.json()
-      onCreated(data.space?.id)
+      const data = await res.json();
+      onCreated(data.space?.id);
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
   }
 
@@ -96,7 +96,6 @@ export function CreateSpacePanel({ open, onClose, onCreated }: CreateSpacePanelP
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="e.g. Marketing"
-            autoFocus
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
           />
         </div>
@@ -118,5 +117,5 @@ export function CreateSpacePanel({ open, onClose, onCreated }: CreateSpacePanelP
         </div>
       </div>
     </RightSidebar>
-  )
+  );
 }

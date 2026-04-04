@@ -1,17 +1,24 @@
-import { Inject, Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Inject, Injectable, ConflictException } from '@nestjs/common';
+import { ResultGuard } from '../shared/result-guard.util';
 import { and, eq, ilike, asc } from 'drizzle-orm';
+import { escapeLike } from '../shared/query-parser.util';
 import { DB } from '../db/db.module';
-import type { DbType } from '../db/db.module';
+import { DbType } from '../db/db.module';
 import { fieldTypes } from '../db/schema';
+import { ENV } from '../config/config.module';
+import type { Env } from '../config/env.schema';
 
 @Injectable()
 export class FieldTypesService {
-  constructor(@Inject(DB) private db: DbType) {}
+  constructor(
+    @Inject(DB) private db: DbType,
+    @Inject(ENV) private env: Env,
+  ) {}
 
   async list(opts: { search?: string; onlyMine?: boolean; page?: number; perPage?: number } = {}) {
     const conditions: any[] = [];
     if (opts.search?.trim()) {
-      conditions.push(ilike(fieldTypes.name, `%${opts.search.trim()}%`));
+      conditions.push(ilike(fieldTypes.name, `%${escapeLike(opts.search.trim())}%`));
     }
 
     const query = this.db
@@ -31,12 +38,16 @@ export class FieldTypesService {
 
   async getOne(id: number) {
     const [row] = await this.db.select().from(fieldTypes).where(eq(fieldTypes.id, id)).limit(1);
-    if (!row) throw new NotFoundException('Field type not found');
+    ResultGuard.throwIfNotFound(row, 'Field type not found');
     return { field_type: this.format(row) };
   }
 
   async create(data: { name: string; body?: string; compiled_body?: string }) {
-    const [existing] = await this.db.select({ id: fieldTypes.id }).from(fieldTypes).where(eq(fieldTypes.name, data.name)).limit(1);
+    const [existing] = await this.db
+      .select({ id: fieldTypes.id })
+      .from(fieldTypes)
+      .where(eq(fieldTypes.name, data.name))
+      .limit(1);
     if (existing) throw new ConflictException(`Field type "${data.name}" already exists`);
 
     const [row] = await this.db
@@ -52,9 +63,23 @@ export class FieldTypesService {
     return { field_type: this.format(row) };
   }
 
-  async update(id: number, data: { name?: string; body?: string; compiled_body?: string; space_ids?: number[]; options?: any[] }, opts?: { publish?: boolean }) {
-    const [existing] = await this.db.select({ id: fieldTypes.id }).from(fieldTypes).where(eq(fieldTypes.id, id)).limit(1);
-    if (!existing) throw new NotFoundException('Field type not found');
+  async update(
+    id: number,
+    data: {
+      name?: string;
+      body?: string;
+      compiled_body?: string;
+      space_ids?: number[];
+      options?: any[];
+    },
+    _opts?: { publish?: boolean },
+  ) {
+    const [existing] = await this.db
+      .select({ id: fieldTypes.id })
+      .from(fieldTypes)
+      .where(eq(fieldTypes.id, id))
+      .limit(1);
+    ResultGuard.throwIfNotFound(existing, 'Field type not found');
 
     const updateData: Record<string, any> = { updatedAt: new Date() };
     if (data.name !== undefined) updateData.name = data.name;
@@ -63,18 +88,35 @@ export class FieldTypesService {
     if (data.space_ids !== undefined) updateData.spaceIds = data.space_ids;
     if (data.options !== undefined) updateData.options = data.options;
 
-    const [row] = await this.db.update(fieldTypes).set(updateData).where(eq(fieldTypes.id, id)).returning();
+    const [row] = await this.db
+      .update(fieldTypes)
+      .set(updateData)
+      .where(eq(fieldTypes.id, id))
+      .returning();
     return { field_type: this.format(row) };
   }
 
   async remove(id: number) {
-    const [existing] = await this.db.select({ id: fieldTypes.id }).from(fieldTypes).where(eq(fieldTypes.id, id)).limit(1);
-    if (!existing) throw new NotFoundException('Field type not found');
+    const [existing] = await this.db
+      .select({ id: fieldTypes.id })
+      .from(fieldTypes)
+      .where(eq(fieldTypes.id, id))
+      .limit(1);
+    ResultGuard.throwIfNotFound(existing, 'Field type not found');
     await this.db.delete(fieldTypes).where(eq(fieldTypes.id, id));
     return {};
   }
 
-  async getHtml(name: string, theme = 'light', extraParams: Record<string, string> = {}): Promise<string> {
+  async getHtml(
+    name: string,
+    theme = 'light',
+    extraParams: Record<string, string> = {},
+    parentOrigin?: string,
+  ): Promise<string> {
+    // Default to ADMIN_URL for postMessage origin validation — never use '*'
+    if (!parentOrigin || parentOrigin === '*') {
+      parentOrigin = this.env.ADMIN_URL;
+    }
     const [row] = await this.db
       .select({ compiledBody: fieldTypes.compiledBody })
       .from(fieldTypes)
@@ -84,24 +126,34 @@ export class FieldTypesService {
     const compiledBody = row?.compiledBody?.trim() ?? '';
 
     if (!compiledBody) {
-      // Proxy from Storyblok CDN — forward all params so host/protocol/uid are passed through
+      // Proxy from Storyblok CDN — forward theme + safe params (strip protocol/host — server derives admin origin from env)
       try {
-        const params = new URLSearchParams({ theme, ...extraParams });
+        // Remove client-supplied origin hints — we use server-side ADMIN_URL instead
+        const { protocol: _p, host: _h, ...safeParams } = extraParams;
+        const params = new URLSearchParams({ theme, ...safeParams });
         const sbUrl = `https://plugins.storyblok.com/v1/field_types/${encodeURIComponent(name)}/get_html?${params.toString()}`;
         const sbRes = await fetch(sbUrl);
         if (sbRes.ok) {
           let html = await sbRes.text();
           // Patch hardcoded Storyblok origin so plugin communicates with our admin
-          const adminOrigin = `${extraParams.protocol ?? 'http:'}\/\/${extraParams.host ?? 'localhost:3001'}`;
+          const adminOrigin = this.env.ADMIN_URL;
           html = html.replace(/https?:\/\/app\.storyblok\.com/g, adminOrigin);
           // Inject transparent background so our dark wrapper shows through
-          html = html.replace('</head>', '<style>html,body{background:transparent!important}</style></head>');
+          html = html.replace(
+            '</head>',
+            '<style>html,body{background:transparent!important}</style></head>',
+          );
           return html;
         }
       } catch {
         // ignore, fall through to empty placeholder
       }
-      return `<!DOCTYPE html><html><body style="margin:0;display:flex;align-items:center;padding:8px;font-family:sans-serif;font-size:12px;color:#9ca3af">Plugin "${name}" has no compiled body.</body></html>`;
+      const safeName = name.replace(
+        /[&<>"']/g,
+        (c: string) =>
+          ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] ?? c,
+      );
+      return `<!DOCTYPE html><html><body style="margin:0;display:flex;align-items:center;padding:8px;font-family:sans-serif;font-size:12px;color:#9ca3af">Plugin "${safeName}" has no compiled body.</body></html>`;
     }
 
     const isDark = theme === 'dark';
@@ -122,7 +174,12 @@ body { margin: 0; padding: 8px; background: ${bg}; color: ${fg}; font-family: -a
 <script>
 (function () {
   var uid = null;
+  var parentOrigin = ${JSON.stringify(parentOrigin)};
   window.__sbxPlugin = null;
+
+  function sendToParent(data) {
+    try { window.parent.postMessage(data, parentOrigin); } catch (_) {}
+  }
 
   window.Storyblok = {
     plugin: {
@@ -140,7 +197,7 @@ body { margin: 0; padding: 8px; background: ${bg}; color: ${fg}; font-family: -a
       watch: {
         model: {
           handler: function (v) {
-            window.parent.postMessage({ action: 'change', value: v, uid: uid }, '*');
+            sendToParent({ action: 'change', value: v, uid: uid });
             setTimeout(notifyHeight, 50);
           },
           deep: true
@@ -151,11 +208,13 @@ body { margin: 0; padding: 8px; background: ${bg}; color: ${fg}; font-family: -a
   };
 
   function notifyHeight() {
-    window.parent.postMessage({ action: 'height', height: document.documentElement.scrollHeight, uid: uid }, '*');
+    sendToParent({ action: 'height', height: document.documentElement.scrollHeight, uid: uid });
   }
 
   window.addEventListener('message', function (e) {
     if (!e.data) return;
+    // Verify origin when parentOrigin is set
+    if (parentOrigin !== '*' && e.origin !== parentOrigin) return;
     // Storyblok protocol: parent sends { action: 'loaded', value, schema, uid }
     if (e.data.action === 'loaded') {
       uid = e.data.uid || null;
@@ -170,11 +229,11 @@ body { margin: 0; padding: 8px; background: ${bg}; color: ${fg}; font-family: -a
     }
   });
 })();
-<\/script>
-<script src="https://cdn.jsdelivr.net/npm/vue@2.7.16/dist/vue.min.js"><\/script>
+</script>
+<script src="https://cdn.jsdelivr.net/npm/vue@2.7.16/dist/vue.min.js"></script>
 <script>
 ${compiledBody}
-<\/script>
+</script>
 <script>
 (function () {
   var component = window.__sbxPlugin;
@@ -186,7 +245,7 @@ ${compiledBody}
 
   if (!component) {
     document.getElementById('app').innerHTML = '<div style="color:#9ca3af;padding:4px;font-size:12px;font-style:italic">Plugin could not initialize</div>';
-    window.parent.postMessage({ action: 'height', height: 32 }, '*');
+    sendToParent({ action: 'height', height: 32 });
     return;
   }
 
@@ -198,12 +257,12 @@ ${compiledBody}
   });
 
   // Tell parent we're ready (Storyblok protocol: plugin sends 'loaded', parent responds with value)
-  window.parent.postMessage({ action: 'loaded' }, '*');
+  sendToParent({ action: 'loaded' });
   setTimeout(function () {
-    window.parent.postMessage({ action: 'height', height: document.documentElement.scrollHeight }, '*');
+    sendToParent({ action: 'height', height: document.documentElement.scrollHeight });
   }, 200);
 })();
-<\/script>
+</script>
 </body>
 </html>`;
   }

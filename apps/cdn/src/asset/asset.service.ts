@@ -1,14 +1,29 @@
-import { Injectable, NotFoundException, PayloadTooLargeException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+  PayloadTooLargeException,
+} from '@nestjs/common';
 import { StorageService } from '../storage/storage.service';
 import { splitOnMarker, parseOperations } from './url-parser';
-import { processImage, ProcessResult } from './sharp-processor';
+import { processImage, type ProcessResult } from './sharp-processor';
 
 /** Maximum asset size: 100 MB — prevents memory exhaustion from oversized files */
 const MAX_ASSET_SIZE = 100 * 1024 * 1024;
 
 // Extensions handled by the Sharp image processor
 const IMAGE_EXTENSIONS = new Set([
-  'jpg', 'jpeg', 'png', 'gif', 'webp', 'avif', 'tiff', 'tif', 'bmp', 'heic', 'heif',
+  'jpg',
+  'jpeg',
+  'png',
+  'gif',
+  'webp',
+  'avif',
+  'tiff',
+  'tif',
+  'bmp',
+  'heic',
+  'heif',
 ]);
 
 // MIME type map for all supported asset types
@@ -81,9 +96,10 @@ export class AssetService {
     const ext = getExtension(urlPath);
 
     // AVIF is not supported in China — downgrade to WebP
-    const effectiveAccept = viewerCountry === 'CN'
-      ? accept.replace('image/avif,', '').replace(',image/avif', '').replace('image/avif', '')
-      : accept;
+    const effectiveAccept =
+      viewerCountry === 'CN'
+        ? accept.replace('image/avif,', '').replace(',image/avif', '').replace('image/avif', '')
+        : accept;
 
     if (IMAGE_EXTENSIONS.has(ext)) {
       return this.handleImage(urlPath, effectiveAccept);
@@ -129,7 +145,12 @@ export class AssetService {
       // Fall through to origin fallback for any storage error:
       // - NotFoundException: object not in MinIO
       // - Connection errors: MinIO is down (ECONNRESET, ECONNREFUSED, etc.)
-      if (err instanceof NotFoundException || (err as any)?.code === 'ECONNRESET' || (err as any)?.code === 'ECONNREFUSED' || (err as any)?.name === 'TimeoutError') {
+      if (
+        err instanceof NotFoundException ||
+        (err as any)?.code === 'ECONNRESET' ||
+        (err as any)?.code === 'ECONNREFUSED' ||
+        (err as any)?.name === 'TimeoutError'
+      ) {
         // continue to origin fallback below
       } else {
         throw err;
@@ -145,12 +166,16 @@ export class AssetService {
 
     const contentLength = Number(response.headers.get('content-length') ?? 0);
     if (contentLength > MAX_ASSET_SIZE) {
-      throw new PayloadTooLargeException(`Asset too large: ${contentLength} bytes (max ${MAX_ASSET_SIZE})`);
+      throw new PayloadTooLargeException(
+        `Asset too large: ${contentLength} bytes (max ${MAX_ASSET_SIZE})`,
+      );
     }
 
     const buffer = Buffer.from(await response.arrayBuffer());
     if (buffer.length > MAX_ASSET_SIZE) {
-      throw new PayloadTooLargeException(`Asset too large: ${buffer.length} bytes (max ${MAX_ASSET_SIZE})`);
+      throw new PayloadTooLargeException(
+        `Asset too large: ${buffer.length} bytes (max ${MAX_ASSET_SIZE})`,
+      );
     }
     return buffer;
   }
@@ -162,7 +187,17 @@ function getExtension(urlPath: string): string {
 }
 
 function toObjectKey(urlPath: string): string {
-  return urlPath.replace(/^\/f\//, '');
+  // Decode percent-encoded characters to catch double-encoding bypass attempts
+  let key = urlPath.replace(/^\/f\//, '');
+  try {
+    key = decodeURIComponent(key);
+  } catch {
+    // If decoding fails, continue with the raw key
+  }
+  if (key.includes('..') || key.startsWith('/') || key.includes('\0')) {
+    throw new BadRequestException('Invalid asset path');
+  }
+  return key;
 }
 
 function stripTransformSuffix(urlPath: string): string {

@@ -1,16 +1,9 @@
-import {
-  Body,
-  Controller,
-  Get,
-  HttpCode,
-  Param,
-  Post,
-  Query,
-  Req,
-} from '@nestjs/common';
+import { AuthenticatedRequest } from '../auth/authenticated-request.interface';
+import { Body, Controller, Get, HttpCode, Post, Query, Req } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Auth } from '../auth/auth.decorator';
 import { WorkflowStageChangesService } from './workflow-stage-changes.service';
+import { QueryParserUtil } from '../shared/query-parser.util';
 
 @ApiTags('Workflow Stage Changes - MAPI')
 @Controller('v1/spaces/:spaceId/workflow_stage_changes')
@@ -19,15 +12,18 @@ export class WorkflowStageChangesController {
   constructor(private readonly workflowStageChangesService: WorkflowStageChangesService) {}
 
   @Get()
-  async getWorkflowStageChanges(@Req() req: any, @Query('with_story') withStory?: string) {
-    const storyId = withStory ? parseInt(withStory) : undefined;
+  async getWorkflowStageChanges(
+    @Req() req: AuthenticatedRequest,
+    @Query('with_story') withStory?: string,
+  ) {
+    const storyId = QueryParserUtil.parseOptionalInt(withStory);
     return this.workflowStageChangesService.findAll(req.space.id, storyId);
   }
 
   @Post()
   @HttpCode(201)
   async createWorkflowStageChange(
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
     @Body()
     body: {
       workflow_stage_change: { workflow_stage_id: number; story_id: number };

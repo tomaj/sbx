@@ -1,29 +1,29 @@
-'use client'
+'use client';
 
-import { HelpCircle } from 'lucide-react'
-import { useState, useRef, useEffect } from 'react'
-import { createPortal } from 'react-dom'
-import { cn } from '@/lib/utils'
+import { HelpCircle } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { cn } from '@/lib/utils';
 
 interface InfoTooltipProps {
-  text: string
-  className?: string
+  text: string;
+  className?: string;
 }
 
 export function InfoTooltip({ text, className }: InfoTooltipProps) {
-  const [visible, setVisible] = useState(false)
-  const [coords, setCoords] = useState({ top: 0, left: 0 })
-  const ref = useRef<HTMLSpanElement>(null)
+  const [visible, setVisible] = useState(false);
+  const [coords, setCoords] = useState({ top: 0, left: 0 });
+  const ref = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
     if (visible && ref.current) {
-      const rect = ref.current.getBoundingClientRect()
+      const rect = ref.current.getBoundingClientRect();
       setCoords({
         top: rect.top + window.scrollY - 8,
         left: rect.left + rect.width / 2 + window.scrollX,
-      })
+      });
     }
-  }, [visible])
+  }, [visible]);
 
   return (
     <span
@@ -42,8 +42,8 @@ export function InfoTooltip({ text, className }: InfoTooltipProps) {
             {text}
             <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-800 dark:border-t-gray-700" />
           </div>,
-          document.body
+          document.body,
         )}
     </span>
-  )
+  );
 }

@@ -1,37 +1,40 @@
-'use client'
+'use client';
 
-import { useState } from 'react'
-import { ImageIcon, X } from 'lucide-react'
-import type { AssetFieldDef, MultiassetFieldDef } from '@/components/block-library/edit-block-modal/types'
-import { fieldLabel } from '../field-label'
-import { FieldLabel } from '../FieldLabel'
-import { AssetPickerModal } from '@/components/assets/asset-picker-modal'
-import { AssetThumb } from '@/components/assets/asset-thumb'
-import type { Asset } from '@/components/assets/asset-grid'
-import { normalizeAssetFilename } from '@/lib/utils'
+import { useState } from 'react';
+import { ImageIcon, X } from 'lucide-react';
+import type {
+  AssetFieldDef,
+  MultiassetFieldDef,
+} from '@/components/block-library/edit-block-modal/types';
+import { fieldLabel } from '../field-label';
+import { FieldLabel } from '../FieldLabel';
+import { AssetPickerModal } from '@/components/assets/asset-picker-modal';
+import { AssetThumb } from '@/components/assets/asset-thumb';
+import type { Asset } from '@/components/assets/asset-grid';
+import { normalizeAssetFilename } from '@/lib/utils';
 
 interface AssetValue {
-  id?: number
-  filename?: string
-  content_type?: string
-  alt?: string
-  title?: string
+  id?: number;
+  filename?: string;
+  content_type?: string;
+  alt?: string;
+  title?: string;
 }
 
 interface SingleProps {
-  fieldKey: string
-  def: AssetFieldDef
-  value: AssetValue | undefined
-  onChange: (v: AssetValue | undefined) => void
-  spaceId: string
+  fieldKey: string;
+  def: AssetFieldDef;
+  value: AssetValue | undefined;
+  onChange: (v: AssetValue | undefined) => void;
+  spaceId: string;
 }
 
 interface MultiProps {
-  fieldKey: string
-  def: MultiassetFieldDef
-  value: AssetValue[] | undefined
-  onChange: (v: AssetValue[]) => void
-  spaceId: string
+  fieldKey: string;
+  def: MultiassetFieldDef;
+  value: AssetValue[] | undefined;
+  onChange: (v: AssetValue[]) => void;
+  spaceId: string;
 }
 
 function assetToValue(asset: Asset): AssetValue {
@@ -41,7 +44,7 @@ function assetToValue(asset: Asset): AssetValue {
     content_type: asset.content_type,
     alt: asset.alt ?? undefined,
     title: asset.title ?? undefined,
-  }
+  };
 }
 
 function AssetCard({
@@ -50,18 +53,20 @@ function AssetCard({
   onRemove,
   onClick,
 }: {
-  value: AssetValue
-  spaceId: string
-  onRemove?: () => void
-  onClick?: () => void
+  value: AssetValue;
+  spaceId: string;
+  onRemove?: () => void;
+  onClick?: () => void;
 }) {
-  const filename = value.filename ?? ''
-  const shortName = filename.split('/').pop() ?? filename
-  const contentType = value.content_type ?? (
-    /\.(jpg|jpeg|png|gif|webp|avif)$/i.test(filename) ? 'image/jpeg' :
-    /\.svg$/i.test(filename) ? 'image/svg+xml' :
-    'application/octet-stream'
-  )
+  const filename = value.filename ?? '';
+  const shortName = filename.split('/').pop() ?? filename;
+  const contentType =
+    value.content_type ??
+    (/\.(jpg|jpeg|png|gif|webp|avif)$/i.test(filename)
+      ? 'image/jpeg'
+      : /\.svg$/i.test(filename)
+        ? 'image/svg+xml'
+        : 'application/octet-stream');
 
   return (
     <div className="flex items-center gap-3 border border-gray-200 dark:border-gray-700 rounded-xl p-2 bg-white dark:bg-gray-900">
@@ -94,14 +99,17 @@ function AssetCard({
       {onRemove && (
         <button
           type="button"
-          onClick={e => { e.stopPropagation(); onRemove() }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
           className="p-1 text-gray-300 hover:text-gray-500 dark:hover:text-gray-400 transition-colors flex-shrink-0"
         >
           <X className="w-4 h-4" />
         </button>
       )}
     </div>
-  )
+  );
 }
 
 function EmptyCard({ onClick }: { onClick: () => void }) {
@@ -116,19 +124,23 @@ function EmptyCard({ onClick }: { onClick: () => void }) {
       </div>
       <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">+ Add Asset</span>
     </button>
-  )
+  );
 }
 
 export function AssetField({ fieldKey, def, value, onChange, spaceId }: SingleProps) {
-  const [pickerOpen, setPickerOpen] = useState(false)
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   function handleSelect(assets: Asset[]) {
-    if (assets[0]) onChange(assetToValue(assets[0]))
+    if (assets[0]) onChange(assetToValue(assets[0]));
   }
 
   return (
     <div>
-      <FieldLabel label={fieldLabel(def.display_name, fieldKey)} required={def.required} description={def.description} />
+      <FieldLabel
+        label={fieldLabel(def.display_name, fieldKey)}
+        required={def.required}
+        description={def.description}
+      />
 
       {value?.filename ? (
         <AssetCard
@@ -150,26 +162,30 @@ export function AssetField({ fieldKey, def, value, onChange, spaceId }: SinglePr
         />
       )}
     </div>
-  )
+  );
 }
 
 export function MultiassetField({ fieldKey, def, value, onChange, spaceId }: MultiProps) {
-  const [pickerOpen, setPickerOpen] = useState(false)
-  const assets = value ?? []
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const assets = value ?? [];
 
   function handleSelect(picked: Asset[]) {
-    const existing = new Set(assets.map(a => a.id))
-    const newAssets = picked.filter(a => !existing.has(a.id)).map(assetToValue)
-    onChange([...assets, ...newAssets])
+    const existing = new Set(assets.map((a) => a.id));
+    const newAssets = picked.filter((a) => !existing.has(a.id)).map(assetToValue);
+    onChange([...assets, ...newAssets]);
   }
 
   function removeAt(index: number) {
-    onChange(assets.filter((_, i) => i !== index))
+    onChange(assets.filter((_, i) => i !== index));
   }
 
   return (
     <div>
-      <FieldLabel label={fieldLabel(def.display_name, fieldKey)} required={def.required} description={def.description} />
+      <FieldLabel
+        label={fieldLabel(def.display_name, fieldKey)}
+        required={def.required}
+        description={def.description}
+      />
 
       <div className="space-y-2">
         {assets.map((asset, i) => (
@@ -192,5 +208,5 @@ export function MultiassetField({ fieldKey, def, value, onChange, spaceId }: Mul
         />
       )}
     </div>
-  )
+  );
 }

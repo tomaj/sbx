@@ -1,47 +1,30 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  HttpCode,
-  Param,
-  Post,
-  Put,
-  Query,
-  Req,
-} from '@nestjs/common';
+import { Controller } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Auth } from '../auth/auth.decorator';
 import { BranchesService } from './branches.service';
+import { BaseCrudController } from '../shared/base-crud.controller';
 import { ResultGuard } from '../shared/result-guard.util';
+import { BaseCrudService } from '../shared/base-crud.service';
 
 @ApiTags('Branches - MAPI')
 @Controller('v1/spaces/:spaceId/branches')
 @Auth('session-or-token')
-export class BranchesController {
-  constructor(private readonly branchesService: BranchesService) {}
-
-  @Get()
-  async getBranches(
-    @Req() req: any,
-    @Query('by_ids') byIds?: string,
-    @Query('search') search?: string,
-  ) {
-    return this.branchesService.findAll(req.space.id, { by_ids: byIds, search });
+export class BranchesController extends BaseCrudController<unknown> {
+  constructor(private readonly branchesService: BranchesService) {
+    super();
   }
 
-  @Get(':id')
-  async getBranch(@Req() req: any, @Param('id') id: string) {
-    return ResultGuard.throwIfNotFound(await this.branchesService.findOne(req.space.id, parseInt(id)));
+  protected get service(): BaseCrudService<unknown> {
+    // BranchesService is not a BaseCrudService subclass but has compatible findOne/remove signatures
+    return this.branchesService as unknown as BaseCrudService<unknown>;
   }
 
-  @Post()
-  @HttpCode(201)
-  async createBranch(
-    @Req() req: any,
-    @Body() body: { branch: { name: string; source_id?: number; url?: string; position?: number } },
-  ) {
-    return this.branchesService.create(req.space.id, {
+  protected async doList(spaceId: number, query: Record<string, string>): Promise<unknown> {
+    return this.branchesService.findAll(spaceId, { by_ids: query.by_ids, search: query.search });
+  }
+
+  protected async doCreate(spaceId: number, body: any): Promise<unknown> {
+    return this.branchesService.create(spaceId, {
       name: body.branch.name,
       url: body.branch.url,
       position: body.branch.position,
@@ -49,25 +32,14 @@ export class BranchesController {
     });
   }
 
-  @Put(':id')
-  async updateBranch(
-    @Req() req: any,
-    @Param('id') id: string,
-    @Body() body: { branch: { name?: string; url?: string; position?: number; source_id?: number | null } },
-  ) {
+  protected async doUpdate(spaceId: number, id: number, body: any): Promise<unknown> {
     return ResultGuard.throwIfNotFound(
-      await this.branchesService.update(req.space.id, parseInt(id), {
+      await this.branchesService.update(spaceId, id, {
         name: body.branch.name,
         url: body.branch.url,
         position: body.branch.position,
         source_id: body.branch.source_id,
       }),
     );
-  }
-
-  @Delete(':id')
-  @HttpCode(204)
-  async deleteBranch(@Req() req: any, @Param('id') id: string) {
-    ResultGuard.throwIfNotFound(await this.branchesService.remove(req.space.id, parseInt(id)));
   }
 }

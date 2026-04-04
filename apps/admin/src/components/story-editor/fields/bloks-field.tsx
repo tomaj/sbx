@@ -1,77 +1,105 @@
-'use client'
+'use client';
 
-import { useState } from 'react'
-import { ChevronDown, ChevronRight, Plus, Trash2, GripVertical, Copy, Scissors, MessageSquare } from 'lucide-react'
-import { parseSchema } from '@/components/block-library/edit-block-modal/types'
-function uuidv4() { return crypto.randomUUID() }
-import type { BloksFieldDef } from '@/components/block-library/edit-block-modal/types'
-import type { ComponentMeta, ComponentGroup } from '../types'
-import { FieldRenderer } from '../field-renderer'
-import { InsertBlockPanel } from '../insert-block-panel'
+import { useState } from 'react';
+import {
+  ChevronDown,
+  ChevronRight,
+  Plus,
+  Trash2,
+  GripVertical,
+  Copy,
+  Scissors,
+  MessageSquare,
+} from 'lucide-react';
+import { parseSchema } from '@/components/block-library/edit-block-modal/types';
+function uuidv4() {
+  return crypto.randomUUID();
+}
+import type { BloksFieldDef } from '@/components/block-library/edit-block-modal/types';
+import type { ComponentMeta, ComponentGroup } from '../types';
+import { FieldRenderer } from '../field-renderer';
+import { InsertBlockPanel } from '../insert-block-panel';
 
 interface BlockItem {
-  _uid: string
-  component: string
-  [key: string]: any
+  _uid: string;
+  component: string;
+  [key: string]: any;
 }
 
 interface Props {
-  fieldKey: string
-  def: BloksFieldDef
-  value: BlockItem[] | undefined
-  onChange: (v: BlockItem[]) => void
-  allComponents: ComponentMeta[]
-  allGroups: ComponentGroup[]
-  spaceId: string
-  onOpenDiscussion?: (fieldKey: string, rect: DOMRect) => void
-  discussionCount?: number
-  isActiveDiscussion?: boolean
+  fieldKey: string;
+  def: BloksFieldDef;
+  value: BlockItem[] | undefined;
+  onChange: (v: BlockItem[]) => void;
+  allComponents: ComponentMeta[];
+  allGroups: ComponentGroup[];
+  spaceId: string;
+  onOpenDiscussion?: (fieldKey: string, rect: DOMRect) => void;
+  discussionCount?: number;
+  isActiveDiscussion?: boolean;
 }
 
-function getBlockPreview(block: BlockItem, schema: Record<string, any> | undefined, previewField: string | null): string {
-  if (!schema) return ''
+function getBlockPreview(
+  block: BlockItem,
+  schema: Record<string, any> | undefined,
+  previewField: string | null,
+): string {
+  if (!schema) return '';
   if (previewField && block[previewField] != null) {
-    const val = block[previewField]
-    if (typeof val === 'string') return val
-    if (typeof val === 'number') return String(val)
+    const val = block[previewField];
+    if (typeof val === 'string') return val;
+    if (typeof val === 'number') return String(val);
   }
   const entries = Object.entries(schema)
     .filter(([, def]) => def.type === 'text' || def.type === 'textarea')
-    .sort(([, a], [, b]) => (a.pos ?? 0) - (b.pos ?? 0))
+    .sort(([, a], [, b]) => (a.pos ?? 0) - (b.pos ?? 0));
   if (entries.length > 0) {
-    const [key] = entries[0]
-    const val = block[key]
-    if (typeof val === 'string' && val.length > 0) return val
+    const [key] = entries[0];
+    const val = block[key];
+    if (typeof val === 'string' && val.length > 0) return val;
   }
-  return ''
+  return '';
+}
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function renderPreviewTmpl(tmpl: string, data: Record<string, any>): string {
   return tmpl
     .replace(/\{\{@image\(it\.(\w+)(?:\.(\w+))?\)\s*\/?\}\}/g, (_, key, prop) => {
-      const obj = data[key]
-      if (!obj) return ''
+      const obj = data[key];
+      if (!obj) return '';
       const url = prop
-        ? (obj && typeof obj === 'object' ? obj[prop] : null)
-        : (typeof obj === 'string' ? obj : obj?.filename)
-      if (!url || typeof url !== 'string') return ''
-      return `<img src="${url}" style="max-width:120px;max-height:80px;object-fit:cover;border-radius:4px;margin-top:4px;" />`
+        ? obj && typeof obj === 'object'
+          ? obj[prop]
+          : null
+        : typeof obj === 'string'
+          ? obj
+          : obj?.filename;
+      if (!url || typeof url !== 'string') return '';
+      return `<img src="${escapeHtml(url)}" style="max-width:120px;max-height:80px;object-fit:cover;border-radius:4px;margin-top:4px;" />`;
     })
     .replace(/\{\{\s*it\.(\w+)\.length\s*\}\}/g, (_, key) => {
-      const val = data[key]
-      return Array.isArray(val) ? String(val.length) : '0'
+      const val = data[key];
+      return Array.isArray(val) ? String(val.length) : '0';
     })
     .replace(/\{\{\s*it\.(\w+)\.(\w+)\s*\}\}/g, (_, key, prop) => {
-      const obj = data[key]
-      if (obj && typeof obj === 'object' && obj[prop] != null) return String(obj[prop])
-      return ''
+      const obj = data[key];
+      if (obj && typeof obj === 'object' && obj[prop] != null) return escapeHtml(String(obj[prop]));
+      return '';
     })
     .replace(/\{\{\s*it\.(\w+)\s*\}\}/g, (_, key) => {
-      const val = data[key]
-      if (val === undefined || val === null) return ''
-      if (typeof val === 'string') return val
-      return String(val)
-    })
+      const val = data[key];
+      if (val === undefined || val === null) return '';
+      if (typeof val === 'string') return escapeHtml(val);
+      return escapeHtml(String(val));
+    });
 }
 
 // ── BlockFields with tabs support ────────────────────────────────────────────
@@ -84,25 +112,23 @@ function BlockFields({
   spaceId,
   onChange,
 }: {
-  schema: Record<string, any>
-  data: Record<string, any>
-  allComponents: ComponentMeta[]
-  allGroups: ComponentGroup[]
-  spaceId: string
-  onChange: (key: string, value: any) => void
+  schema: Record<string, any>;
+  data: Record<string, any>;
+  allComponents: ComponentMeta[];
+  allGroups: ComponentGroup[];
+  spaceId: string;
+  onChange: (key: string, value: any) => void;
 }) {
-  const [activeTab, setActiveTab] = useState(0)
-  const { tabs, fields } = parseSchema(schema)
-  const visibleTabs = tabs.filter((t) => fields.some((f) => f.tabKey === t.key))
-  const hasTabs = visibleTabs.length > 1
+  const [activeTab, setActiveTab] = useState(0);
+  const { tabs, fields } = parseSchema(schema);
+  const visibleTabs = tabs.filter((t) => fields.some((f) => f.tabKey === t.key));
+  const hasTabs = visibleTabs.length > 1;
 
-  const currentTab = hasTabs ? (visibleTabs[activeTab] ?? visibleTabs[0]) : visibleTabs[0]
-  const visibleFields = hasTabs
-    ? fields.filter((f) => f.tabKey === currentTab?.key)
-    : fields
+  const currentTab = hasTabs ? (visibleTabs[activeTab] ?? visibleTabs[0]) : visibleTabs[0];
+  const visibleFields = hasTabs ? fields.filter((f) => f.tabKey === currentTab?.key) : fields;
 
   if (visibleFields.length === 0 && !hasTabs) {
-    return <p className="text-sm text-gray-400">No fields defined</p>
+    return <p className="text-sm text-gray-400">No fields defined</p>;
   }
 
   return (
@@ -140,13 +166,13 @@ function BlockFields({
         ))}
       </div>
     </div>
-  )
+  );
 }
 
 // ── AddBlockDivider ───────────────────────────────────────────────────────────
 
 function AddBlockDivider({ onAdd, empty = false }: { onAdd: () => void; empty?: boolean }) {
-  const [hovered, setHovered] = useState(false)
+  const [hovered, setHovered] = useState(false);
 
   if (empty) {
     return (
@@ -160,12 +186,14 @@ function AddBlockDivider({ onAdd, empty = false }: { onAdd: () => void; empty?: 
         onMouseLeave={() => setHovered(false)}
         onClick={onAdd}
       >
-        <div className={`flex items-center gap-1.5 text-sm transition-colors ${hovered ? 'text-teal-600 dark:text-teal-400' : 'text-gray-300 dark:text-gray-600'}`}>
+        <div
+          className={`flex items-center gap-1.5 text-sm transition-colors ${hovered ? 'text-teal-600 dark:text-teal-400' : 'text-gray-300 dark:text-gray-600'}`}
+        >
           <Plus className="w-4 h-4" />
           <span>Add block</span>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -195,25 +223,25 @@ function AddBlockDivider({ onAdd, empty = false }: { onAdd: () => void; empty?: 
         <div className="absolute inset-x-0 top-1/2 h-px bg-gray-100 dark:bg-gray-800 pointer-events-none" />
       )}
     </div>
-  )
+  );
 }
 
 // ── BlockRow ──────────────────────────────────────────────────────────────────
 
 interface BlockRowProps {
-  block: BlockItem
-  allComponents: ComponentMeta[]
-  allGroups: ComponentGroup[]
-  spaceId: string
-  onUpdate: (block: BlockItem) => void
-  onRemove: () => void
-  onDuplicate: () => void
-  isDragging: boolean
-  isDragOver: boolean
-  onDragStart: () => void
-  onDragEnd: () => void
-  onDragOver: (e: React.DragEvent) => void
-  onDrop: () => void
+  block: BlockItem;
+  allComponents: ComponentMeta[];
+  allGroups: ComponentGroup[];
+  spaceId: string;
+  onUpdate: (block: BlockItem) => void;
+  onRemove: () => void;
+  onDuplicate: () => void;
+  isDragging: boolean;
+  isDragOver: boolean;
+  onDragStart: () => void;
+  onDragEnd: () => void;
+  onDragOver: (e: React.DragEvent) => void;
+  onDrop: () => void;
 }
 
 function BlockRow({
@@ -231,16 +259,18 @@ function BlockRow({
   onDragOver,
   onDrop,
 }: BlockRowProps) {
-  const [expanded, setExpanded] = useState(false)
+  const [expanded, setExpanded] = useState(false);
 
-  const componentMeta = allComponents.find((c) => c.name === block.component)
-  const schema = componentMeta?.schema
-  const displayName = componentMeta?.display_name || block.component
-  const previewTmpl = componentMeta?.preview_tmpl
-  const preview = previewTmpl ? null : getBlockPreview(block, schema, componentMeta?.preview_field ?? null)
+  const componentMeta = allComponents.find((c) => c.name === block.component);
+  const schema = componentMeta?.schema;
+  const displayName = componentMeta?.display_name || block.component;
+  const previewTmpl = componentMeta?.preview_tmpl;
+  const preview = previewTmpl
+    ? null
+    : getBlockPreview(block, schema, componentMeta?.preview_field ?? null);
 
   function handleFieldChange(key: string, value: any) {
-    onUpdate({ ...block, [key]: value })
+    onUpdate({ ...block, [key]: value });
   }
 
   return (
@@ -252,7 +282,10 @@ function BlockRow({
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
       onDragOver={onDragOver}
-      onDrop={(e) => { e.preventDefault(); onDrop() }}
+      onDrop={(e) => {
+        e.preventDefault();
+        onDrop();
+      }}
     >
       {/* Block header */}
       <div
@@ -274,14 +307,19 @@ function BlockRow({
         )}
 
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-semibold text-gray-800 dark:text-gray-200">{displayName}</div>
+          <div className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+            {displayName}
+          </div>
           {previewTmpl ? (
             <div
               className="text-xs text-gray-400 dark:text-gray-500 mt-0.5"
+              // biome-ignore lint/security/noDangerouslySetInnerHtml: intentional — renders CMS preview template from trusted admin config, not user input
               dangerouslySetInnerHTML={{ __html: renderPreviewTmpl(previewTmpl, block) }}
             />
           ) : preview ? (
-            <div className="text-xs text-gray-400 dark:text-gray-500 truncate mt-0.5">{preview}</div>
+            <div className="text-xs text-gray-400 dark:text-gray-500 truncate mt-0.5">
+              {preview}
+            </div>
           ) : null}
         </div>
 
@@ -290,16 +328,28 @@ function BlockRow({
           className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
           onClick={(e) => e.stopPropagation()}
         >
-          <button type="button" title="Duplicate" onClick={onDuplicate}
-            className="p-1.5 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors">
+          <button
+            type="button"
+            title="Duplicate"
+            onClick={onDuplicate}
+            className="p-1.5 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+          >
             <Copy className="w-3.5 h-3.5" />
           </button>
-          <button type="button" title="Cut" onClick={onRemove}
-            className="p-1.5 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors">
+          <button
+            type="button"
+            title="Cut"
+            onClick={onRemove}
+            className="p-1.5 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+          >
             <Scissors className="w-3.5 h-3.5" />
           </button>
-          <button type="button" title="Delete" onClick={onRemove}
-            className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors">
+          <button
+            type="button"
+            title="Delete"
+            onClick={onRemove}
+            className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
+          >
             <Trash2 className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -324,69 +374,87 @@ function BlockRow({
         </div>
       )}
     </div>
-  )
+  );
 }
 
 // ── BloksField ────────────────────────────────────────────────────────────────
 
-export function BloksField({ fieldKey, def, value, onChange, allComponents, allGroups, spaceId, onOpenDiscussion, discussionCount, isActiveDiscussion }: Props) {
-  const blocks = value ?? []
-  const [draggingIdx, setDraggingIdx] = useState<number | null>(null)
-  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null)
-  const [panelOpen, setPanelOpen] = useState(false)
-  const [insertAt, setInsertAt] = useState(0)
+export function BloksField({
+  fieldKey,
+  def,
+  value,
+  onChange,
+  allComponents,
+  allGroups,
+  spaceId,
+  onOpenDiscussion,
+  discussionCount,
+  isActiveDiscussion,
+}: Props) {
+  const blocks = value ?? [];
+  const [draggingIdx, setDraggingIdx] = useState<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [insertAt, setInsertAt] = useState(0);
 
-  let allowedComponents = allComponents
+  let allowedComponents = allComponents;
   if (def.restrict_components && def.component_whitelist && def.component_whitelist.length > 0) {
-    allowedComponents = allComponents.filter((c) => def.component_whitelist!.includes(c.name))
+    allowedComponents = allComponents.filter((c) => def.component_whitelist!.includes(c.name));
   }
   if (def.component_denylist && def.component_denylist.length > 0) {
-    allowedComponents = allowedComponents.filter((c) => !def.component_denylist!.includes(c.name))
+    allowedComponents = allowedComponents.filter((c) => !def.component_denylist!.includes(c.name));
   }
 
   function addBlock(componentName: string) {
-    const newBlock: BlockItem = { _uid: uuidv4(), component: componentName }
-    const meta = allComponents.find((c) => c.name === componentName)
+    const newBlock: BlockItem = { _uid: uuidv4(), component: componentName };
+    const meta = allComponents.find((c) => c.name === componentName);
     if (meta?.schema) {
       Object.entries(meta.schema).forEach(([key, fieldDef]: [string, any]) => {
-        if (fieldDef.default_value !== undefined) newBlock[key] = fieldDef.default_value
-      })
+        if (fieldDef.default_value !== undefined) newBlock[key] = fieldDef.default_value;
+      });
     }
-    const next = [...blocks]
-    next.splice(insertAt, 0, newBlock)
-    onChange(next)
+    const next = [...blocks];
+    next.splice(insertAt, 0, newBlock);
+    onChange(next);
   }
 
   function openPanelAt(index: number) {
-    setInsertAt(index)
-    setPanelOpen(true)
+    setInsertAt(index);
+    setPanelOpen(true);
   }
 
   function updateBlock(index: number, updated: BlockItem) {
-    const next = [...blocks]; next[index] = updated; onChange(next)
+    const next = [...blocks];
+    next[index] = updated;
+    onChange(next);
   }
 
   function removeBlock(index: number) {
-    onChange(blocks.filter((_, i) => i !== index))
+    onChange(blocks.filter((_, i) => i !== index));
   }
 
   function duplicateBlock(index: number) {
-    const copy: BlockItem = { ...blocks[index], _uid: uuidv4() }
-    const next = [...blocks]; next.splice(index + 1, 0, copy); onChange(next)
+    const copy: BlockItem = { ...blocks[index], _uid: uuidv4() };
+    const next = [...blocks];
+    next.splice(index + 1, 0, copy);
+    onChange(next);
   }
 
   function handleDrop(toIndex: number) {
     if (draggingIdx === null || draggingIdx === toIndex) {
-      setDraggingIdx(null); setDragOverIdx(null); return
+      setDraggingIdx(null);
+      setDragOverIdx(null);
+      return;
     }
-    const next = [...blocks]
-    const [item] = next.splice(draggingIdx, 1)
-    next.splice(toIndex, 0, item)
-    onChange(next)
-    setDraggingIdx(null); setDragOverIdx(null)
+    const next = [...blocks];
+    const [item] = next.splice(draggingIdx, 1);
+    next.splice(toIndex, 0, item);
+    onChange(next);
+    setDraggingIdx(null);
+    setDragOverIdx(null);
   }
 
-  const atMax = def.maximum !== undefined && blocks.length >= def.maximum
+  const atMax = def.maximum !== undefined && blocks.length >= def.maximum;
 
   return (
     <div>
@@ -399,7 +467,9 @@ export function BloksField({ fieldKey, def, value, onChange, allComponents, allG
           {onOpenDiscussion && (
             <button
               type="button"
-              onClick={(e) => onOpenDiscussion(fieldKey, (e.currentTarget as HTMLElement).getBoundingClientRect())}
+              onClick={(e) =>
+                onOpenDiscussion(fieldKey, (e.currentTarget as HTMLElement).getBoundingClientRect())
+              }
               title="Start a discussion"
               className={`group-hover:opacity-100 flex items-center gap-1 p-0.5 rounded transition-all ${
                 isActiveDiscussion
@@ -414,7 +484,8 @@ export function BloksField({ fieldKey, def, value, onChange, allComponents, allG
             </button>
           )}
           <span className="text-xs text-gray-400">
-            {blocks.length}{def.maximum ? ` / ${def.maximum}` : ''} block{blocks.length !== 1 ? 's' : ''}
+            {blocks.length}
+            {def.maximum ? ` / ${def.maximum}` : ''} block{blocks.length !== 1 ? 's' : ''}
           </span>
         </div>
       </div>
@@ -437,13 +508,17 @@ export function BloksField({ fieldKey, def, value, onChange, allComponents, allG
                 isDragging={draggingIdx === i}
                 isDragOver={dragOverIdx === i && draggingIdx !== i}
                 onDragStart={() => setDraggingIdx(i)}
-                onDragEnd={() => { setDraggingIdx(null); setDragOverIdx(null) }}
-                onDragOver={(e) => { e.preventDefault(); setDragOverIdx(i) }}
+                onDragEnd={() => {
+                  setDraggingIdx(null);
+                  setDragOverIdx(null);
+                }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDragOverIdx(i);
+                }}
                 onDrop={() => handleDrop(i)}
               />
-              {!atMax && (
-                <AddBlockDivider onAdd={() => openPanelAt(i + 1)} />
-              )}
+              {!atMax && <AddBlockDivider onAdd={() => openPanelAt(i + 1)} />}
             </div>
           ))}
         </div>
@@ -459,5 +534,5 @@ export function BloksField({ fieldKey, def, value, onChange, allComponents, allG
         onClose={() => setPanelOpen(false)}
       />
     </div>
-  )
+  );
 }

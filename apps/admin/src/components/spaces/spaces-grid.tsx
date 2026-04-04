@@ -1,11 +1,12 @@
-'use client'
+'use client';
 
-import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
-import { Star, ChevronDown, ChevronRight, Search, Plus } from 'lucide-react'
-import { SpaceCard } from './space-card'
-import { CreateSpacePanel } from './create-space-panel'
-import type { Space } from '@sbx/types'
+import { useState, useCallback } from 'react';
+import { useApi } from '@/lib/swr';
+import { useRouter } from 'next/navigation';
+import { Star, ChevronDown, ChevronRight, Search, Plus } from 'lucide-react';
+import { SpaceCard } from './space-card';
+import { CreateSpacePanel } from './create-space-panel';
+import type { Space } from '@sbx/types';
 
 function SectionHeader({
   label,
@@ -14,64 +15,70 @@ function SectionHeader({
   onToggle,
   icon,
 }: {
-  label: string
-  count: number
-  open: boolean
-  onToggle: () => void
-  icon?: React.ReactNode
+  label: string;
+  count: number;
+  open: boolean;
+  onToggle: () => void;
+  icon?: React.ReactNode;
 }) {
   return (
     <button
       onClick={onToggle}
       className="flex items-center gap-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 transition-colors mb-4 group"
     >
-      {open
-        ? <ChevronDown className="size-3.5 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300" />
-        : <ChevronRight className="size-3.5 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300" />
-      }
+      {open ? (
+        <ChevronDown className="size-3.5 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300" />
+      ) : (
+        <ChevronRight className="size-3.5 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300" />
+      )}
       {icon}
       {label}
       <span className="text-gray-400 dark:text-gray-500 font-normal">· {count}</span>
     </button>
-  )
+  );
 }
 
 export function SpacesGrid({ spaces }: { spaces: Space[] }) {
-  const [search, setSearch] = useState('')
-  const [favOpen, setFavOpen] = useState(true)
-  const [allOpen, setAllOpen] = useState(true)
-  const [createOpen, setCreateOpen] = useState(false)
-  const [favouriteSpaces, setFavouriteSpaces] = useState<number[]>([])
-  const router = useRouter()
+  const [search, setSearch] = useState('');
+  const [favOpen, setFavOpen] = useState(true);
+  const [allOpen, setAllOpen] = useState(true);
+  const [createOpen, setCreateOpen] = useState(false);
+  const router = useRouter();
 
-  useEffect(() => {
-    fetch('/api/admin/user/me')
-      .then((r) => r.json())
-      .then((data) => { setFavouriteSpaces(data.user?.favourite_spaces ?? []) })
-      .catch(() => {})
-  }, [])
+  const { data: meData, mutate: mutateMe } = useApi<{ user: { favourite_spaces: number[] } }>(
+    '/api/admin/user/me',
+  );
+  const favouriteSpaces = meData?.user?.favourite_spaces ?? [];
 
-  const toggleFav = useCallback(async (spaceId: number) => {
-    const isFav = favouriteSpaces.includes(spaceId)
-    const newIds = isFav
-      ? favouriteSpaces.filter((id) => id !== spaceId)
-      : [...favouriteSpaces, spaceId]
-    setFavouriteSpaces(newIds)
-    const res = await fetch('/api/admin/user/me', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ favourite_spaces: newIds }),
-    })
-    if (!res.ok) setFavouriteSpaces(favouriteSpaces)
-  }, [favouriteSpaces])
+  const toggleFav = useCallback(
+    async (spaceId: number) => {
+      const isFav = favouriteSpaces.includes(spaceId);
+      const newIds = isFav
+        ? favouriteSpaces.filter((id) => id !== spaceId)
+        : [...favouriteSpaces, spaceId];
+      const res = await fetch('/api/admin/user/me', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ favourite_spaces: newIds }),
+      });
+      if (res.ok) {
+        await mutateMe();
+      }
+    },
+    [favouriteSpaces, mutateMe],
+  );
 
-  const query = search.trim().toLowerCase()
-  const favoriteSpaces = spaces.filter((s) => favouriteSpaces.includes(s.id))
-  const otherSpaces = spaces.filter((s) => !favouriteSpaces.includes(s.id))
+  const query = search.trim().toLowerCase();
+  const favoriteSpaces = spaces.filter((s) => favouriteSpaces.includes(s.id));
+  const otherSpaces = spaces.filter((s) => !favouriteSpaces.includes(s.id));
 
-  const filteredFavorites = query ? favoriteSpaces.filter((s) => s.name.toLowerCase().includes(query)) : favoriteSpaces
-  const filteredOthers = query ? otherSpaces.filter((s) => s.name.toLowerCase().includes(query)) : otherSpaces
-  const noResults = query && filteredFavorites.length === 0 && filteredOthers.length === 0
+  const filteredFavorites = query
+    ? favoriteSpaces.filter((s) => s.name.toLowerCase().includes(query))
+    : favoriteSpaces;
+  const filteredOthers = query
+    ? otherSpaces.filter((s) => s.name.toLowerCase().includes(query))
+    : otherSpaces;
+  const noResults = query && filteredFavorites.length === 0 && filteredOthers.length === 0;
 
   return (
     <div>
@@ -99,7 +106,9 @@ export function SpacesGrid({ spaces }: { spaces: Space[] }) {
       </div>
 
       {noResults && (
-        <p className="text-sm text-gray-400 text-center py-12">No spaces match &ldquo;{search}&rdquo;</p>
+        <p className="text-sm text-gray-400 text-center py-12">
+          No spaces match &ldquo;{search}&rdquo;
+        </p>
       )}
 
       {/* Favorites section */}
@@ -155,8 +164,11 @@ export function SpacesGrid({ spaces }: { spaces: Space[] }) {
       <CreateSpacePanel
         open={createOpen}
         onClose={() => setCreateOpen(false)}
-        onCreated={(spaceId) => { setCreateOpen(false); router.push(`/spaces/${spaceId}`) }}
+        onCreated={(spaceId) => {
+          setCreateOpen(false);
+          router.push(`/spaces/${spaceId}`);
+        }}
       />
     </div>
-  )
+  );
 }

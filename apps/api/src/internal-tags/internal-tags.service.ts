@@ -1,7 +1,9 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import { ResultGuard } from '../shared/result-guard.util';
 import { and, asc, eq, ilike, sql } from 'drizzle-orm';
+import { escapeLike } from '../shared/query-parser.util';
 import { DB } from '../db/db.module';
-import type { DbType } from '../db/db.module';
+import { DbType } from '../db/db.module';
 import { internalTags, components, assets } from '../db/schema';
 
 @Injectable()
@@ -11,7 +13,7 @@ export class InternalTagsService {
   async listTags(spaceId: number, objectType?: string, search?: string) {
     const conditions = [eq(internalTags.spaceId, spaceId)];
     if (objectType) conditions.push(eq(internalTags.objectType, objectType));
-    if (search) conditions.push(ilike(internalTags.name, `%${search}%`));
+    if (search) conditions.push(ilike(internalTags.name, `%${escapeLike(search)}%`));
 
     const tableRows = await this.db
       .select()
@@ -26,7 +28,10 @@ export class InternalTagsService {
 
     if (!objectType || objectType === 'component') {
       const compRows = await this.db
-        .select({ internalTagIds: components.internalTagIds, internalTagsList: components.internalTagsList })
+        .select({
+          internalTagIds: components.internalTagIds,
+          internalTagsList: components.internalTagsList,
+        })
         .from(components)
         .where(eq(components.spaceId, spaceId));
       for (const row of compRows) {
@@ -34,13 +39,17 @@ export class InternalTagsService {
         const list: { id: number; name: string }[] = (row.internalTagsList as any) ?? [];
         for (const id of ids) countById[Number(id)] = (countById[Number(id)] ?? 0) + 1;
         for (const t of list) {
-          if (!orphanById.has(t.id)) orphanById.set(t.id, { name: t.name, objectType: 'component' });
+          if (!orphanById.has(t.id))
+            orphanById.set(t.id, { name: t.name, objectType: 'component' });
         }
       }
     }
     if (!objectType || objectType === 'asset') {
       const assetRows = await this.db
-        .select({ internalTagIds: assets.internalTagIds, internalTagsList: assets.internalTagsList })
+        .select({
+          internalTagIds: assets.internalTagIds,
+          internalTagsList: assets.internalTagsList,
+        })
         .from(assets)
         .where(eq(assets.spaceId, spaceId));
       for (const row of assetRows) {
@@ -71,7 +80,12 @@ export class InternalTagsService {
           result.push(this.format(inserted[0], countById[id] ?? 0));
         } else {
           // Already exists (race condition) — add to result with count
-          result.push({ id, name: tag.name, object_type: tag.objectType, count: countById[id] ?? 0 });
+          result.push({
+            id,
+            name: tag.name,
+            object_type: tag.objectType,
+            count: countById[id] ?? 0,
+          });
         }
       }
     }
@@ -79,7 +93,11 @@ export class InternalTagsService {
     // so future auto-generated IDs don't collide
     if (orphanById.size > 0) {
       const maxId = Math.max(...Array.from(orphanById.keys()));
-      await this.db.execute(sql`SELECT setval(pg_get_serial_sequence('internal_tags', 'id'), GREATEST(nextval(pg_get_serial_sequence('internal_tags', 'id')), ${maxId + 1}))`).catch(() => {});
+      await this.db
+        .execute(
+          sql`SELECT setval(pg_get_serial_sequence('internal_tags', 'id'), GREATEST(nextval(pg_get_serial_sequence('internal_tags', 'id')), ${maxId + 1}))`,
+        )
+        .catch(() => {});
     }
 
     result.sort((a, b) => a.name.localeCompare(b.name));
@@ -98,14 +116,14 @@ export class InternalTagsService {
     const setData: Record<string, any> = {};
     if (data.name !== undefined) setData.name = data.name;
     if (data.object_type !== undefined) setData.objectType = data.object_type;
-    if (Object.keys(setData).length === 0) throw new NotFoundException('Tag not found');
+    if (Object.keys(setData).length === 0) return { internal_tag: null };
 
     const [row] = await this.db
       .update(internalTags)
       .set(setData)
       .where(and(eq(internalTags.id, id), eq(internalTags.spaceId, spaceId)))
       .returning();
-    if (!row) throw new NotFoundException('Tag not found');
+    ResultGuard.throwIfNotFound(row, 'Tag not found');
 
     // Update name on all components/assets that reference this tag
     if (data.name !== undefined) {
@@ -120,7 +138,10 @@ export class InternalTagsService {
           if (list.some((t) => t.id === id)) {
             await this.db
               .update(components)
-              .set({ internalTagsList: list.map((t) => (t.id === id ? { ...t, name: newName } : t)), updatedAt: new Date() })
+              .set({
+                internalTagsList: list.map((t) => (t.id === id ? { ...t, name: newName } : t)),
+                updatedAt: new Date(),
+              })
               .where(eq(components.id, c.id));
           }
         }
@@ -134,7 +155,10 @@ export class InternalTagsService {
           if (list.some((t) => t.id === id)) {
             await this.db
               .update(assets)
-              .set({ internalTagsList: list.map((t) => (t.id === id ? { ...t, name: newName } : t)), updatedAt: new Date() })
+              .set({
+                internalTagsList: list.map((t) => (t.id === id ? { ...t, name: newName } : t)),
+                updatedAt: new Date(),
+              })
               .where(eq(assets.id, a.id));
           }
         }
@@ -148,12 +172,16 @@ export class InternalTagsService {
       .delete(internalTags)
       .where(and(eq(internalTags.id, id), eq(internalTags.spaceId, spaceId)))
       .returning();
-    if (!row) throw new NotFoundException('Tag not found');
+    ResultGuard.throwIfNotFound(row, 'Tag not found');
 
     // Remove from all components/assets
     if (row.objectType === 'component') {
       const compRows = await this.db
-        .select({ id: components.id, internalTagsList: components.internalTagsList, internalTagIds: components.internalTagIds })
+        .select({
+          id: components.id,
+          internalTagsList: components.internalTagsList,
+          internalTagIds: components.internalTagIds,
+        })
         .from(components)
         .where(eq(components.spaceId, spaceId));
       for (const c of compRows) {
@@ -162,13 +190,21 @@ export class InternalTagsService {
           const newList = list.filter((t) => t.id !== id);
           await this.db
             .update(components)
-            .set({ internalTagsList: newList, internalTagIds: newList.map((t) => String(t.id)), updatedAt: new Date() })
+            .set({
+              internalTagsList: newList,
+              internalTagIds: newList.map((t) => String(t.id)),
+              updatedAt: new Date(),
+            })
             .where(eq(components.id, c.id));
         }
       }
     } else {
       const assetRows = await this.db
-        .select({ id: assets.id, internalTagsList: assets.internalTagsList, internalTagIds: assets.internalTagIds })
+        .select({
+          id: assets.id,
+          internalTagsList: assets.internalTagsList,
+          internalTagIds: assets.internalTagIds,
+        })
         .from(assets)
         .where(eq(assets.spaceId, spaceId));
       for (const a of assetRows) {
@@ -177,7 +213,11 @@ export class InternalTagsService {
           const newList = list.filter((t) => t.id !== id);
           await this.db
             .update(assets)
-            .set({ internalTagsList: newList, internalTagIds: newList.map((t) => String(t.id)), updatedAt: new Date() })
+            .set({
+              internalTagsList: newList,
+              internalTagIds: newList.map((t) => String(t.id)),
+              updatedAt: new Date(),
+            })
             .where(eq(assets.id, a.id));
         }
       }

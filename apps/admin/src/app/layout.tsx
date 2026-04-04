@@ -1,11 +1,11 @@
-import type { Metadata } from 'next'
-import './globals.css'
-import { Geist } from "next/font/google";
-import { cn } from "@/lib/utils";
-import { ThemeProvider } from "@/components/providers/theme-provider";
-import { SWRProvider } from "@/components/providers/swr-provider";
+import type { Metadata } from 'next';
+import './globals.css';
+import { Geist } from 'next/font/google';
+import { cn } from '@/lib/utils';
+import { ThemeProvider } from '@/components/providers/theme-provider';
+import { SWRProvider } from '@/components/providers/swr-provider';
 
-const geist = Geist({subsets:['latin'],variable:'--font-sans'});
+const geist = Geist({ subsets: ['latin'], variable: '--font-sans' });
 
 export const metadata: Metadata = {
   title: {
@@ -13,22 +13,16 @@ export const metadata: Metadata = {
     default: 'SBX',
   },
   description: 'SBX Content Management System',
-}
+};
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={cn("font-sans", geist.variable)} suppressHydrationWarning>
+    <html lang="en" className={cn('font-sans', geist.variable)} suppressHydrationWarning>
       <body>
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
-          <SWRProvider>
-            {children}
-          </SWRProvider>
+          <SWRProvider>{children}</SWRProvider>
         </ThemeProvider>
       </body>
     </html>
-  )
+  );
 }

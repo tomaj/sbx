@@ -1,8 +1,8 @@
-'use client'
+'use client';
 
-import { useState } from 'react'
-import { Settings, GripVertical, Plus, X } from 'lucide-react'
-import { FieldIcon } from './field-icon'
+import { useState } from 'react';
+import { Settings, GripVertical, X } from 'lucide-react';
+import { FieldIcon } from './field-icon';
 import {
   type WorkingField,
   type WorkingTab,
@@ -11,10 +11,10 @@ import {
   FIELD_TYPE_LABELS,
   DEFAULT_TAB_KEY,
   makeDefaultFieldDef,
-} from './types'
+} from './types';
 
 function TooltipHint({ text }: { text: string }) {
-  const [show, setShow] = useState(false)
+  const [show, setShow] = useState(false);
   return (
     <div
       className="relative inline-flex flex-shrink-0"
@@ -31,38 +31,49 @@ function TooltipHint({ text }: { text: string }) {
         </div>
       )}
     </div>
-  )
+  );
 }
 
 // ─── Field type picker popup ──────────────────────────────────────────────────
 
 interface TypePickerProps {
-  selected: FieldType
-  onSelect: (t: FieldType) => void
-  onClose: () => void
+  selected: FieldType;
+  onSelect: (t: FieldType) => void;
+  onClose: () => void;
 }
 
 function TypePicker({ selected, onSelect, onClose }: TypePickerProps) {
-  const [filter, setFilter] = useState('')
+  const [filter, setFilter] = useState('');
   const filtered = ADDABLE_FIELD_TYPES.filter((ft) =>
-    ft.label.toLowerCase().includes(filter.toLowerCase())
-  )
+    ft.label.toLowerCase().includes(filter.toLowerCase()),
+  );
 
   return (
     <div className="absolute top-full left-0 right-0 mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl">
       <div className="p-3 border-b border-gray-100 dark:border-gray-800">
-        <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">Filter field types</p>
+        <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">
+          Filter field types
+        </p>
         <div className="relative">
           <input
-            autoFocus
             type="text"
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
             placeholder="Filter field types"
             className="w-full pl-8 pr-3 py-1.5 border border-teal-400 rounded-lg text-sm bg-white dark:bg-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500"
           />
-          <svg className="absolute left-2.5 top-2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          <svg
+            className="absolute left-2.5 top-2 w-4 h-4 text-gray-400"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+            />
           </svg>
         </div>
       </div>
@@ -71,7 +82,10 @@ function TypePicker({ selected, onSelect, onClose }: TypePickerProps) {
           <button
             key={ft.type}
             type="button"
-            onClick={() => { onSelect(ft.type); onClose() }}
+            onClick={() => {
+              onSelect(ft.type);
+              onClose();
+            }}
             className={`flex flex-col items-center gap-1.5 p-2 rounded-lg transition-colors text-center ${
               selected === ft.type
                 ? 'bg-gray-100 dark:bg-gray-800'
@@ -79,7 +93,9 @@ function TypePicker({ selected, onSelect, onClose }: TypePickerProps) {
             }`}
           >
             <FieldIcon type={ft.type} size={28} />
-            <span className="text-[10px] text-gray-600 dark:text-gray-400 leading-tight">{ft.label}</span>
+            <span className="text-[10px] text-gray-600 dark:text-gray-400 leading-tight">
+              {ft.label}
+            </span>
           </button>
         ))}
         {filtered.length === 0 && (
@@ -87,21 +103,21 @@ function TypePicker({ selected, onSelect, onClose }: TypePickerProps) {
         )}
       </div>
     </div>
-  )
+  );
 }
 
 // ─── Field row ────────────────────────────────────────────────────────────────
 
 interface FieldRowProps {
-  field: WorkingField
-  onEdit: () => void
-  onDelete: () => void
-  isDragOver: boolean
-  dragFieldKey: string
-  onDragStart: (key: string, e: React.DragEvent) => void
-  onDragOver: (key: string, e: React.DragEvent) => void
-  onDrop: (key: string, e: React.DragEvent) => void
-  onDragEnd: () => void
+  field: WorkingField;
+  onEdit: () => void;
+  onDelete: () => void;
+  isDragOver: boolean;
+  dragFieldKey: string;
+  onDragStart: (key: string, e: React.DragEvent) => void;
+  onDragOver: (key: string, e: React.DragEvent) => void;
+  onDrop: (key: string, e: React.DragEvent) => void;
+  onDragEnd: () => void;
 }
 
 function FieldRow({
@@ -115,8 +131,8 @@ function FieldRow({
   onDrop,
   onDragEnd,
 }: FieldRowProps) {
-  const label = FIELD_TYPE_LABELS[field.def.type as FieldType] ?? field.def.type
-  const isBeingDragged = dragFieldKey === field.key
+  const label = FIELD_TYPE_LABELS[field.def.type as FieldType] ?? field.def.type;
+  const isBeingDragged = dragFieldKey === field.key;
 
   return (
     <div
@@ -129,8 +145,8 @@ function FieldRow({
         isDragOver
           ? 'border-teal-400 bg-teal-50/40 dark:bg-teal-900/10'
           : isBeingDragged
-          ? 'opacity-40 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900'
-          : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:border-gray-300 dark:hover:border-gray-600'
+            ? 'opacity-40 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900'
+            : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:border-gray-300 dark:hover:border-gray-600'
       }`}
       onClick={onEdit}
     >
@@ -140,30 +156,31 @@ function FieldRow({
         <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
           {field.key}
         </p>
-        <p className="text-xs text-gray-400 dark:text-gray-500 truncate mt-0.5">
-          {label}
-        </p>
+        <p className="text-xs text-gray-400 dark:text-gray-500 truncate mt-0.5">{label}</p>
       </div>
       <button
         type="button"
-        onClick={(e) => { e.stopPropagation(); onDelete() }}
+        onClick={(e) => {
+          e.stopPropagation();
+          onDelete();
+        }}
         className="p-1.5 text-gray-300 hover:text-red-500 transition-colors flex-shrink-0"
       >
         <X className="w-4 h-4" />
       </button>
     </div>
-  )
+  );
 }
 
 // ─── FieldsTab ────────────────────────────────────────────────────────────────
 
 interface FieldsTabProps {
-  tabs: WorkingTab[]
-  fields: WorkingField[]
-  onTabsChange: (tabs: WorkingTab[]) => void
-  onFieldsChange: (fields: WorkingField[]) => void
-  onEditField: (key: string) => void
-  onManageTabs: () => void
+  tabs: WorkingTab[];
+  fields: WorkingField[];
+  onTabsChange: (tabs: WorkingTab[]) => void;
+  onFieldsChange: (fields: WorkingField[]) => void;
+  onEditField: (key: string) => void;
+  onManageTabs: () => void;
 }
 
 export function FieldsTab({
@@ -174,96 +191,100 @@ export function FieldsTab({
   onEditField,
   onManageTabs,
 }: FieldsTabProps) {
-  const [newFieldName, setNewFieldName] = useState('')
-  const [newFieldType, setNewFieldType] = useState<FieldType>('text')
-  const [showTypePicker, setShowTypePicker] = useState(false)
-  const [activeTabKey, setActiveTabKey] = useState<string>(tabs[0]?.key ?? DEFAULT_TAB_KEY)
-  const [nameError, setNameError] = useState<string | null>(null)
+  const [newFieldName, setNewFieldName] = useState('');
+  const [newFieldType, setNewFieldType] = useState<FieldType>('text');
+  const [showTypePicker, setShowTypePicker] = useState(false);
+  const [activeTabKey, setActiveTabKey] = useState<string>(tabs[0]?.key ?? DEFAULT_TAB_KEY);
+  const [nameError, setNameError] = useState<string | null>(null);
 
   // ─── Drag & drop state ───────────────────────────────────────────────────────
-  const [draggingKey, setDraggingKey] = useState<string | null>(null)
-  const [dragOverFieldKey, setDragOverFieldKey] = useState<string | null>(null)
-  const [dragOverTabKey, setDragOverTabKey] = useState<string | null>(null)
+  const [draggingKey, setDraggingKey] = useState<string | null>(null);
+  const [dragOverFieldKey, setDragOverFieldKey] = useState<string | null>(null);
+  const [dragOverTabKey, setDragOverTabKey] = useState<string | null>(null);
 
-  const activeTab = tabs.find((t) => t.key === activeTabKey) ?? tabs[0]
-  const tabFields = fields.filter((f) => f.tabKey === activeTabKey)
+  const _activeTab = tabs.find((t) => t.key === activeTabKey) ?? tabs[0];
+  const tabFields = fields.filter((f) => f.tabKey === activeTabKey);
 
   function handleAdd() {
-    const name = newFieldName.trim().replace(/\s/g, '_').toLowerCase()
-    if (!name) { setNameError('Field name is required'); return }
-    if (fields.some((f) => f.key === name)) { setNameError('Field name already exists'); return }
-    setNameError(null)
+    const name = newFieldName.trim().replace(/\s/g, '_').toLowerCase();
+    if (!name) {
+      setNameError('Field name is required');
+      return;
+    }
+    if (fields.some((f) => f.key === name)) {
+      setNameError('Field name already exists');
+      return;
+    }
+    setNameError(null);
 
-    const def = makeDefaultFieldDef(newFieldType)
-    const newField: WorkingField = { key: name, tabKey: activeTabKey, def }
-    onFieldsChange([...fields, newField])
-    setNewFieldName('')
+    const def = makeDefaultFieldDef(newFieldType);
+    const newField: WorkingField = { key: name, tabKey: activeTabKey, def };
+    onFieldsChange([...fields, newField]);
+    setNewFieldName('');
   }
 
   function handleDelete(key: string) {
-    onFieldsChange(fields.filter((f) => f.key !== key))
+    onFieldsChange(fields.filter((f) => f.key !== key));
   }
 
   // ─── DnD: field start/over/drop ──────────────────────────────────────────────
   function handleFieldDragStart(key: string, e: React.DragEvent) {
-    e.dataTransfer.effectAllowed = 'move'
-    e.dataTransfer.setData('text/plain', key)
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', key);
     // Delay state so the drag image captures non-dimmed element
-    setTimeout(() => setDraggingKey(key), 0)
+    setTimeout(() => setDraggingKey(key), 0);
   }
 
   function handleFieldDragOver(key: string, e: React.DragEvent) {
-    e.preventDefault()
-    e.dataTransfer.dropEffect = 'move'
-    setDragOverFieldKey(key)
-    setDragOverTabKey(null)
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverFieldKey(key);
+    setDragOverTabKey(null);
   }
 
   function handleFieldDrop(targetKey: string, e: React.DragEvent) {
-    e.preventDefault()
-    const fromKey = e.dataTransfer.getData('text/plain')
-    clearDragState()
-    if (!fromKey || fromKey === targetKey) return
+    e.preventDefault();
+    const fromKey = e.dataTransfer.getData('text/plain');
+    clearDragState();
+    if (!fromKey || fromKey === targetKey) return;
 
-    const allTabFields = [...tabFields]
-    const fromIdx = allTabFields.findIndex((f) => f.key === fromKey)
-    const toIdx = allTabFields.findIndex((f) => f.key === targetKey)
+    const allTabFields = [...tabFields];
+    const fromIdx = allTabFields.findIndex((f) => f.key === fromKey);
+    const toIdx = allTabFields.findIndex((f) => f.key === targetKey);
 
     if (fromIdx !== -1 && toIdx !== -1) {
       // Reorder within same tab
-      const [moved] = allTabFields.splice(fromIdx, 1)
-      allTabFields.splice(toIdx, 0, moved)
-      const otherFields = fields.filter((f) => f.tabKey !== activeTabKey)
-      onFieldsChange([...otherFields, ...allTabFields])
+      const [moved] = allTabFields.splice(fromIdx, 1);
+      allTabFields.splice(toIdx, 0, moved);
+      const otherFields = fields.filter((f) => f.tabKey !== activeTabKey);
+      onFieldsChange([...otherFields, ...allTabFields]);
     }
   }
 
   // ─── DnD: tab drop target ────────────────────────────────────────────────────
   function handleTabDragOver(tabKey: string, e: React.DragEvent) {
-    e.preventDefault()
-    e.dataTransfer.dropEffect = 'move'
-    setDragOverTabKey(tabKey)
-    setDragOverFieldKey(null)
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverTabKey(tabKey);
+    setDragOverFieldKey(null);
   }
 
   function handleTabDrop(tabKey: string, e: React.DragEvent) {
-    e.preventDefault()
-    const fromKey = e.dataTransfer.getData('text/plain')
-    clearDragState()
-    if (!fromKey) return
+    e.preventDefault();
+    const fromKey = e.dataTransfer.getData('text/plain');
+    clearDragState();
+    if (!fromKey) return;
 
     // Move field to the target tab
-    onFieldsChange(
-      fields.map((f) => (f.key === fromKey ? { ...f, tabKey } : f))
-    )
+    onFieldsChange(fields.map((f) => (f.key === fromKey ? { ...f, tabKey } : f)));
     // Switch to target tab so user sees the moved field
-    setActiveTabKey(tabKey)
+    setActiveTabKey(tabKey);
   }
 
   function clearDragState() {
-    setDraggingKey(null)
-    setDragOverFieldKey(null)
-    setDragOverTabKey(null)
+    setDraggingKey(null);
+    setDragOverFieldKey(null);
+    setDragOverTabKey(null);
   }
 
   return (
@@ -278,8 +299,13 @@ export function FieldsTab({
           <input
             type="text"
             value={newFieldName}
-            onChange={(e) => { setNewFieldName(e.target.value.replace(/\s/g, '_').toLowerCase()); setNameError(null) }}
-            onKeyDown={(e) => { if (e.key === 'Enter') handleAdd() }}
+            onChange={(e) => {
+              setNewFieldName(e.target.value.replace(/\s/g, '_').toLowerCase());
+              setNameError(null);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleAdd();
+            }}
             placeholder="e.g. news_items, title, columns..."
             className={`flex-1 px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500 ${
               nameError ? 'border-red-400' : 'border-gray-200 dark:border-gray-700'
@@ -302,10 +328,15 @@ export function FieldsTab({
                 <div className="fixed inset-0 z-40" onClick={() => setShowTypePicker(false)} />
                 <div className="absolute top-full right-0 mt-1 z-50 w-72 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl">
                   <div className="p-3 border-b border-gray-100 dark:border-gray-800">
-                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">Filter field types</p>
+                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">
+                      Filter field types
+                    </p>
                     <FilteredTypeGrid
                       selected={newFieldType}
-                      onSelect={(t) => { setNewFieldType(t); setShowTypePicker(false) }}
+                      onSelect={(t) => {
+                        setNewFieldType(t);
+                        setShowTypePicker(false);
+                      }}
                     />
                   </div>
                 </div>
@@ -339,8 +370,8 @@ export function FieldsTab({
                 dragOverTabKey === tab.key
                   ? 'bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300'
                   : activeTabKey === tab.key
-                  ? 'text-teal-600 dark:text-teal-400 border-b-2 border-teal-600 dark:border-teal-400'
-                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                    ? 'text-teal-600 dark:text-teal-400 border-b-2 border-teal-600 dark:border-teal-400'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
               }`}
             >
               {tab.name}
@@ -382,30 +413,45 @@ export function FieldsTab({
         )}
       </div>
     </div>
-  )
+  );
 }
 
 // ─── Filtered type grid (inline version) ─────────────────────────────────────
 
-function FilteredTypeGrid({ selected, onSelect }: { selected: FieldType; onSelect: (t: FieldType) => void }) {
-  const [filter, setFilter] = useState('')
+function FilteredTypeGrid({
+  selected,
+  onSelect,
+}: {
+  selected: FieldType;
+  onSelect: (t: FieldType) => void;
+}) {
+  const [filter, setFilter] = useState('');
   const filtered = ADDABLE_FIELD_TYPES.filter((ft) =>
-    ft.label.toLowerCase().includes(filter.toLowerCase())
-  )
+    ft.label.toLowerCase().includes(filter.toLowerCase()),
+  );
 
   return (
     <>
       <div className="relative mb-2">
         <input
-          autoFocus
           type="text"
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           placeholder="Filter field types"
           className="w-full pl-8 pr-3 py-1.5 border border-teal-400 rounded-lg text-sm bg-white dark:bg-gray-800 dark:text-gray-200 focus:outline-none"
         />
-        <svg className="absolute left-2.5 top-2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        <svg
+          className="absolute left-2.5 top-2 w-4 h-4 text-gray-400"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+          />
         </svg>
       </div>
       <div className="grid grid-cols-4 gap-1 max-h-52 overflow-y-auto">
@@ -415,14 +461,18 @@ function FilteredTypeGrid({ selected, onSelect }: { selected: FieldType; onSelec
             type="button"
             onClick={() => onSelect(ft.type)}
             className={`flex flex-col items-center gap-1 p-1.5 rounded-lg transition-colors ${
-              selected === ft.type ? 'bg-gray-100 dark:bg-gray-800' : 'hover:bg-gray-50 dark:hover:bg-gray-800/60'
+              selected === ft.type
+                ? 'bg-gray-100 dark:bg-gray-800'
+                : 'hover:bg-gray-50 dark:hover:bg-gray-800/60'
             }`}
           >
             <FieldIcon type={ft.type} size={24} />
-            <span className="text-[9px] text-gray-600 dark:text-gray-400 leading-tight text-center">{ft.label}</span>
+            <span className="text-[9px] text-gray-600 dark:text-gray-400 leading-tight text-center">
+              {ft.label}
+            </span>
           </button>
         ))}
       </div>
     </>
-  )
+  );
 }

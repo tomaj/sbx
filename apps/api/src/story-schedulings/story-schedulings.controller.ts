@@ -1,3 +1,4 @@
+import { AuthenticatedRequest } from '../auth/authenticated-request.interface';
 import {
   Body,
   Controller,
@@ -6,6 +7,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  ParseIntPipe,
   Post,
   Put,
   Query,
@@ -22,22 +24,19 @@ export class StorySchedulingsController {
   constructor(private readonly service: StorySchedulingsService) {}
 
   @Get()
-  async list(
-    @Req() req: any,
-    @Query('by_status') byStatus?: string,
-  ) {
+  async list(@Req() req: AuthenticatedRequest, @Query('by_status') byStatus?: string) {
     return this.service.findAll(req.space.id, byStatus);
   }
 
   @Get(':id')
-  async getOne(@Req() req: any, @Param('id') id: string) {
-    return this.service.findOne(req.space.id, parseInt(id));
+  async getOne(@Req() req: AuthenticatedRequest, @Param('id', ParseIntPipe) id: number) {
+    return this.service.findOne(req.space.id, id);
   }
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
   async create(
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
     @Body()
     body: {
       story_scheduling: {
@@ -50,14 +49,14 @@ export class StorySchedulingsController {
     return this.service.create(
       req.space.id,
       body.story_scheduling,
-      req.adminUser?.id,
+      req.adminUser?.sbxUserId ?? undefined,
     );
   }
 
   @Put(':id')
   async update(
-    @Req() req: any,
-    @Param('id') id: string,
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseIntPipe) id: number,
     @Body()
     body: {
       story_scheduling: {
@@ -66,12 +65,12 @@ export class StorySchedulingsController {
       };
     },
   ) {
-    return this.service.update(req.space.id, parseInt(id), body.story_scheduling);
+    return this.service.update(req.space.id, id, body.story_scheduling);
   }
 
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
-  async remove(@Req() req: any, @Param('id') id: string) {
-    return this.service.remove(req.space.id, parseInt(id));
+  async remove(@Req() req: AuthenticatedRequest, @Param('id', ParseIntPipe) id: number) {
+    return this.service.remove(req.space.id, id);
   }
 }

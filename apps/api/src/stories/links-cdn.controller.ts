@@ -1,3 +1,4 @@
+import { AuthenticatedRequest } from '../auth/authenticated-request.interface';
 import { Controller, Get, Param, Query, Req } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Auth } from '../auth/auth.decorator';
@@ -12,7 +13,7 @@ export class LinksCdnController {
 
   @Get()
   list(
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
     @Query('version') version?: string,
     @Query('starts_with') startsWith?: string,
     @Query('with_parent') withParent?: string,
@@ -20,11 +21,14 @@ export class LinksCdnController {
     @Query('page') page?: string,
     @Query('per_page') perPage?: string,
   ) {
-    const { page: parsedPage, perPage: parsedPerPage } = QueryParserUtil.parsePagination(page, perPage);
+    const { page: parsedPage, perPage: parsedPerPage } = QueryParserUtil.parsePagination(
+      page,
+      perPage,
+    );
     return this.linksCdnService.listLinks(req.space.id, {
       version: version === 'draft' ? 'draft' : 'published',
       startsWith,
-      withParent: withParent !== undefined ? parseInt(withParent) : undefined,
+      withParent: QueryParserUtil.parseOptionalInt(withParent),
       includeDates: includeDates === '1',
       page: parsedPage,
       perPage: Math.min(1000, parsedPerPage),
@@ -33,7 +37,7 @@ export class LinksCdnController {
 
   @Get(':uuid')
   getOne(
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
     @Param('uuid') uuid: string,
     @Query('include_dates') _includeDates?: string,
   ) {

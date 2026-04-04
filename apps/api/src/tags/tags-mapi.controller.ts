@@ -1,3 +1,4 @@
+import { AuthenticatedRequest } from '../auth/authenticated-request.interface';
 import {
   Body,
   Controller,
@@ -5,6 +6,7 @@ import {
   Get,
   HttpCode,
   Param,
+  ParseIntPipe,
   Post,
   Put,
   Query,
@@ -23,14 +25,17 @@ export class TagsMAPIController {
 
   @Get()
   list(
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
     @Query('search') search?: string,
     @Query('sort_by') sortBy?: string,
     @Query('all_tags') allTags?: string,
     @Query('page') page?: string,
     @Query('per_page') perPage?: string,
   ) {
-    const { page: parsedPage, perPage: parsedPerPage } = QueryParserUtil.parsePagination(page, perPage);
+    const { page: parsedPage, perPage: parsedPerPage } = QueryParserUtil.parsePagination(
+      page,
+      perPage,
+    );
     return this.tagsService.listMapi(req.space.id, {
       search,
       sortBy,
@@ -42,7 +47,10 @@ export class TagsMAPIController {
 
   @Post()
   @HttpCode(201)
-  create(@Req() req: any, @Body() body: { tag: { name: string; story_id?: number } }) {
+  create(
+    @Req() req: AuthenticatedRequest,
+    @Body() body: { tag: { name: string; story_id?: number } },
+  ) {
     return this.tagsService.createTag(req.space.id, {
       name: body.tag.name,
       storyId: body.tag.story_id,
@@ -51,16 +59,16 @@ export class TagsMAPIController {
 
   @Put(':id')
   update(
-    @Req() req: any,
-    @Param('id') id: string,
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseIntPipe) id: number,
     @Body() body: { tag: { name: string } },
   ) {
-    return this.tagsService.updateTag(parseInt(id), req.space.id, { name: body.tag.name });
+    return this.tagsService.updateTag(id, req.space.id, { name: body.tag.name });
   }
 
   @Delete(':tagName')
-  @HttpCode(204)
-  remove(@Req() req: any, @Param('tagName') tagName: string) {
+  @HttpCode(200)
+  remove(@Req() req: AuthenticatedRequest, @Param('tagName') tagName: string) {
     return this.tagsService.deleteTagByName(tagName, req.space.id);
   }
 }

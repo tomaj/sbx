@@ -1,67 +1,75 @@
-'use client'
+'use client';
 
-import { useState, useEffect, useRef } from 'react'
-import { authClient } from '@/lib/auth-client'
-import { Check, HelpCircle } from 'lucide-react'
-import { UserAvatar } from '@/components/ui/user-avatar'
-import { useUnsavedChanges } from '@/hooks/use-unsaved-changes'
-import { UnsavedChangesModal } from '@/components/ui/unsaved-changes-modal'
+import { useState, useEffect, useRef } from 'react';
+import { useApi } from '@/lib/swr';
+import { Check, HelpCircle } from 'lucide-react';
+import { UserAvatar } from '@/components/ui/user-avatar';
+import { useUnsavedChanges } from '@/hooks/use-unsaved-changes';
+import { UnsavedChangesModal } from '@/components/ui/unsaved-changes-modal';
 
 const ROLES = [
   { value: 'developer', label: '💻 Developer' },
   { value: 'marketer', label: '📢 Marketer' },
   { value: 'content_creator', label: '✏️ Content Creator' },
   { value: 'other', label: '⭐ Other' },
-]
+];
+
+interface MeResponse {
+  user: {
+    id: number;
+    email: string;
+    firstname?: string;
+    lastname?: string;
+    avatar?: string | null;
+  };
+}
 
 export default function AccountPage() {
-  const { data: session } = authClient.useSession()
-  const [firstname, setFirstname] = useState('')
-  const [lastname, setLastname] = useState('')
-  const [role, setRole] = useState('developer')
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
-  const [avatar, setAvatar] = useState<string | null>(null)
-  const [uploading, setUploading] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const [isDirty, setIsDirty] = useState(false)
-  const { showModal: showUnsavedModal, handleConfirm: confirmUnsaved, handleCancel: cancelUnsaved } = useUnsavedChanges(isDirty)
+  const { data: me, mutate: mutateMe } = useApi<MeResponse>('/api/admin/user/me');
+  const [firstname, setFirstname] = useState('');
+  const [lastname, setLastname] = useState('');
+  const [role, setRole] = useState('developer');
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isDirty, setIsDirty] = useState(false);
+  const {
+    showModal: showUnsavedModal,
+    handleConfirm: confirmUnsaved,
+    handleCancel: cancelUnsaved,
+  } = useUnsavedChanges(isDirty);
 
   useEffect(() => {
-    if (session?.user?.name) {
-      const parts = session.user.name.split(' ')
-      setFirstname(parts[0] ?? '')
-      setLastname(parts.slice(1).join(' ') ?? '')
+    if (me?.user) {
+      setFirstname(me.user.firstname ?? '');
+      setLastname(me.user.lastname ?? '');
     }
-  }, [session])
-
-  useEffect(() => {
-    fetch('/api/admin/user/me')
-      .then((r) => r.json())
-      .then((data) => { if (data?.user?.avatar) setAvatar(data.user.avatar) })
-      .catch(() => {})
-  }, [])
+  }, [me]);
 
   async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setUploading(true)
-    const form = new FormData()
-    form.append('file', file)
-    const res = await fetch('/api/admin/user/avatar', { method: 'POST', body: form })
-    const data = await res.json()
-    if (data?.avatar) setAvatar(data.avatar)
-    setUploading(false)
-    e.target.value = ''
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    const form = new FormData();
+    form.append('file', file);
+    await fetch('/api/admin/user/avatar', { method: 'POST', body: form });
+    await mutateMe();
+    setUploading(false);
+    e.target.value = '';
   }
 
   async function handleSave() {
-    setSaving(true)
-    await authClient.updateUser({ name: `${firstname} ${lastname}`.trim() })
-    setSaving(false)
-    setIsDirty(false)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
+    setSaving(true);
+    await fetch('/api/admin/user/me', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ firstname, lastname }),
+    });
+    setSaving(false);
+    setIsDirty(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
   }
 
   return (
@@ -81,8 +89,8 @@ export default function AccountPage() {
       {/* Avatar */}
       <div className="flex items-center gap-4 mb-8">
         <UserAvatar
-          name={`${firstname} ${lastname}`.trim() || session?.user?.email}
-          src={avatar}
+          name={`${firstname} ${lastname}`.trim() || me?.user?.email}
+          src={me?.user?.avatar ?? null}
           size="xl"
         />
         <div>
@@ -113,7 +121,7 @@ export default function AccountPage() {
           </label>
           <input
             type="email"
-            value={session?.user?.email ?? ''}
+            value={me?.user?.email ?? ''}
             readOnly
             className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-md text-sm bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400"
           />
@@ -127,7 +135,10 @@ export default function AccountPage() {
           <input
             type="text"
             value={firstname}
-            onChange={(e) => { setFirstname(e.target.value); setIsDirty(true) }}
+            onChange={(e) => {
+              setFirstname(e.target.value);
+              setIsDirty(true);
+            }}
             className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-md text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
           />
         </div>
@@ -140,7 +151,10 @@ export default function AccountPage() {
           <input
             type="text"
             value={lastname}
-            onChange={(e) => { setLastname(e.target.value); setIsDirty(true) }}
+            onChange={(e) => {
+              setLastname(e.target.value);
+              setIsDirty(true);
+            }}
             className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-md text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
           />
         </div>
@@ -154,7 +168,10 @@ export default function AccountPage() {
             {ROLES.map((r) => (
               <button
                 key={r.value}
-                onClick={() => { setRole(r.value); setIsDirty(true) }}
+                onClick={() => {
+                  setRole(r.value);
+                  setIsDirty(true);
+                }}
                 className={cn(
                   'px-4 py-2.5 text-sm rounded-md border transition-colors text-left',
                   role === r.value
@@ -167,7 +184,6 @@ export default function AccountPage() {
             ))}
           </div>
         </div>
-
       </div>
 
       <UnsavedChangesModal
@@ -176,9 +192,9 @@ export default function AccountPage() {
         onCancel={cancelUnsaved}
       />
     </div>
-  )
+  );
 }
 
 function cn(...classes: (string | boolean | undefined)[]) {
-  return classes.filter(Boolean).join(' ')
+  return classes.filter(Boolean).join(' ');
 }

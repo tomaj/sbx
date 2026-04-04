@@ -1,7 +1,8 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import { ResultGuard } from '../shared/result-guard.util';
 import { and, count, desc, eq, inArray } from 'drizzle-orm';
 import { DB } from '../db/db.module';
-import type { DbType } from '../db/db.module';
+import { DbType } from '../db/db.module';
 import { componentVersions, users } from '../db/schema';
 
 @Injectable()
@@ -34,7 +35,9 @@ export class ComponentVersionsService {
         isDraft: true,
         ...(params.createdAt ? { createdAt: params.createdAt } : {}),
       })
-      .catch(() => { /* non-critical */ });
+      .catch(() => {
+        /* non-critical */
+      });
   }
 
   async listVersions(opts: {
@@ -70,7 +73,13 @@ export class ComponentVersionsService {
 
     if (userIds.length > 0) {
       const userRows = await this.db
-        .select({ id: users.id, firstname: users.firstname, lastname: users.lastname, email: users.email, avatar: users.avatar })
+        .select({
+          id: users.id,
+          firstname: users.firstname,
+          lastname: users.lastname,
+          email: users.email,
+          avatar: users.avatar,
+        })
         .from(users)
         .where(inArray(users.id, userIds));
       for (const u of userRows) {
@@ -109,7 +118,7 @@ export class ComponentVersionsService {
       )
       .limit(1);
 
-    if (!row) throw new NotFoundException('Component version not found');
+    ResultGuard.throwIfNotFound(row, 'Component version not found');
 
     return {
       component_version: {
@@ -138,7 +147,7 @@ export class ComponentVersionsService {
       )
       .limit(1);
 
-    if (!version) throw new NotFoundException('Component version not found');
+    ResultGuard.throwIfNotFound(version, 'Component version not found');
     return version;
   }
 }

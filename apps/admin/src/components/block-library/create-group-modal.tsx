@@ -1,46 +1,49 @@
-'use client'
+'use client';
 
-import { useState, useEffect } from 'react'
-import { X } from 'lucide-react'
+import { useState, useEffect } from 'react';
+import { X } from 'lucide-react';
 
 interface CreateGroupModalProps {
-  open: boolean
-  onConfirm: (name: string) => Promise<void>
-  onCancel: () => void
+  open: boolean;
+  onConfirm: (name: string) => Promise<void>;
+  onCancel: () => void;
 }
 
 export function CreateGroupModal({ open, onConfirm, onCancel }: CreateGroupModalProps) {
-  const [name, setName] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [name, setName] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) {
-      setName('')
-      setError(null)
+      setName('');
+      setError(null);
     }
-  }, [open])
+  }, [open]);
 
   useEffect(() => {
-    if (!open) return
+    if (!open) return;
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onCancel()
+      if (e.key === 'Escape') onCancel();
     }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [open, onCancel])
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open, onCancel]);
 
-  if (!open) return null
+  if (!open) return null;
 
   async function handleCreate() {
-    if (!name.trim()) { setError('Group name is required'); return }
-    setSaving(true)
-    setError(null)
+    if (!name.trim()) {
+      setError('Group name is required');
+      return;
+    }
+    setSaving(true);
+    setError(null);
     try {
-      await onConfirm(name.trim())
+      await onConfirm(name.trim());
     } catch (e: any) {
-      setError(e.message ?? 'Failed to create group')
-      setSaving(false)
+      setError(e.message ?? 'Failed to create group');
+      setSaving(false);
     }
   }
 
@@ -50,17 +53,21 @@ export function CreateGroupModal({ open, onConfirm, onCancel }: CreateGroupModal
       <div className="relative bg-white dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-sm mx-4 p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Create Group</h2>
-          <button onClick={onCancel} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+          <button
+            onClick={onCancel}
+            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+          >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         <input
-          autoFocus
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') handleCreate() }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') handleCreate();
+          }}
           placeholder="e.g. Content, Layout, Forms"
           className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500 placeholder-gray-400 mb-4"
         />
@@ -84,5 +91,5 @@ export function CreateGroupModal({ open, onConfirm, onCancel }: CreateGroupModal
         </div>
       </div>
     </div>
-  )
+  );
 }

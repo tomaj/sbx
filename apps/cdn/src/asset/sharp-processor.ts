@@ -121,7 +121,12 @@ export async function processImage(
     }
   }
 
-  return encodeOutput(img, { ...ops, format: forcedFormat ?? ops.format }, acceptHeader, meta.format ?? 'jpeg');
+  return encodeOutput(
+    img,
+    { ...ops, format: forcedFormat ?? ops.format },
+    acceptHeader,
+    meta.format ?? 'jpeg',
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -177,11 +182,10 @@ function resolveFillBackground(fill: string | undefined): sharp.Color {
 async function applyRoundCorners(
   img: sharp.Sharp,
   rc: NonNullable<ImageOps['roundCorner']>,
-  fill: string | undefined,
+  _fill: string | undefined,
   w: number,
   h: number,
 ): Promise<sharp.Sharp> {
-
   const rx = rc.radius;
   const ry = rc.ellipsis ?? rc.radius;
 
@@ -191,9 +195,7 @@ async function applyRoundCorners(
 
   if (rc.transparent) {
     // Keep transparent background — output must be PNG
-    return img
-      .composite([{ input: Buffer.from(svgMask), blend: 'dest-in' }])
-      .png();
+    return img.composite([{ input: Buffer.from(svgMask), blend: 'dest-in' }]).png();
   }
 
   // Solid background fill
@@ -202,11 +204,10 @@ async function applyRoundCorners(
     <rect width="${w}" height="${h}" fill="${bg}"/>
   </svg>`;
 
-  return img
-    .composite([
-      { input: Buffer.from(background), blend: 'dest-over' },
-      { input: Buffer.from(svgMask), blend: 'dest-in' },
-    ]);
+  return img.composite([
+    { input: Buffer.from(background), blend: 'dest-over' },
+    { input: Buffer.from(svgMask), blend: 'dest-in' },
+  ]);
 }
 
 async function encodeOutput(
@@ -250,8 +251,6 @@ async function encodeOutput(
 
     case 'gif' as any:
       return { buffer: await img.toBuffer(), contentType: 'image/gif' };
-
-    case 'jpeg':
     default:
       img = img.jpeg({ quality });
       return { buffer: await img.toBuffer(), contentType: 'image/jpeg' };

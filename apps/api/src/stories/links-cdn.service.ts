@@ -1,7 +1,9 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import { ResultGuard } from '../shared/result-guard.util';
 import { and, asc, eq, ilike, isNull } from 'drizzle-orm';
+import { escapeLike } from '../shared/query-parser.util';
 import { DB } from '../db/db.module';
-import type { DbType } from '../db/db.module';
+import { DbType } from '../db/db.module';
 import { stories } from '../db/schema';
 
 @Injectable()
@@ -50,17 +52,14 @@ export class LinksCdnService {
       perPage = 25,
     } = opts;
 
-    const conditions: any[] = [
-      eq(stories.spaceId, spaceId),
-      isNull(stories.deletedAt),
-    ];
+    const conditions: any[] = [eq(stories.spaceId, spaceId), isNull(stories.deletedAt)];
 
     if (version === 'published') {
       conditions.push(eq(stories.published, true));
     }
 
     if (startsWith?.trim()) {
-      conditions.push(ilike(stories.fullSlug, `${startsWith.trim()}%`));
+      conditions.push(ilike(stories.fullSlug, `${escapeLike(startsWith.trim())}%`));
     }
 
     if (withParent !== undefined) {
@@ -91,16 +90,10 @@ export class LinksCdnService {
     const [row] = await this.db
       .select()
       .from(stories)
-      .where(
-        and(
-          eq(stories.spaceId, spaceId),
-          eq(stories.uuid, uuid),
-          isNull(stories.deletedAt),
-        ),
-      )
+      .where(and(eq(stories.spaceId, spaceId), eq(stories.uuid, uuid), isNull(stories.deletedAt)))
       .limit(1);
 
-    if (!row) throw new NotFoundException('Link not found');
+    ResultGuard.throwIfNotFound(row, 'Link not found');
 
     return {
       link: { [row.uuid]: this.formatLink(row, true) },

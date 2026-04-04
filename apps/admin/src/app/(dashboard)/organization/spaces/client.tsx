@@ -1,16 +1,16 @@
-'use client'
+'use client';
 
-import { useState, useMemo } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { Plus, Search, MoreHorizontal, ChevronDown, ChevronUp } from 'lucide-react'
-import { TimeAgo } from '@/components/ui/time-ago'
-import { UserAvatar } from '@/components/ui/user-avatar'
-import { CreateSpacePanel } from '@/components/spaces/create-space-panel'
-import type { Space } from '@sbx/types'
+import { useState, useMemo } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { Plus, Search, MoreHorizontal, ChevronDown, ChevronUp } from 'lucide-react';
+import { TimeAgo } from '@/components/ui/time-ago';
+import { UserAvatar } from '@/components/ui/user-avatar';
+import { CreateSpacePanel } from '@/components/spaces/create-space-panel';
+import type { Space } from '@sbx/types';
 
 function OrgSpaceCard({ space }: { space: Space }) {
-  const owner = space.members[0] ?? null
+  const owner = space.members[0] ?? null;
 
   return (
     <Link
@@ -23,7 +23,10 @@ function OrgSpaceCard({ space }: { space: Space }) {
           {space.name}
         </h3>
         <button
-          onClick={(e) => { e.preventDefault(); e.stopPropagation() }}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
           className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors flex-shrink-0"
         >
           <MoreHorizontal className="size-4" />
@@ -33,25 +36,21 @@ function OrgSpaceCard({ space }: { space: Space }) {
       {/* Middle: avatar left, space ID right */}
       <div className="flex items-end justify-between">
         <div className="flex flex-col gap-1">
-          {owner && (
-            <UserAvatar
-              name={`${owner.firstname} ${owner.lastname}`}
-              src={owner.avatar}
-            />
-          )}
+          {owner && <UserAvatar name={`${owner.firstname} ${owner.lastname}`} src={owner.avatar} />}
           <span className="text-xs text-gray-400 mt-1">
             <TimeAgo date={space.last_activity_at ?? space.updated_at} />
           </span>
         </div>
         <div className="text-right">
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            Space ID: <span className="font-semibold text-gray-900 dark:text-gray-100">#{space.id}</span>
+            Space ID:{' '}
+            <span className="font-semibold text-gray-900 dark:text-gray-100">#{space.id}</span>
           </p>
           <p className="text-xs text-gray-400 mt-1">Enterprise · EU</p>
         </div>
       </div>
     </Link>
-  )
+  );
 }
 
 function Section({
@@ -60,12 +59,12 @@ function Section({
   spaces,
   emptyText,
 }: {
-  title: string
-  count: number
-  spaces: Space[]
-  emptyText?: string
+  title: string;
+  count: number;
+  spaces: Space[];
+  emptyText?: string;
 }) {
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = useState(true);
 
   return (
     <div className="mb-8">
@@ -77,8 +76,8 @@ function Section({
         {title} ({count})
       </button>
 
-      {open && (
-        spaces.length === 0 ? (
+      {open &&
+        (spaces.length === 0 ? (
           <p className="text-sm text-gray-400 pl-6">{emptyText ?? 'No spaces found.'}</p>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -86,43 +85,40 @@ function Section({
               <OrgSpaceCard key={space.id} space={space} />
             ))}
           </div>
-        )
-      )}
+        ))}
     </div>
-  )
+  );
 }
 
 const SORT_OPTIONS = [
   { value: 'updated', label: 'Last updated' },
   { value: 'name', label: 'Name' },
   { value: 'id', label: 'Space ID' },
-]
+];
 
 export function OrgSpacesClient({ spaces }: { spaces: Space[] }) {
-  const [search, setSearch] = useState('')
-  const [sort, setSort] = useState('updated')
-  const [sortOpen, setSortOpen] = useState(false)
-  const [createOpen, setCreateOpen] = useState(false)
-  const router = useRouter()
+  const [search, setSearch] = useState('');
+  const [sort, setSort] = useState('updated');
+  const [sortOpen, setSortOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const router = useRouter();
 
   const filtered = useMemo(() => {
-    let list = spaces
+    let list = spaces;
     if (search) {
-      const q = search.toLowerCase()
-      list = list.filter(
-        (s) => s.name.toLowerCase().includes(q) || String(s.id).includes(q),
-      )
+      const q = search.toLowerCase();
+      list = list.filter((s) => s.name.toLowerCase().includes(q) || String(s.id).includes(q));
     }
     return [...list].sort((a, b) => {
-      if (sort === 'name') return a.name.localeCompare(b.name)
-      if (sort === 'id') return a.id - b.id
-      const aDate = a.last_activity_at ?? a.updated_at
-      const bDate = b.last_activity_at ?? b.updated_at
-      return new Date(bDate).getTime() - new Date(aDate).getTime()
-    })
-  }, [spaces, search, sort])
+      if (sort === 'name') return a.name.localeCompare(b.name);
+      if (sort === 'id') return a.id - b.id;
+      const aDate = a.last_activity_at ?? a.updated_at;
+      const bDate = b.last_activity_at ?? b.updated_at;
+      return new Date(bDate).getTime() - new Date(aDate).getTime();
+    });
+  }, [spaces, search, sort]);
 
-  const sortLabel = SORT_OPTIONS.find((o) => o.value === sort)?.label ?? 'Last updated'
+  const sortLabel = SORT_OPTIONS.find((o) => o.value === sort)?.label ?? 'Last updated';
 
   return (
     <div className="p-8 max-w-6xl">
@@ -163,7 +159,10 @@ export function OrgSpacesClient({ spaces }: { spaces: Space[] }) {
               {SORT_OPTIONS.map((opt) => (
                 <button
                   key={opt.value}
-                  onClick={() => { setSort(opt.value); setSortOpen(false) }}
+                  onClick={() => {
+                    setSort(opt.value);
+                    setSortOpen(false);
+                  }}
                   className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${
                     sort === opt.value
                       ? 'text-teal-700 dark:text-teal-400 bg-teal-50 dark:bg-teal-900/20'
@@ -194,8 +193,11 @@ export function OrgSpacesClient({ spaces }: { spaces: Space[] }) {
       <CreateSpacePanel
         open={createOpen}
         onClose={() => setCreateOpen(false)}
-        onCreated={() => { setCreateOpen(false); router.refresh() }}
+        onCreated={() => {
+          setCreateOpen(false);
+          router.refresh();
+        }}
       />
     </div>
-  )
+  );
 }

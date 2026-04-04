@@ -1,8 +1,9 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { asc, eq } from 'drizzle-orm';
 import { DB } from '../db/db.module';
-import type { DbType } from '../db/db.module';
+import { DbType } from '../db/db.module';
 import { tasks } from '../db/schema';
+import { validateExternalUrl } from '../shared/url-validation.util';
 
 @Injectable()
 export class TasksService {
@@ -19,23 +20,24 @@ export class TasksService {
   }
 
   async findOne(spaceId: number, id: number) {
-    const [row] = await this.db
-      .select()
-      .from(tasks)
-      .where(eq(tasks.id, id))
-      .limit(1);
+    const [row] = await this.db.select().from(tasks).where(eq(tasks.id, id)).limit(1);
 
     if (!row || row.spaceId !== spaceId) return null;
     return { task: this.format(row) };
   }
 
-  async create(spaceId: number, body: {
-    name: string;
-    description?: string;
-    task_type?: string;
-    webhook_url?: string;
-    user_dialog?: any;
-  }) {
+  async create(
+    spaceId: number,
+    body: {
+      name: string;
+      description?: string;
+      task_type?: string;
+      webhook_url?: string;
+      user_dialog?: any;
+    },
+  ) {
+    if (body.webhook_url) validateExternalUrl(body.webhook_url);
+
     const [row] = await this.db
       .insert(tasks)
       .values({
@@ -51,13 +53,19 @@ export class TasksService {
     return { task: this.format(row) };
   }
 
-  async update(spaceId: number, id: number, body: {
-    name?: string;
-    description?: string;
-    task_type?: string;
-    webhook_url?: string;
-    user_dialog?: any;
-  }) {
+  async update(
+    spaceId: number,
+    id: number,
+    body: {
+      name?: string;
+      description?: string;
+      task_type?: string;
+      webhook_url?: string;
+      user_dialog?: any;
+    },
+  ) {
+    if (body.webhook_url) validateExternalUrl(body.webhook_url);
+
     const [existing] = await this.db.select().from(tasks).where(eq(tasks.id, id)).limit(1);
     if (!existing || existing.spaceId !== spaceId) throw new NotFoundException();
 
@@ -90,6 +98,9 @@ export class TasksService {
     if (!row || row.spaceId !== spaceId) throw new NotFoundException();
     if (!row.webhookUrl) throw new NotFoundException();
 
+    // Re-validate at execution time — defense-in-depth against data migrated before validation was added
+    validateExternalUrl(row.webhookUrl);
+
     const userEmail = user?.email ?? 'unknown';
     const payload = {
       task: { id: row.id, name: row.name },
@@ -101,7 +112,10 @@ export class TasksService {
 
     let lastResponse: any = null;
     try {
-      await this.db.update(tasks).set({ running: true, updatedAt: new Date() }).where(eq(tasks.id, id));
+      await this.db
+        .update(tasks)
+        .set({ running: true, updatedAt: new Date() })
+        .where(eq(tasks.id, id));
 
       const res = await fetch(row.webhookUrl, {
         method: 'POST',

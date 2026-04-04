@@ -1,10 +1,9 @@
-import { UserMenu } from './user-menu'
-import { NavLinks } from './nav-links'
-import { auth } from '@/lib/auth'
-import { headers } from 'next/headers'
+import { UserMenu } from './user-menu';
+import { NavLinks } from './nav-links';
+import { getServerSession } from '@/lib/api-server';
 
 export async function Sidebar() {
-  const session = await auth.api.getSession({ headers: await headers() })
+  const session = await getServerSession();
 
   return (
     <aside className="w-[220px] shrink-0 bg-[#1b2539] flex flex-col h-screen sticky top-0">
@@ -21,11 +20,8 @@ export async function Sidebar() {
 
       {/* User menu */}
       <div className="px-2 pb-2">
-        <UserMenu
-          name={session?.user?.name ?? ''}
-          email={session?.user?.email ?? ''}
-        />
+        <UserMenu name={session?.name ?? ''} email={session?.email ?? ''} />
       </div>
     </aside>
-  )
+  );
 }

@@ -1,8 +1,8 @@
-'use client'
+'use client';
 
-import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { cn } from '@/lib/utils'
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { cn } from '@/lib/utils';
 
 const sections = [
   {
@@ -19,10 +19,10 @@ const sections = [
       { href: '/settings/tokens', label: 'Personal access token' },
     ],
   },
-]
+];
 
 export default function SettingsLayout({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname()
+  const pathname = usePathname();
 
   return (
     <div className="flex min-h-full">
@@ -54,9 +54,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
       </nav>
 
       {/* Content */}
-      <div className="flex-1 p-8 max-w-3xl">
-        {children}
-      </div>
+      <div className="flex-1 p-8 max-w-3xl">{children}</div>
     </div>
-  )
+  );
 }

@@ -1,139 +1,121 @@
-'use client'
+'use client';
 
-import { useState, useEffect } from 'react'
-import { MessageSquare, CheckCircle, RotateCcw, Send } from 'lucide-react'
-import { CommentItem, type CommentData } from '@/components/ui/comment-item'
+import { useState } from 'react';
+import { MessageSquare, CheckCircle, RotateCcw, Send } from 'lucide-react';
+import { CommentItem, type CommentData } from '@/components/ui/comment-item';
+import useSWR from 'swr';
+import { fetcher } from '@/lib/swr';
 
 interface Discussion {
-  id: number
-  space_id: number
-  story_id: number | null
-  field_key: string | null
-  resolved_at: string | null
-  created_at: string
-  updated_at: string
-  comments: CommentData[]
+  id: number;
+  space_id: number;
+  story_id: number | null;
+  field_key: string | null;
+  resolved_at: string | null;
+  created_at: string;
+  updated_at: string;
+  comments: CommentData[];
 }
 
 interface CommentTabProps {
-  spaceId: string
-  storyId: number | null
-  onDiscussionChange?: () => void
+  spaceId: string;
+  storyId: number | null;
+  onDiscussionChange?: () => void;
 }
 
-type TabType = 'open' | 'resolved'
+type TabType = 'open' | 'resolved';
 
 export function CommentTab({ spaceId, storyId, onDiscussionChange }: CommentTabProps) {
-  const [activeTab, setActiveTab] = useState<TabType>('open')
-  const [discussions, setDiscussions] = useState<Discussion[]>([])
-  const [loading, setLoading] = useState(true)
-  const [replyMessages, setReplyMessages] = useState<Record<number, string>>({})
-  const [submitting, setSubmitting] = useState(false)
-  const [replyingTo, setReplyingTo] = useState<number | null>(null)
+  const [activeTab, setActiveTab] = useState<TabType>('open');
+  const [replyMessages, setReplyMessages] = useState<Record<number, string>>({});
+  const [submitting, setSubmitting] = useState(false);
+  const [replyingTo, setReplyingTo] = useState<number | null>(null);
 
-  async function loadDiscussions() {
-    if (!storyId) {
-      setLoading(false)
-      return
-    }
-    setLoading(true)
-    try {
-      const res = await fetch(
-        `/api/admin/spaces/${spaceId}/discussions?story_id=${storyId}&by_status=${activeTab === 'resolved' ? 'solved' : 'unsolved'}`,
-      )
-      if (!res.ok) throw new Error('Failed to load')
-      const data = await res.json()
-      const discs = data.discussions ?? []
+  const discussionsUrl = storyId
+    ? `/api/admin/spaces/${spaceId}/discussions?story_id=${storyId}&by_status=${activeTab === 'resolved' ? 'solved' : 'unsolved'}`
+    : null;
 
+  const {
+    data: discussionsData,
+    isLoading: loading,
+    mutate: mutateDiscussions,
+  } = useSWR<Discussion[]>(
+    discussionsUrl,
+    async (url: string) => {
+      const res = await fetcher(url);
+      const discs: any[] = res.discussions ?? [];
       // Fetch comments for each discussion in parallel
       const withComments = await Promise.all(
         discs.map(async (d: any) => {
           try {
-            const cRes = await fetch(
+            const cData = await fetcher(
               `/api/admin/spaces/${spaceId}/discussions/${d.id}/comments`,
-            )
-            if (cRes.ok) {
-              const cData = await cRes.json()
-              return { ...d, comments: cData.comments ?? [] }
-            }
-          } catch {}
-          return { ...d, comments: [] }
+            );
+            return { ...d, comments: cData.comments ?? [] };
+          } catch {
+            return { ...d, comments: [] };
+          }
         }),
-      )
+      );
       // Only show discussions that have comments (matching previous behavior)
-      setDiscussions(withComments.filter((d: Discussion) => d.comments.length > 0))
-    } catch {
-      setDiscussions([])
-    } finally {
-      setLoading(false)
-    }
-  }
+      return withComments.filter((d: Discussion) => d.comments.length > 0);
+    },
+    { revalidateOnFocus: false },
+  );
 
-  useEffect(() => {
-    loadDiscussions()
-  }, [spaceId, storyId, activeTab])
+  const discussions = discussionsData ?? [];
 
   async function handleReply(discussionId: number) {
-    const message = replyMessages[discussionId]?.trim()
-    if (!message || submitting) return
-    setSubmitting(true)
+    const message = replyMessages[discussionId]?.trim();
+    if (!message || submitting) return;
+    setSubmitting(true);
     try {
       await fetch(`/api/admin/spaces/${spaceId}/discussions/${discussionId}/comments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ comment: { message } }),
-      })
-      setReplyMessages((prev) => ({ ...prev, [discussionId]: '' }))
-      setReplyingTo(null)
-      await loadDiscussions()
-      onDiscussionChange?.()
+      });
+      setReplyMessages((prev) => ({ ...prev, [discussionId]: '' }));
+      setReplyingTo(null);
+      await mutateDiscussions();
+      onDiscussionChange?.();
     } finally {
-      setSubmitting(false)
+      setSubmitting(false);
     }
   }
 
   async function handleResolve(discussionId: number) {
-    await fetch(
-      `/api/admin/spaces/${spaceId}/discussions/${discussionId}`,
-      {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ discussion: { solved_at: new Date().toISOString() } }),
-      },
-    )
-    await loadDiscussions()
-    onDiscussionChange?.()
+    await fetch(`/api/admin/spaces/${spaceId}/discussions/${discussionId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ discussion: { solved_at: new Date().toISOString() } }),
+    });
+    await mutateDiscussions();
+    onDiscussionChange?.();
   }
 
   async function handleUnresolve(discussionId: number) {
-    await fetch(
-      `/api/admin/spaces/${spaceId}/discussions/${discussionId}`,
-      {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ discussion: { solved_at: null } }),
-      },
-    )
-    await loadDiscussions()
-    onDiscussionChange?.()
+    await fetch(`/api/admin/spaces/${spaceId}/discussions/${discussionId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ discussion: { solved_at: null } }),
+    });
+    await mutateDiscussions();
+    onDiscussionChange?.();
   }
 
   async function handleDeleteComment(discussionId: number, commentId: number) {
-    await fetch(
-      `/api/admin/spaces/${spaceId}/discussions/${discussionId}/comments/${commentId}`,
-      { method: 'DELETE' },
-    )
-    await loadDiscussions()
-    onDiscussionChange?.()
+    await fetch(`/api/admin/spaces/${spaceId}/discussions/${discussionId}/comments/${commentId}`, {
+      method: 'DELETE',
+    });
+    await mutateDiscussions();
+    onDiscussionChange?.();
   }
 
-  function handleKeyDown(
-    e: React.KeyboardEvent<HTMLTextAreaElement>,
-    onSubmit: () => void,
-  ) {
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>, onSubmit: () => void) {
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-      e.preventDefault()
-      onSubmit()
+      e.preventDefault();
+      onSubmit();
     }
   }
 
@@ -177,12 +159,10 @@ export function CommentTab({ spaceId, storyId, onDiscussionChange }: CommentTabP
                 replyValue={replyMessages[disc.id] ?? ''}
                 isReplying={replyingTo === disc.id}
                 submitting={submitting}
-                onReplyChange={(val) =>
-                  setReplyMessages((prev) => ({ ...prev, [disc.id]: val }))
-                }
+                onReplyChange={(val) => setReplyMessages((prev) => ({ ...prev, [disc.id]: val }))}
                 onReplyFocus={() => setReplyingTo(disc.id)}
                 onReplyBlur={() => {
-                  if (!replyMessages[disc.id]?.trim()) setReplyingTo(null)
+                  if (!replyMessages[disc.id]?.trim()) setReplyingTo(null);
                 }}
                 onReply={() => handleReply(disc.id)}
                 onResolve={() => handleResolve(disc.id)}
@@ -195,23 +175,23 @@ export function CommentTab({ spaceId, storyId, onDiscussionChange }: CommentTabP
         )}
       </div>
     </div>
-  )
+  );
 }
 
 interface DiscussionThreadProps {
-  discussion: Discussion
-  resolved: boolean
-  replyValue: string
-  isReplying: boolean
-  submitting: boolean
-  onReplyChange: (val: string) => void
-  onReplyFocus: () => void
-  onReplyBlur: () => void
-  onReply: () => void
-  onResolve: () => void
-  onUnresolve: () => void
-  onDeleteComment: (commentId: number) => Promise<void>
-  onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>, submit: () => void) => void
+  discussion: Discussion;
+  resolved: boolean;
+  replyValue: string;
+  isReplying: boolean;
+  submitting: boolean;
+  onReplyChange: (val: string) => void;
+  onReplyFocus: () => void;
+  onReplyBlur: () => void;
+  onReply: () => void;
+  onResolve: () => void;
+  onUnresolve: () => void;
+  onDeleteComment: (commentId: number) => Promise<void>;
+  onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>, submit: () => void) => void;
 }
 
 function DiscussionThread({
@@ -244,12 +224,7 @@ function DiscussionThread({
       {/* Comments */}
       <div className="space-y-3">
         {discussion.comments.map((comment) => (
-          <CommentItem
-            key={comment.id}
-            comment={comment}
-            onDelete={onDeleteComment}
-            canDelete
-          />
+          <CommentItem key={comment.id} comment={comment} onDelete={onDeleteComment} canDelete />
         ))}
         {discussion.comments.length === 0 && (
           <p className="text-xs text-gray-400 italic">No comments yet.</p>
@@ -299,7 +274,6 @@ function DiscussionThread({
             onBlur={onReplyBlur}
             placeholder="Write a comment and notify others with @ (⌘↵ to send)"
             rows={2}
-            autoFocus
             className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 placeholder-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
           />
           <button
@@ -314,7 +288,7 @@ function DiscussionThread({
         </div>
       )}
     </div>
-  )
+  );
 }
 
 function EmptyState({ resolved }: { resolved: boolean }) {
@@ -332,7 +306,7 @@ function EmptyState({ resolved }: { resolved: boolean }) {
           : 'Start a discussion by clicking the comment icon on a field.'}
       </p>
     </div>
-  )
+  );
 }
 
 function DiscussionsSkeleton() {
@@ -354,5 +328,5 @@ function DiscussionsSkeleton() {
         </div>
       ))}
     </div>
-  )
+  );
 }

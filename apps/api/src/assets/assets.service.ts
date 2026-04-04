@@ -1,15 +1,12 @@
-import {
-  BadRequestException,
-  Inject,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { ResultGuard } from '../shared/result-guard.util';
 import { and, asc, desc, count, eq, ilike, isNull, isNotNull, or, sql } from 'drizzle-orm';
 import { DB } from '../db/db.module';
-import type { DbType } from '../db/db.module';
+import { DbType } from '../db/db.module';
 import { assets, assetFolders, internalTags } from '../db/schema';
 import { AiService } from '../ai/ai.service';
 import { AiConfigurationsService } from '../ai-configurations/ai-configurations.service';
+import { escapeLike } from '../shared/query-parser.util';
 import { inArray } from 'drizzle-orm';
 import { StorageService } from '../storage/storage.service';
 import { WebhooksService } from '../webhooks/webhooks.service';
@@ -41,7 +38,7 @@ export class AssetsService {
       conditions.push(inArray(assetFolders.id, opts.byIds));
     }
     if (opts?.search) {
-      conditions.push(ilike(assetFolders.name, `%${opts.search}%`));
+      conditions.push(ilike(assetFolders.name, `%${escapeLike(opts.search)}%`));
     }
     if (opts?.withParent !== undefined) {
       if (opts.withParent === 0) {
@@ -69,14 +66,24 @@ export class AssetsService {
       .select()
       .from(assetFolders)
       .where(and(eq(assetFolders.id, id), eq(assetFolders.spaceId, spaceId)));
-    if (!row) throw new NotFoundException('Folder not found');
+    ResultGuard.throwIfNotFound(row, 'Folder not found');
 
     let parentUuid: string | null = null;
     if (row.parentId) {
-      const [parent] = await this.db.select({ uuid: assetFolders.uuid }).from(assetFolders).where(eq(assetFolders.id, row.parentId)).limit(1);
+      const [parent] = await this.db
+        .select({ uuid: assetFolders.uuid })
+        .from(assetFolders)
+        .where(eq(assetFolders.id, row.parentId))
+        .limit(1);
       parentUuid = parent?.uuid ?? null;
     }
-    return this.formatFolder(row, new Map<number, string>([[row.id, row.uuid], ...(row.parentId ? [[row.parentId, parentUuid ?? '']] as [number, string][] : [])]));
+    return this.formatFolder(
+      row,
+      new Map<number, string>([
+        [row.id, row.uuid],
+        ...(row.parentId ? ([[row.parentId, parentUuid ?? '']] as [number, string][]) : []),
+      ]),
+    );
   }
 
   async createFolder(spaceId: number, data: { name: string; parent_id?: number | null }) {
@@ -85,7 +92,11 @@ export class AssetsService {
 
     let parentUuid: string | null = null;
     if (data.parent_id) {
-      const [parent] = await this.db.select({ uuid: assetFolders.uuid }).from(assetFolders).where(eq(assetFolders.id, data.parent_id)).limit(1);
+      const [parent] = await this.db
+        .select({ uuid: assetFolders.uuid })
+        .from(assetFolders)
+        .where(eq(assetFolders.id, data.parent_id))
+        .limit(1);
       parentUuid = parent?.uuid ?? null;
     }
 
@@ -99,7 +110,11 @@ export class AssetsService {
     return this.formatFolder(row, idToUuid);
   }
 
-  async updateFolder(id: number, spaceId: number, data: { name?: string; parent_id?: number | null }) {
+  async updateFolder(
+    id: number,
+    spaceId: number,
+    data: { name?: string; parent_id?: number | null },
+  ) {
     const [row] = await this.db
       .update(assetFolders)
       .set({
@@ -109,11 +124,15 @@ export class AssetsService {
       })
       .where(and(eq(assetFolders.id, id), eq(assetFolders.spaceId, spaceId)))
       .returning();
-    if (!row) throw new NotFoundException('Folder not found');
+    ResultGuard.throwIfNotFound(row, 'Folder not found');
 
     let parentUuid: string | null = null;
     if (row.parentId) {
-      const [parent] = await this.db.select({ uuid: assetFolders.uuid }).from(assetFolders).where(eq(assetFolders.id, row.parentId)).limit(1);
+      const [parent] = await this.db
+        .select({ uuid: assetFolders.uuid })
+        .from(assetFolders)
+        .where(eq(assetFolders.id, row.parentId))
+        .limit(1);
       parentUuid = parent?.uuid ?? null;
     }
     const idToUuid = new Map<number, string>([[row.id, row.uuid]]);
@@ -126,7 +145,7 @@ export class AssetsService {
       .delete(assetFolders)
       .where(and(eq(assetFolders.id, id), eq(assetFolders.spaceId, spaceId)))
       .returning();
-    if (!row) throw new NotFoundException('Folder not found');
+    ResultGuard.throwIfNotFound(row, 'Folder not found');
     return { deleted: true };
   }
 
@@ -150,7 +169,21 @@ export class AssetsService {
       withTags?: string;
     },
   ) {
-    const { page, perPage, search, folderId, sortField, sortDir, deleted, contentType, isPrivate, byAlt, byCopyright, byTitle, withTags } = opts;
+    const {
+      page,
+      perPage,
+      search,
+      folderId,
+      sortField,
+      sortDir,
+      deleted,
+      contentType,
+      isPrivate,
+      byAlt,
+      byCopyright,
+      byTitle,
+      withTags,
+    } = opts;
 
     const conditions: any[] = [eq(assets.spaceId, spaceId)];
 
@@ -163,10 +196,10 @@ export class AssetsService {
     if (search) {
       conditions.push(
         or(
-          ilike(assets.filename, `%${search}%`),
-          ilike(assets.shortFilename, `%${search}%`),
-          ilike(assets.alt, `%${search}%`),
-          ilike(assets.title, `%${search}%`),
+          ilike(assets.filename, `%${escapeLike(search)}%`),
+          ilike(assets.shortFilename, `%${escapeLike(search)}%`),
+          ilike(assets.alt, `%${escapeLike(search)}%`),
+          ilike(assets.title, `%${escapeLike(search)}%`),
         ),
       );
     }
@@ -178,44 +211,46 @@ export class AssetsService {
     }
 
     if (contentType) {
-      conditions.push(ilike(assets.contentType, `${contentType}%`));
+      conditions.push(ilike(assets.contentType, `${escapeLike(contentType)}%`));
     }
 
     if (byAlt) {
-      conditions.push(ilike(assets.alt, `%${byAlt}%`));
+      conditions.push(ilike(assets.alt, `%${escapeLike(byAlt)}%`));
     }
 
     if (byCopyright) {
-      conditions.push(ilike(assets.copyright, `%${byCopyright}%`));
+      conditions.push(ilike(assets.copyright, `%${escapeLike(byCopyright)}%`));
     }
 
     if (byTitle) {
-      conditions.push(ilike(assets.title, `%${byTitle}%`));
+      conditions.push(ilike(assets.title, `%${escapeLike(byTitle)}%`));
     }
 
     // with_tags: comma-separated tag names, OR logic — filter assets that have any of these tags
     if (withTags) {
-      const tagNames = withTags.split(',').map((t) => t.trim()).filter(Boolean);
+      const tagNames = withTags
+        .split(',')
+        .slice(0, 1000)
+        .map((t) => t.trim())
+        .filter(Boolean);
       if (tagNames.length > 0) {
         // Look up tag IDs by name
         const tagRows = await this.db
           .select({ id: internalTags.id })
           .from(internalTags)
-          .where(and(
-            eq(internalTags.spaceId, spaceId),
-            inArray(internalTags.name, tagNames),
-          ));
+          .where(and(eq(internalTags.spaceId, spaceId), inArray(internalTags.name, tagNames)));
         if (tagRows.length === 0) {
           // No matching tags — return empty result
           return { assets: [], total: 0, page, per_page: perPage };
         }
         const tagIdStrings = tagRows.map((t) => String(t.id));
         // internal_tag_ids is a JSON array of string IDs; use SQL to check overlap
-        const tagConditions = tagIdStrings.map((tagId) =>
-          // Check if the JSON array contains this tag ID string
-          // Using raw SQL: internal_tag_ids::jsonb @> '["tagId"]'::jsonb
-          // With Drizzle, use sql template
-          sql`${assets.internalTagIds}::jsonb @> ${JSON.stringify([tagId])}::jsonb`,
+        const tagConditions = tagIdStrings.map(
+          (tagId) =>
+            // Check if the JSON array contains this tag ID string
+            // Using raw SQL: internal_tag_ids::jsonb @> '["tagId"]'::jsonb
+            // With Drizzle, use sql template
+            sql`${assets.internalTagIds}::jsonb @> ${JSON.stringify([tagId])}::jsonb`,
         );
         conditions.push(or(...tagConditions));
       }
@@ -231,12 +266,21 @@ export class AssetsService {
 
     let orderCol: any;
     switch (sortField) {
-      case 'created_at': orderCol = assets.createdAt; break;
-      case 'updated_at': orderCol = assets.updatedAt; break;
+      case 'created_at':
+        orderCol = assets.createdAt;
+        break;
+      case 'updated_at':
+        orderCol = assets.updatedAt;
+        break;
       case 'short_filename':
-      case 'filename': orderCol = assets.shortFilename; break;
-      case 'content_length': orderCol = assets.contentLength; break;
-      default: orderCol = assets.createdAt;
+      case 'filename':
+        orderCol = assets.shortFilename;
+        break;
+      case 'content_length':
+        orderCol = assets.contentLength;
+        break;
+      default:
+        orderCol = assets.createdAt;
     }
     const orderFn = sortDir === 'asc' ? asc(orderCol) : desc(orderCol);
 
@@ -264,7 +308,7 @@ export class AssetsService {
       .select()
       .from(assets)
       .where(and(eq(assets.id, id), eq(assets.spaceId, spaceId)));
-    if (!row) throw new NotFoundException('Asset not found');
+    ResultGuard.throwIfNotFound(row, 'Asset not found');
     return this.formatAsset(row);
   }
 
@@ -318,7 +362,7 @@ export class AssetsService {
       .set(updates)
       .where(and(eq(assets.id, id), eq(assets.spaceId, spaceId)))
       .returning();
-    if (!row) throw new NotFoundException('Asset not found');
+    ResultGuard.throwIfNotFound(row, 'Asset not found');
 
     void this.webhooks.dispatch(spaceId, 'asset.updated', {
       action: 'asset_updated',
@@ -331,11 +375,7 @@ export class AssetsService {
     return this.formatAsset(row);
   }
 
-  async uploadAssets(
-    spaceId: number,
-    files: Express.Multer.File[],
-    folderId?: number | null,
-  ) {
+  async uploadAssets(spaceId: number, files: Express.Multer.File[], folderId?: number | null) {
     const results = await Promise.all(
       files.map(async (file) => {
         const id = Date.now() * 1000 + Math.floor(Math.random() * 1000);
@@ -379,7 +419,7 @@ export class AssetsService {
       .select()
       .from(assets)
       .where(and(eq(assets.id, id), eq(assets.spaceId, spaceId)));
-    if (!existing) throw new NotFoundException('Asset not found');
+    ResultGuard.throwIfNotFound(existing, 'Asset not found');
 
     // Derive key from existing filename: /f/{spaceId}/key → {spaceId}/key
     const key = existing.filename.replace(/^\/f\//, '');
@@ -405,7 +445,7 @@ export class AssetsService {
       .set({ deletedAt: new Date(), updatedAt: new Date() })
       .where(and(eq(assets.id, id), eq(assets.spaceId, spaceId), isNull(assets.deletedAt)))
       .returning();
-    if (!row) throw new NotFoundException('Asset not found');
+    ResultGuard.throwIfNotFound(row, 'Asset not found');
 
     void this.webhooks.dispatch(spaceId, WEBHOOK_ACTIONS.ASSET_DELETED, {
       action: 'asset_deleted',
@@ -424,7 +464,7 @@ export class AssetsService {
       .set({ deletedAt: null, updatedAt: new Date() })
       .where(and(eq(assets.id, id), eq(assets.spaceId, spaceId), isNotNull(assets.deletedAt)))
       .returning();
-    if (!row) throw new NotFoundException('Deleted asset not found');
+    ResultGuard.throwIfNotFound(row, 'Deleted asset not found');
     return this.formatAsset(row);
   }
 
@@ -464,7 +504,9 @@ export class AssetsService {
     await this.db
       .update(assets)
       .set({ deletedAt: null, updatedAt: new Date() })
-      .where(and(eq(assets.spaceId, spaceId), inArray(assets.id, ids), isNotNull(assets.deletedAt)));
+      .where(
+        and(eq(assets.spaceId, spaceId), inArray(assets.id, ids), isNotNull(assets.deletedAt)),
+      );
   }
 
   async generateAltText(assetId: number, spaceId: number): Promise<{ alt_text: string }> {
@@ -474,7 +516,7 @@ export class AssetsService {
       .from(assets)
       .where(and(eq(assets.id, assetId), eq(assets.spaceId, spaceId)))
       .limit(1);
-    if (!asset) throw new NotFoundException('Asset not found');
+    ResultGuard.throwIfNotFound(asset, 'Asset not found');
 
     // Only image assets can have alt text generated
     if (!asset.contentType?.startsWith('image/')) {
@@ -483,7 +525,10 @@ export class AssetsService {
 
     // Load active AI configuration and branding rule
     const config = await this.aiConfigurations.getActiveConfigWithCredentials(spaceId);
-    if (!config) throw new BadRequestException('AI is not configured for this space. Configure a provider in Settings → AI Settings.');
+    if (!config)
+      throw new BadRequestException(
+        'AI is not configured for this space. Configure a provider in Settings → AI Settings.',
+      );
     const branding = await this.aiConfigurations.getActiveBrandingRule(spaceId);
 
     // Normalize filename (handles migrated Storyblok URLs), then strip /f/ to get MinIO key
@@ -502,7 +547,13 @@ export class AssetsService {
       imageBuffer = Buffer.from(await response.arrayBuffer());
     }
 
-    const altText = await this.ai.generateAltText(config, branding, imageBuffer, asset.contentType, spaceId);
+    const altText = await this.ai.generateAltText(
+      config,
+      branding,
+      imageBuffer,
+      asset.contentType,
+      spaceId,
+    );
     return { alt_text: altText };
   }
 
@@ -528,7 +579,7 @@ export class AssetsService {
 
   private formatAsset(a: typeof assets.$inferSelect) {
     const filename = this.normalizeFilename(a.filename);
-    const metaData = a.metaData as Record<string, unknown> ?? {};
+    const metaData = (a.metaData as Record<string, unknown>) ?? {};
     // Parse dimensions from filename if not stored in meta_data
     // Storyblok encodes dimensions as /f/{spaceId}/{width}x{height}/{hash}/name
     if (!metaData.width && !metaData.height) {

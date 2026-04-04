@@ -1,16 +1,21 @@
-'use client'
+'use client';
 
-import { Search, X } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { Search, X } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface SearchBarProps {
-  value: string
-  onChange: (value: string) => void
-  placeholder?: string
-  className?: string
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  className?: string;
 }
 
-export function SearchBar({ value, onChange, placeholder = 'Search...', className }: SearchBarProps) {
+export function SearchBar({
+  value,
+  onChange,
+  placeholder = 'Search...',
+  className,
+}: SearchBarProps) {
   return (
     <div className={cn('relative', className)}>
       <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-gray-400 pointer-events-none" />
@@ -30,5 +35,5 @@ export function SearchBar({ value, onChange, placeholder = 'Search...', classNam
         </button>
       )}
     </div>
-  )
+  );
 }

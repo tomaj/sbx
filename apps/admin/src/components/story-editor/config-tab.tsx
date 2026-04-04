@@ -1,15 +1,16 @@
-'use client'
+'use client';
 
-import { useState, useRef, useEffect, useMemo } from 'react'
-import { Home, HelpCircle, ChevronDown, X, Plus, Search } from 'lucide-react'
-import { cn } from '@/lib/utils'
-import type { StoryDetail } from './types'
+import { useState, useRef, useEffect, useMemo } from 'react';
+import { Home, HelpCircle, ChevronDown, X, Plus, Search } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { useApi } from '@/lib/swr';
+import type { StoryDetail } from './types';
 
 interface Props {
-  spaceId: string
-  story: StoryDetail
-  onSave: (data: Partial<StoryDetail>) => Promise<void>
-  isFormOnly?: boolean
+  spaceId: string;
+  story: StoryDetail;
+  onSave: (data: Partial<StoryDetail>) => Promise<void>;
+  isFormOnly?: boolean;
 }
 
 // Story tags select — works with string[] tag names via MAPI tags endpoint
@@ -18,75 +19,79 @@ function StoryTagsSelect({
   value,
   onChange,
 }: {
-  spaceId: string
-  value: string[]
-  onChange: (v: string[]) => void
+  spaceId: string;
+  value: string[];
+  onChange: (v: string[]) => void;
 }) {
-  const [open, setOpen] = useState(false)
-  const [input, setInput] = useState('')
-  const [available, setAvailable] = useState<string[]>([])
-  const containerRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const [open, setOpen] = useState(false);
+  const [input, setInput] = useState('');
+  const [extraTags, setExtraTags] = useState<string[]>([]);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const { data: tagsData } = useApi<{ tags: { name: string }[] }>(
+    `/api/admin/spaces/${spaceId}/tags?all_tags=1&per_page=200`,
+  );
+  const available = useMemo(() => {
+    const fetched = (tagsData?.tags ?? []).map((t) => t.name);
+    return [...fetched, ...extraTags.filter((t) => !fetched.includes(t))];
+  }, [tagsData, extraTags]);
 
   useEffect(() => {
-    fetch(`/api/admin/spaces/${spaceId}/tags?all_tags=1&per_page=200`)
-      .then((r) => r.json())
-      .then((data) => setAvailable((data.tags ?? []).map((t: any) => t.name as string)))
-      .catch(() => {})
-  }, [spaceId])
-
-  useEffect(() => {
-    if (!open) return
-    setTimeout(() => inputRef.current?.focus(), 0)
+    if (!open) return;
+    setTimeout(() => inputRef.current?.focus(), 0);
     function handleClickOutside(e: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false)
-        setInput('')
+        setOpen(false);
+        setInput('');
       }
     }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [open])
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [open]);
 
   const filtered = useMemo(() => {
-    const q = input.trim().toLowerCase()
-    return q ? available.filter((t) => t.toLowerCase().includes(q)) : available
-  }, [available, input])
+    const q = input.trim().toLowerCase();
+    return q ? available.filter((t) => t.toLowerCase().includes(q)) : available;
+  }, [available, input]);
 
-  const selected = new Set(value)
+  const selected = new Set(value);
   const canCreate =
     input.trim().length > 0 &&
-    !available.some((t) => t.toLowerCase() === input.trim().toLowerCase())
+    !available.some((t) => t.toLowerCase() === input.trim().toLowerCase());
 
   function toggle(name: string) {
     if (selected.has(name)) {
-      onChange(value.filter((t) => t !== name))
+      onChange(value.filter((t) => t !== name));
     } else {
-      onChange([...value, name])
+      onChange([...value, name]);
     }
   }
 
   function remove(name: string, e: React.MouseEvent) {
-    e.stopPropagation()
-    onChange(value.filter((t) => t !== name))
+    e.stopPropagation();
+    onChange(value.filter((t) => t !== name));
   }
 
   function create() {
-    const name = input.trim()
-    if (!name) return
-    if (!available.includes(name)) setAvailable((prev) => [...prev, name])
-    if (!selected.has(name)) onChange([...value, name])
-    setInput('')
+    const name = input.trim();
+    if (!name) return;
+    if (!available.includes(name)) setExtraTags((prev) => [...prev, name]);
+    if (!selected.has(name)) onChange([...value, name]);
+    setInput('');
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Enter') {
-      e.preventDefault()
-      if (canCreate) create()
-      else if (filtered.length === 1) { toggle(filtered[0]); setInput('') }
+      e.preventDefault();
+      if (canCreate) create();
+      else if (filtered.length === 1) {
+        toggle(filtered[0]);
+        setInput('');
+      }
     } else if (e.key === 'Escape') {
-      setOpen(false)
-      setInput('')
+      setOpen(false);
+      setInput('');
     }
   }
 
@@ -123,7 +128,12 @@ function StoryTagsSelect({
             ))
           )}
         </span>
-        <ChevronDown className={cn('w-4 h-4 text-gray-400 shrink-0 ml-1 transition-transform', open && 'rotate-180')} />
+        <ChevronDown
+          className={cn(
+            'w-4 h-4 text-gray-400 shrink-0 ml-1 transition-transform',
+            open && 'rotate-180',
+          )}
+        />
       </button>
 
       {open && (
@@ -155,42 +165,58 @@ function StoryTagsSelect({
               <p className="text-center text-sm text-gray-400 py-4">No tags found</p>
             ) : (
               filtered.map((tag) => {
-                const checked = selected.has(tag)
+                const checked = selected.has(tag);
                 return (
                   <button
                     key={tag}
                     type="button"
-                    onClick={() => { toggle(tag); setInput('') }}
+                    onClick={() => {
+                      toggle(tag);
+                      setInput('');
+                    }}
                     className="w-full text-left px-4 py-2.5 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                   >
                     <div
                       className={cn(
                         'size-4 shrink-0 rounded border flex items-center justify-center transition-colors',
-                        checked ? 'bg-teal-600 border-teal-600' : 'border-gray-300 dark:border-gray-600',
+                        checked
+                          ? 'bg-teal-600 border-teal-600'
+                          : 'border-gray-300 dark:border-gray-600',
                       )}
                     >
                       {checked && (
-                        <svg viewBox="0 0 12 12" className="w-3 h-3 text-white fill-none stroke-white" strokeWidth={2}>
+                        <svg
+                          viewBox="0 0 12 12"
+                          className="w-3 h-3 text-white fill-none stroke-white"
+                          strokeWidth={2}
+                        >
                           <polyline points="2,6 5,9 10,3" />
                         </svg>
                       )}
                     </div>
-                    <span className={cn('text-sm', checked ? 'text-teal-600 dark:text-teal-400 font-medium' : 'text-gray-800 dark:text-gray-200')}>
+                    <span
+                      className={cn(
+                        'text-sm',
+                        checked
+                          ? 'text-teal-600 dark:text-teal-400 font-medium'
+                          : 'text-gray-800 dark:text-gray-200',
+                      )}
+                    >
                       {tag}
                     </span>
                   </button>
-                )
+                );
               })
             )}
           </div>
         </div>
       )}
     </div>
-  )
+  );
 }
 
 function FieldLabel({ label, tooltip }: { label: string; tooltip: string }) {
-  const [show, setShow] = useState(false)
+  const [show, setShow] = useState(false);
   return (
     <label className="flex items-center gap-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
       {label}
@@ -211,21 +237,23 @@ function FieldLabel({ label, tooltip }: { label: string; tooltip: string }) {
         )}
       </div>
     </label>
-  )
+  );
 }
 
 export function ConfigTab({ spaceId, story, onSave, isFormOnly }: Props) {
-  const [name, setName] = useState(story.name)
-  const [slug, setSlug] = useState(story.slug)
-  const [isStartpage, setIsStartpage] = useState(story.is_startpage)
-  const [path, setPath] = useState(story.path ?? '')
-  const [tags, setTags] = useState<string[]>(story.tag_list)
-  const [sortByDate, setSortByDate] = useState(story.sort_by_date ?? '')
-  const [editMode, setEditMode] = useState<'visual' | 'form-only'>(story.disable_fe_editor ? 'form-only' : 'visual')
-  const [saving, setSaving] = useState(false)
+  const [name, setName] = useState(story.name);
+  const [slug, setSlug] = useState(story.slug);
+  const [isStartpage, setIsStartpage] = useState(story.is_startpage);
+  const [path, setPath] = useState(story.path ?? '');
+  const [tags, setTags] = useState<string[]>(story.tag_list);
+  const [sortByDate, setSortByDate] = useState(story.sort_by_date ?? '');
+  const [editMode, setEditMode] = useState<'visual' | 'form-only'>(
+    story.disable_fe_editor ? 'form-only' : 'visual',
+  );
+  const [saving, setSaving] = useState(false);
 
   async function handleSave() {
-    setSaving(true)
+    setSaving(true);
     try {
       await onSave({
         name,
@@ -235,9 +263,9 @@ export function ConfigTab({ spaceId, story, onSave, isFormOnly }: Props) {
         tag_list: tags,
         sort_by_date: sortByDate || null,
         disable_fe_editor: editMode === 'form-only',
-      })
+      });
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
   }
 
@@ -248,13 +276,17 @@ export function ConfigTab({ spaceId, story, onSave, isFormOnly }: Props) {
 
         {/* Edit mode */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Edit mode</label>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Edit mode
+          </label>
           <div className="flex items-center gap-4">
             <label className="flex items-center gap-2 cursor-pointer">
               <div
                 className={cn(
                   'w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors',
-                  editMode === 'visual' ? 'border-teal-500' : 'border-gray-400 dark:border-gray-500',
+                  editMode === 'visual'
+                    ? 'border-teal-500'
+                    : 'border-gray-400 dark:border-gray-500',
                 )}
                 onClick={() => setEditMode('visual')}
               >
@@ -271,7 +303,9 @@ export function ConfigTab({ spaceId, story, onSave, isFormOnly }: Props) {
               <div
                 className={cn(
                   'w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors',
-                  editMode === 'form-only' ? 'border-teal-500' : 'border-gray-400 dark:border-gray-500',
+                  editMode === 'form-only'
+                    ? 'border-teal-500'
+                    : 'border-gray-400 dark:border-gray-500',
                 )}
                 onClick={() => setEditMode('form-only')}
               >
@@ -300,7 +334,9 @@ export function ConfigTab({ spaceId, story, onSave, isFormOnly }: Props) {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Slug</label>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Slug
+          </label>
           <input
             type="text"
             value={slug}
@@ -319,18 +355,26 @@ export function ConfigTab({ spaceId, story, onSave, isFormOnly }: Props) {
             className="mt-0.5 w-4 h-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500 shrink-0"
           />
           <div>
-            <label htmlFor="is-startpage" className="flex items-center gap-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer">
+            <label
+              htmlFor="is-startpage"
+              className="flex items-center gap-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer"
+            >
               <Home className="w-3.5 h-3.5" />
               Define as root for the folder
             </label>
             <p className="text-xs text-gray-400 mt-0.5">
-              Allows you to use the slug of the folder for the current Story. Example <code className="bg-gray-200 dark:bg-gray-700 px-1 rounded">/posts</code> for an overview instead of <code className="bg-gray-200 dark:bg-gray-700 px-1 rounded">/posts/overview</code>.
+              Allows you to use the slug of the folder for the current Story. Example{' '}
+              <code className="bg-gray-200 dark:bg-gray-700 px-1 rounded">/posts</code> for an
+              overview instead of{' '}
+              <code className="bg-gray-200 dark:bg-gray-700 px-1 rounded">/posts/overview</code>.
             </p>
           </div>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tags</label>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Tags
+          </label>
           <StoryTagsSelect spaceId={spaceId} value={tags} onChange={setTags} />
         </div>
 
@@ -347,7 +391,13 @@ export function ConfigTab({ spaceId, story, onSave, isFormOnly }: Props) {
               placeholder="Select date (YY-MM-DD)"
               className="w-full px-3 py-2 pl-9 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
             />
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <svg
+              className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={1.5}
+            >
               <rect x="3" y="4" width="18" height="18" rx="2" />
               <path d="M16 2v4M8 2v4M3 10h18" />
             </svg>
@@ -369,7 +419,9 @@ export function ConfigTab({ spaceId, story, onSave, isFormOnly }: Props) {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Full slug</label>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Full slug
+          </label>
           <div className="px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-500">
             {story.full_slug}
           </div>
@@ -378,9 +430,12 @@ export function ConfigTab({ spaceId, story, onSave, isFormOnly }: Props) {
 
         {story.is_folder && (
           <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
-            <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">Folder content settings</h4>
+            <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">
+              Folder content settings
+            </h4>
             <p className="text-xs text-gray-400">
-              Set <strong>Form-only</strong> edit mode above to disable the visual editor for all stories in this folder.
+              Set <strong>Form-only</strong> edit mode above to disable the visual editor for all
+              stories in this folder.
             </p>
           </div>
         )}
@@ -397,5 +452,5 @@ export function ConfigTab({ spaceId, story, onSave, isFormOnly }: Props) {
         </button>
       </div>
     </div>
-  )
+  );
 }

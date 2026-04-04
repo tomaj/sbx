@@ -1,3 +1,4 @@
+import { AuthenticatedRequest } from '../auth/authenticated-request.interface';
 import { Controller, Get, Param, ParseIntPipe, Query, Req } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Auth } from '../auth/auth.decorator';
@@ -21,7 +22,7 @@ export class ActivitiesController {
 
   @Get()
   async getActivities(
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
     @Query('page') page = '1',
     @Query('per_page') perPage = '25',
     @Query('created_at_gte') createdAtGte?: string,
@@ -29,25 +30,23 @@ export class ActivitiesController {
     @Query('by_owner_ids') byOwnerIds?: string,
     @Query('types') types?: string,
   ) {
-    const { page: parsedPage, perPage: parsedPerPage } = QueryParserUtil.parsePagination(page, perPage);
-    return this.activitiesService.findAll(
-      req.space.id,
-      parsedPage,
-      parsedPerPage,
-      {
-        createdAtGte: createdAtGte || undefined,
-        createdAtLte: createdAtLte || undefined,
-        byOwnerIds: QueryParserUtil.parseCsvToInts(byOwnerIds),
-        types: QueryParserUtil.parseCsvToStrings(types),
-      },
+    const { page: parsedPage, perPage: parsedPerPage } = QueryParserUtil.parsePagination(
+      page,
+      perPage,
     );
+    return this.activitiesService.findAllWithMeta(req.space.id, parsedPage, parsedPerPage, {
+      createdAtGte: createdAtGte || undefined,
+      createdAtLte: createdAtLte || undefined,
+      byOwnerIds: QueryParserUtil.parseCsvToInts(byOwnerIds),
+      types: QueryParserUtil.parseCsvToStrings(types),
+    });
   }
 
   @Get(':activityId')
   async getActivity(
-    @Req() req: any,
-    @Param('activityId') activityId: string,
+    @Req() req: AuthenticatedRequest,
+    @Param('activityId', ParseIntPipe) activityId: number,
   ) {
-    return this.activitiesService.findOne(req.space.id, parseInt(activityId));
+    return this.activitiesService.findOne(req.space.id, activityId);
   }
 }

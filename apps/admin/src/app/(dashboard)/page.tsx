@@ -1,8 +1,8 @@
-import type { Metadata } from 'next'
-import { redirect } from 'next/navigation'
+import type { Metadata } from 'next';
+import { redirect } from 'next/navigation';
 
-export const metadata: Metadata = { title: 'Dashboard' }
+export const metadata: Metadata = { title: 'Dashboard' };
 
 export default function RootPage() {
-  redirect('/spaces')
+  redirect('/spaces');
 }

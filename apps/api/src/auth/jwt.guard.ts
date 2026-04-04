@@ -1,6 +1,6 @@
 import {
-  CanActivate,
-  ExecutionContext,
+  type CanActivate,
+  type ExecutionContext,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -12,7 +12,7 @@ export class JwtGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context.switchToHttp().getRequest();
-    const authHeader: string = req.headers['authorization'];
+    const authHeader: string = req.headers.authorization;
 
     if (!authHeader?.startsWith('Bearer ')) {
       throw new UnauthorizedException('No token provided');

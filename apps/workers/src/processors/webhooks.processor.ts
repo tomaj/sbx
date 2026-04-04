@@ -2,11 +2,10 @@ import { createHmac } from 'crypto';
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Inject, Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
-import { eq } from 'drizzle-orm';
 import { WEBHOOKS_QUEUE } from '@sbx/jobs';
-import type { WebhookDispatchJobData } from '@sbx/jobs';
+import { WebhookDispatchJobData } from '@sbx/jobs';
 import { DB } from '../db/db.module.js';
-import type { DbType } from '../db/db.module.js';
+import { DbType } from '../db/db.module.js';
 import { webhookLogs } from '../db/schema.js';
 
 @Processor(WEBHOOKS_QUEUE, { concurrency: 10 })
@@ -68,7 +67,7 @@ export class WebhooksProcessor extends WorkerHost {
         spaceId,
         action,
         status,
-        requestBody: payload as any,
+        requestBody: payload,
         responseBody,
         responseStatus,
         executedAt: new Date(),

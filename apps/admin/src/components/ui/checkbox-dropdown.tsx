@@ -1,23 +1,23 @@
-'use client'
+'use client';
 
-import { useState, useRef, useEffect, useMemo } from 'react'
-import { ChevronDown, Check, Search } from 'lucide-react'
-import { cn } from '@/lib/utils'
-import { UserAvatar } from './user-avatar'
+import { useState, useRef, useEffect, useMemo } from 'react';
+import { ChevronDown, Check, Search } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { UserAvatar } from './user-avatar';
 
 export interface CheckboxOption {
-  value: string
-  label: string
-  avatarName?: string
-  avatarSrc?: string | null
+  value: string;
+  label: string;
+  avatarName?: string;
+  avatarSrc?: string | null;
 }
 
 interface CheckboxDropdownProps {
-  options: CheckboxOption[]
-  value: string[]
-  onChange: (value: string[]) => void
-  placeholder?: string
-  className?: string
+  options: CheckboxOption[];
+  value: string[];
+  onChange: (value: string[]) => void;
+  placeholder?: string;
+  className?: string;
 }
 
 export function CheckboxDropdown({
@@ -27,38 +27,38 @@ export function CheckboxDropdown({
   placeholder = 'Select...',
   className,
 }: CheckboxDropdownProps) {
-  const [open, setOpen] = useState(false)
-  const [search, setSearch] = useState('')
-  const containerRef = useRef<HTMLDivElement>(null)
-  const searchRef = useRef<HTMLInputElement>(null)
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const containerRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (!open) return
-    setTimeout(() => searchRef.current?.focus(), 0)
+    if (!open) return;
+    setTimeout(() => searchRef.current?.focus(), 0);
     function handleClickOutside(e: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false)
+        setOpen(false);
       }
     }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [open])
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [open]);
 
   function toggle(v: string) {
-    onChange(value.includes(v) ? value.filter((id) => id !== v) : [...value, v])
+    onChange(value.includes(v) ? value.filter((id) => id !== v) : [...value, v]);
   }
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    return q ? options.filter((o) => o.label.toLowerCase().includes(q)) : options
-  }, [options, search])
+    const q = search.trim().toLowerCase();
+    return q ? options.filter((o) => o.label.toLowerCase().includes(q)) : options;
+  }, [options, search]);
 
   const label =
     value.length === 0
       ? placeholder
       : value.length === 1
-      ? (options.find((o) => o.value === value[0])?.label ?? placeholder)
-      : `${value.length} selected`
+        ? (options.find((o) => o.value === value[0])?.label ?? placeholder)
+        : `${value.length} selected`;
 
   return (
     <div ref={containerRef} className={cn('relative', className)}>
@@ -103,7 +103,7 @@ export function CheckboxDropdown({
               <p className="text-center text-sm text-gray-400 py-4">No results</p>
             ) : (
               filtered.map((opt) => {
-                const checked = value.includes(opt.value)
+                const checked = value.includes(opt.value);
                 return (
                   <button
                     key={opt.value}
@@ -126,12 +126,12 @@ export function CheckboxDropdown({
                     )}
                     <span className="text-sm text-gray-800 dark:text-gray-200">{opt.label}</span>
                   </button>
-                )
+                );
               })
             )}
           </div>
         </div>
       )}
     </div>
-  )
+  );
 }

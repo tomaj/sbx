@@ -1,89 +1,72 @@
-'use client'
+'use client';
 
-import { useState, useEffect } from 'react'
-import { ChevronDown } from 'lucide-react'
-import type { OptionFieldDef } from '@/components/block-library/edit-block-modal/types'
-import { fieldLabel } from '../field-label'
-import { FieldLabel } from '../FieldLabel'
-import { StoryPickerModal } from '../StoryPickerModal'
-import { SelectDropdown } from '@/components/ui/select-dropdown'
+import { useState } from 'react';
+import { useApi } from '@/lib/swr';
+import { ChevronDown } from 'lucide-react';
+import type { OptionFieldDef } from '@/components/block-library/edit-block-modal/types';
+import { fieldLabel } from '../field-label';
+import { FieldLabel } from '../FieldLabel';
+import { StoryPickerModal } from '../StoryPickerModal';
+import { SelectDropdown } from '@/components/ui/select-dropdown';
 
 interface Props {
-  fieldKey: string
-  def: OptionFieldDef
-  value: string | undefined
-  onChange: (v: string) => void
-  spaceId: string
+  fieldKey: string;
+  def: OptionFieldDef;
+  value: string | undefined;
+  onChange: (v: string) => void;
+  spaceId: string;
 }
 
 export function OptionField({ fieldKey, def, value, onChange, spaceId }: Props) {
-  const [pickerOpen, setPickerOpen] = useState(false)
-  const [selectedLabel, setSelectedLabel] = useState<string | null>(null)
-  const [datasourceOptions, setDatasourceOptions] = useState<Array<{ value: string; label: string }> | null>(null)
-  const [loadingDatasource, setLoadingDatasource] = useState(false)
+  const [pickerOpen, setPickerOpen] = useState(false);
 
-  const isInternalStories = def.source === 'internal_stories'
-  const isInternalDatasource = def.source === 'internal' && !!def.datasource_slug
+  const isInternalStories = def.source === 'internal_stories';
+  const isInternalDatasource = def.source === 'internal' && !!def.datasource_slug;
 
-  // For internal_stories: fetch the display name of current value on mount / value change
-  useEffect(() => {
-    if (!isInternalStories || !value) {
-      setSelectedLabel(null)
-      return
-    }
-    const params = new URLSearchParams({ per_page: '1' })
-    if (def.use_uuid) params.set('uuid', value)
-    else params.set('story_id', value)
-    if (def.filter_content_type?.length) params.set('content_type', def.filter_content_type[0])
-    fetch(`/api/admin/spaces/${spaceId}/stories?${params}`)
-      .then((r) => r.json())
-      .then((data) => {
-        const story = data.stories?.[0]
-        setSelectedLabel(story ? story.name : value)
-      })
-      .catch(() => setSelectedLabel(value))
-  }, [isInternalStories, value, spaceId, def.use_uuid, def.filter_content_type])
+  // For internal_stories: fetch the display name of current value
+  const storyLabelParams = (() => {
+    if (!isInternalStories || !value) return null;
+    const params = new URLSearchParams({ per_page: '1' });
+    if (def.use_uuid) params.set('uuid', value);
+    else params.set('story_id', value);
+    if (def.filter_content_type?.length) params.set('content_type', def.filter_content_type[0]);
+    return params.toString();
+  })();
+  const { data: storyLabelData } = useApi<{ stories: Array<{ name: string }> }>(
+    storyLabelParams ? `/api/admin/spaces/${spaceId}/stories?${storyLabelParams}` : null,
+  );
+  const selectedLabel = storyLabelData
+    ? (storyLabelData.stories?.[0]?.name ?? value ?? null)
+    : null;
 
-  // For internal datasource: fetch entries by slug
-  useEffect(() => {
-    if (!isInternalDatasource) return
-    let cancelled = false
-    setLoadingDatasource(true)
+  // For internal datasource: first fetch the datasource list to get the id
+  const { data: datasourcesData, isLoading: loadingDatasources } = useApi<{
+    datasources: Array<{ id: number; slug: string }>;
+  }>(isInternalDatasource ? `/api/admin/spaces/${spaceId}/datasources` : null);
+  const datasourceId =
+    datasourcesData?.datasources?.find((d) => d.slug === def.datasource_slug)?.id ?? null;
 
-    async function load() {
-      try {
-        const dsRes = await fetch(`/api/admin/spaces/${spaceId}/datasources`)
-        const dsData = await dsRes.json()
-        const ds = (dsData.datasources ?? []).find((d: any) => d.slug === def.datasource_slug)
-        if (!ds) {
-          if (!cancelled) setDatasourceOptions([])
-          return
-        }
-        const entriesRes = await fetch(
-          `/api/admin/spaces/${spaceId}/datasources/${ds.id}/entries?per_page=500`,
-        )
-        const entriesData = await entriesRes.json()
-        const entries = entriesData.entries ?? []
-        if (!cancelled)
-          setDatasourceOptions(entries.map((e: any) => ({ value: e.value, label: e.name })))
-      } catch {
-        if (!cancelled) setDatasourceOptions([])
-      } finally {
-        if (!cancelled) setLoadingDatasource(false)
-      }
-    }
-
-    load()
-    return () => {
-      cancelled = true
-    }
-  }, [isInternalDatasource, spaceId, def.datasource_slug])
+  // Then fetch entries using the resolved id
+  const { data: entriesData, isLoading: loadingEntries } = useApi<{
+    entries: Array<{ value: string; name: string }>;
+  }>(
+    isInternalDatasource && datasourceId !== null
+      ? `/api/admin/spaces/${spaceId}/datasources/${datasourceId}/entries?per_page=500`
+      : null,
+  );
+  const loadingDatasource = loadingDatasources || loadingEntries;
+  const datasourceOptions =
+    entriesData?.entries?.map((e) => ({ value: e.value, label: e.name })) ?? null;
 
   if (isInternalStories) {
     return (
       <>
         <div>
-          <FieldLabel label={fieldLabel(def.display_name, fieldKey)} required={def.required} description={def.description} />
+          <FieldLabel
+            label={fieldLabel(def.display_name, fieldKey)}
+            required={def.required}
+            description={def.description}
+          />
           <button
             type="button"
             onClick={() => setPickerOpen(true)}
@@ -103,18 +86,24 @@ export function OptionField({ fieldKey, def, value, onChange, spaceId }: Props) 
             filterContentType={def.filter_content_type}
             useUuid={def.use_uuid}
             value={value}
-            onSelect={(v, name) => { onChange(v); setSelectedLabel(name) }}
+            onSelect={(v) => {
+              onChange(v);
+            }}
             onClose={() => setPickerOpen(false)}
           />
         )}
       </>
-    )
+    );
   }
 
   if (isInternalDatasource) {
     return (
       <div>
-        <FieldLabel label={fieldLabel(def.display_name, fieldKey)} required={def.required} description={def.description} />
+        <FieldLabel
+          label={fieldLabel(def.display_name, fieldKey)}
+          required={def.required}
+          description={def.description}
+        />
         <SelectDropdown
           options={datasourceOptions ?? []}
           value={value}
@@ -123,14 +112,18 @@ export function OptionField({ fieldKey, def, value, onChange, spaceId }: Props) 
           loading={loadingDatasource}
         />
       </div>
-    )
+    );
   }
 
   // Static options (source: 'self' or no source)
-  const options = (def.options ?? []).map((o) => ({ value: o.value, label: o.name }))
+  const options = (def.options ?? []).map((o) => ({ value: o.value, label: o.name }));
   return (
     <div>
-      <FieldLabel label={fieldLabel(def.display_name, fieldKey)} required={def.required} description={def.description} />
+      <FieldLabel
+        label={fieldLabel(def.display_name, fieldKey)}
+        required={def.required}
+        description={def.description}
+      />
       <SelectDropdown
         options={options}
         value={value}
@@ -138,5 +131,5 @@ export function OptionField({ fieldKey, def, value, onChange, spaceId }: Props) 
         placeholder="Choose an option"
       />
     </div>
-  )
+  );
 }

@@ -1,128 +1,116 @@
-'use client'
+'use client';
 
-import { useState, useCallback, useEffect, useMemo } from 'react'
-import { X, FolderPlus, Plus, Search } from 'lucide-react'
-import { usePerPage } from '@/hooks/use-per-page'
-import { Pagination } from '@/components/ui/pagination'
-import { GroupTree, type ComponentGroup } from '@/components/block-library/group-tree'
-import { CreateGroupModal } from '@/components/block-library/create-group-modal'
-import { CreateBlockModal } from '@/components/block-library/create-block-modal'
-import { BlockList, type Block } from '@/components/block-library/block-list'
-import { EditBlockModal } from '@/components/block-library/edit-block-modal'
-import { SelectDropdown } from '@/components/ui/select-dropdown'
+import { useState, useEffect, useMemo } from 'react';
+import { X, FolderPlus, Plus, Search } from 'lucide-react';
+import { usePerPage } from '@/hooks/use-per-page';
+import { useApi } from '@/lib/swr';
+import { Pagination } from '@/components/ui/pagination';
+import { GroupTree, type ComponentGroup } from '@/components/block-library/group-tree';
+import { CreateGroupModal } from '@/components/block-library/create-group-modal';
+import { CreateBlockModal } from '@/components/block-library/create-block-modal';
+import { BlockList, type Block } from '@/components/block-library/block-list';
+import { EditBlockModal } from '@/components/block-library/edit-block-modal';
+import { SelectDropdown } from '@/components/ui/select-dropdown';
 
 const SORT_OPTIONS = [
   { value: 'name', label: 'Name (A–Z)' },
   { value: 'updated_at', label: 'Updated (newest)' },
-]
+];
 
 interface BlockLibraryModalProps {
-  spaceId: string
-  onClose: () => void
+  spaceId: string;
+  onClose: () => void;
 }
 
 export function BlockLibraryModal({ spaceId, onClose }: BlockLibraryModalProps) {
-  const [allBlocks, setAllBlocks] = useState<Block[]>([])
-  const [groups, setGroups] = useState<ComponentGroup[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const {
+    data: componentsData,
+    isLoading,
+    mutate,
+  } = useApi<{ components: Block[]; component_groups: ComponentGroup[] }>(
+    `/api/admin/spaces/${spaceId}/components`,
+  );
+  const allBlocks = componentsData?.components ?? [];
+  const groups = componentsData?.component_groups ?? [];
 
-  const [selectedGroupUuid, setSelectedGroupUuid] = useState<string | null>(null)
-  const [search, setSearch] = useState('')
-  const [sort, setSort] = useState('name')
+  const [selectedGroupUuid, setSelectedGroupUuid] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [sort, setSort] = useState('name');
 
-  const [page, setPage] = useState(1)
-  const [perPage, setPerPage] = usePerPage('perPage:blocks-modal', 25)
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = usePerPage('perPage:blocks-modal', 25);
 
-  const [createBlockOpen, setCreateBlockOpen] = useState(false)
-  const [editBlock, setEditBlock] = useState<Block | null>(null)
-  const [createGroupOpen, setCreateGroupOpen] = useState(false)
-
-  const loadData = useCallback(async () => {
-    setIsLoading(true)
-    try {
-      const res = await fetch(`/api/admin/spaces/${spaceId}/components`)
-      if (res.ok) {
-        const data = await res.json()
-        setAllBlocks(data.components ?? [])
-        setGroups(data.component_groups ?? [])
-      }
-    } finally {
-      setIsLoading(false)
-    }
-  }, [spaceId])
+  const [createBlockOpen, setCreateBlockOpen] = useState(false);
+  const [editBlock, setEditBlock] = useState<Block | null>(null);
+  const [createGroupOpen, setCreateGroupOpen] = useState(false);
 
   const counts = useMemo(() => {
-    const byGroup: Record<string, number> = {}
-    let total = 0
+    const byGroup: Record<string, number> = {};
+    let total = 0;
     for (const b of allBlocks) {
-      total++
+      total++;
       if (b.component_group_uuid) {
-        byGroup[b.component_group_uuid] = (byGroup[b.component_group_uuid] ?? 0) + 1
+        byGroup[b.component_group_uuid] = (byGroup[b.component_group_uuid] ?? 0) + 1;
       }
     }
-    return { total, by_group: byGroup }
-  }, [allBlocks])
+    return { total, by_group: byGroup };
+  }, [allBlocks]);
 
   const filtered = useMemo(() => {
-    let result = allBlocks
+    let result = allBlocks;
     if (selectedGroupUuid !== null) {
-      result = result.filter((b) => b.component_group_uuid === selectedGroupUuid)
+      result = result.filter((b) => b.component_group_uuid === selectedGroupUuid);
     }
-    const q = search.trim().toLowerCase()
+    const q = search.trim().toLowerCase();
     if (q) {
       result = result.filter(
-        (b) =>
-          b.name.toLowerCase().includes(q) ||
-          (b.display_name ?? '').toLowerCase().includes(q),
-      )
+        (b) => b.name.toLowerCase().includes(q) || (b.display_name ?? '').toLowerCase().includes(q),
+      );
     }
     if (sort === 'updated_at') {
       result = [...result].sort(
         (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
-      )
+      );
     } else {
-      result = [...result].sort((a, b) => a.name.localeCompare(b.name))
+      result = [...result].sort((a, b) => a.name.localeCompare(b.name));
     }
-    return result
-  }, [allBlocks, selectedGroupUuid, search, sort])
+    return result;
+  }, [allBlocks, selectedGroupUuid, search, sort]);
 
-  const total = filtered.length
+  const total = filtered.length;
   const pageBlocks = useMemo(() => {
-    const start = (page - 1) * perPage
-    return filtered.slice(start, start + perPage)
-  }, [filtered, page, perPage])
-
-  useEffect(() => { loadData() }, [loadData])
-  useEffect(() => { setPage(1) }, [search, sort, selectedGroupUuid])
+    const start = (page - 1) * perPage;
+    return filtered.slice(start, start + perPage);
+  }, [filtered, page, perPage]);
 
   // Close on Escape (when edit modal is not open)
   useEffect(() => {
-    if (editBlock) return
+    if (editBlock) return;
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') onClose();
     }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [editBlock, onClose])
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [editBlock, onClose]);
 
   async function handleCreateBlock(data: {
-    name: string
-    description: string
-    is_nestable: boolean
-    is_root: boolean
-    component_group_uuid: string | null
+    name: string;
+    description: string;
+    is_nestable: boolean;
+    is_root: boolean;
+    component_group_uuid: string | null;
   }) {
     const res = await fetch(`/api/admin/spaces/${spaceId}/components`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
-    })
+    });
     if (!res.ok) {
-      const err = await res.json()
-      throw new Error(err.message ?? 'Failed to create block')
+      const err = await res.json();
+      throw new Error(err.message ?? 'Failed to create block');
     }
-    setCreateBlockOpen(false)
-    await loadData()
+    setCreateBlockOpen(false);
+    await mutate();
   }
 
   async function handleCreateGroup(name: string) {
@@ -130,13 +118,13 @@ export function BlockLibraryModal({ spaceId, onClose }: BlockLibraryModalProps) 
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name }),
-    })
+    });
     if (!res.ok) {
-      const err = await res.json()
-      throw new Error(err.message ?? 'Failed to create group')
+      const err = await res.json();
+      throw new Error(err.message ?? 'Failed to create group');
     }
-    setCreateGroupOpen(false)
-    await loadData()
+    setCreateGroupOpen(false);
+    await mutate();
   }
 
   return (
@@ -225,7 +213,10 @@ export function BlockLibraryModal({ spaceId, onClose }: BlockLibraryModalProps) 
             page={page}
             perPage={perPage}
             onPageChange={setPage}
-            onPerPageChange={(n) => { setPerPage(n); setPage(1) }}
+            onPerPageChange={(n) => {
+              setPerPage(n);
+              setPage(1);
+            }}
             storageKey="perPage:blocks-modal"
           />
         </div>
@@ -240,8 +231,8 @@ export function BlockLibraryModal({ spaceId, onClose }: BlockLibraryModalProps) 
           groups={groups}
           onClose={() => setEditBlock(null)}
           onSaved={(updatedBlock) => {
-            setAllBlocks((prev) => prev.map((b) => (b.id === updatedBlock.id ? updatedBlock : b)))
-            setEditBlock(updatedBlock)
+            mutate();
+            setEditBlock(updatedBlock);
           }}
         />
       )}
@@ -261,5 +252,5 @@ export function BlockLibraryModal({ spaceId, onClose }: BlockLibraryModalProps) 
         onCancel={() => setCreateGroupOpen(false)}
       />
     </div>
-  )
+  );
 }

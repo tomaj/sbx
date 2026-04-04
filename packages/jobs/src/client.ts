@@ -1,10 +1,10 @@
-import { Queue, JobsOptions } from 'bullmq';
+import { Queue, type JobsOptions } from 'bullmq';
 import type { ConnectionOptions } from 'bullmq';
-import { WEBHOOKS_QUEUE, WebhookDispatchJobData } from './queues/webhooks';
-import { STORIES_QUEUE, StoryPublishJobData, StoryExpireJobData } from './queues/stories';
-import { RELEASES_QUEUE, ReleaseExecuteJobData } from './queues/releases';
-import { EMAILS_QUEUE, EmailJobData } from './queues/emails';
-import { WORKFLOW_EVENTS_QUEUE, WorkflowEventJobData } from './queues/workflow-events';
+import { WEBHOOKS_QUEUE, type WebhookDispatchJobData } from './queues/webhooks';
+import { STORIES_QUEUE, type StoryPublishJobData, type StoryExpireJobData } from './queues/stories';
+import { RELEASES_QUEUE, type ReleaseExecuteJobData } from './queues/releases';
+import { EMAILS_QUEUE, type EmailJobData } from './queues/emails';
+import { WORKFLOW_EVENTS_QUEUE, type WorkflowEventJobData } from './queues/workflow-events';
 
 export class JobsClient {
   private queues = new Map<string, Queue>();

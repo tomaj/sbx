@@ -5,6 +5,7 @@ import {
   Get,
   HttpCode,
   Param,
+  ParseIntPipe,
   Post,
   Put,
   Query,
@@ -23,18 +24,25 @@ export class DatasourcesMapiController {
 
   @Get()
   list(
-    @Param('spaceId') spaceId: string,
+    @Param('spaceId', ParseIntPipe) spaceId: number,
     @Query('page') page = '1',
     @Query('per_page') perPage = '25',
-    @Query('sort_by') sortBy?: string,         // format: "name:asc" or "created_at:desc"
+    @Query('sort_by') sortBy?: string, // format: "name:asc" or "created_at:desc"
     @Query('search') search?: string,
     @Query('by_ids') byIds?: string,
   ) {
-    const { field: sortField, dir: sortDirParsed } = QueryParserUtil.parseSortBy(sortBy, 'name', 'asc');
+    const { field: sortField, dir: sortDirParsed } = QueryParserUtil.parseSortBy(
+      sortBy,
+      'name',
+      'asc',
+    );
     const byIdsArr = QueryParserUtil.parseCsvToInts(byIds);
 
-    const { page: parsedPage, perPage: parsedPerPage } = QueryParserUtil.parsePagination(page, perPage);
-    return this.datasourcesService.listDatasourcesAdmin(parseInt(spaceId), {
+    const { page: parsedPage, perPage: parsedPerPage } = QueryParserUtil.parsePagination(
+      page,
+      perPage,
+    );
+    return this.datasourcesService.listDatasourcesAdmin(spaceId, {
       page: parsedPage,
       perPage: Math.min(200, parsedPerPage),
       sortField,
@@ -45,9 +53,12 @@ export class DatasourcesMapiController {
   }
 
   @Get(':id')
-  async getOne(@Param('spaceId') spaceId: string, @Param('id') id: string) {
+  async getOne(
+    @Param('spaceId', ParseIntPipe) spaceId: number,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
     return ResultGuard.throwIfNotFound(
-      await this.datasourcesService.findOne(parseInt(spaceId), parseInt(id)),
+      await this.datasourcesService.findOne(spaceId, id),
       'Datasource not found',
     );
   }
@@ -55,7 +66,7 @@ export class DatasourcesMapiController {
   @Post()
   @HttpCode(201)
   async create(
-    @Param('spaceId') spaceId: string,
+    @Param('spaceId', ParseIntPipe) spaceId: number,
     @Body()
     body: {
       datasource: {
@@ -65,17 +76,14 @@ export class DatasourcesMapiController {
       };
     },
   ) {
-    const ds = await this.datasourcesService.createDatasource(
-      parseInt(spaceId),
-      body.datasource,
-    );
+    const ds = await this.datasourcesService.createDatasource(spaceId, body.datasource);
     return { datasource: ds };
   }
 
   @Put(':id')
   async update(
-    @Param('spaceId') spaceId: string,
-    @Param('id') id: string,
+    @Param('spaceId', ParseIntPipe) spaceId: number,
+    @Param('id', ParseIntPipe) id: number,
     @Body()
     body: {
       datasource: {
@@ -85,21 +93,17 @@ export class DatasourcesMapiController {
       };
     },
   ) {
-    const ds = await this.datasourcesService.updateDatasource(
-      BigInt(id),
-      parseInt(spaceId),
-      body.datasource,
-    );
+    const ds = await this.datasourcesService.updateDatasource(BigInt(id), spaceId, body.datasource);
     return { datasource: ds };
   }
 
   @Delete(':id')
   @HttpCode(200)
-  async remove(@Param('spaceId') spaceId: string, @Param('id') id: string) {
-    await this.datasourcesService.deleteDatasource(
-      BigInt(id),
-      parseInt(spaceId),
-    );
+  async remove(
+    @Param('spaceId', ParseIntPipe) spaceId: number,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    await this.datasourcesService.deleteDatasource(BigInt(id), spaceId);
     return {};
   }
 }

@@ -1,32 +1,39 @@
-'use client'
+'use client';
 
-import { RotateCcw } from 'lucide-react'
-import { AssetThumb } from './asset-thumb'
-import type { Asset } from './asset-grid'
-import { formatDateTime } from '@/lib/date'
+import { RotateCcw } from 'lucide-react';
+import { AssetThumb } from './asset-thumb';
+import type { Asset } from './asset-grid';
+import { formatDateTime } from '@/lib/date';
 
 function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 B'
-  const units = ['B', 'KB', 'MB', 'GB']
-  const i = Math.floor(Math.log(bytes) / Math.log(1024))
-  return `${(bytes / Math.pow(1024, i)).toFixed(2)} ${units[i]}`
+  if (bytes === 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+  return `${(bytes / 1024 ** i).toFixed(2)} ${units[i]}`;
 }
 
 function formatExt(contentType: string): string {
-  const parts = contentType.split('/')
-  return parts[1] ?? parts[0] ?? ''
+  const parts = contentType.split('/');
+  return parts[1] ?? parts[0] ?? '';
 }
 
 interface AssetListProps {
-  assets: Asset[]
-  spaceId: string
-  isLoading?: boolean
-  showRestore?: boolean
-  onRestore?: (asset: Asset) => void
-  onAssetClick?: (asset: Asset) => void
+  assets: Asset[];
+  spaceId: string;
+  isLoading?: boolean;
+  showRestore?: boolean;
+  onRestore?: (asset: Asset) => void;
+  onAssetClick?: (asset: Asset) => void;
 }
 
-export function AssetList({ assets, spaceId, isLoading, showRestore, onRestore, onAssetClick }: AssetListProps) {
+export function AssetList({
+  assets,
+  spaceId,
+  isLoading,
+  showRestore,
+  onRestore,
+  onAssetClick,
+}: AssetListProps) {
   if (isLoading) {
     return (
       <div className="flex flex-col gap-1">
@@ -45,7 +52,7 @@ export function AssetList({ assets, spaceId, isLoading, showRestore, onRestore, 
           </div>
         ))}
       </div>
-    )
+    );
   }
 
   if (assets.length === 0) {
@@ -53,12 +60,12 @@ export function AssetList({ assets, spaceId, isLoading, showRestore, onRestore, 
       <div className="flex flex-col items-center justify-center py-16 text-gray-400">
         <p className="text-sm">No assets found</p>
       </div>
-    )
+    );
   }
 
   return (
     <div className="flex flex-col divide-y divide-gray-100 dark:divide-gray-800">
-      {assets.map(asset => (
+      {assets.map((asset) => (
         <div
           key={asset.id}
           className="flex items-center gap-4 py-3 px-1 hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded-lg group cursor-pointer"
@@ -103,7 +110,10 @@ export function AssetList({ assets, spaceId, isLoading, showRestore, onRestore, 
           {/* Restore button (deleted view) */}
           {showRestore && onRestore && (
             <button
-              onClick={e => { e.stopPropagation(); onRestore(asset) }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onRestore(asset);
+              }}
               title="Restore"
               className="opacity-0 group-hover:opacity-100 p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 shrink-0"
             >
@@ -113,5 +123,5 @@ export function AssetList({ assets, spaceId, isLoading, showRestore, onRestore, 
         </div>
       ))}
     </div>
-  )
+  );
 }

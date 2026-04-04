@@ -1,21 +1,14 @@
-import { Type } from 'class-transformer';
-import { IsNumber, IsOptional, IsString, ValidateNested } from 'class-validator';
+import { z } from 'zod';
+import { createZodDto } from 'nestjs-zod';
 
-export class ComponentGroupDataDto {
-  @IsString()
-  name!: string;
+const ComponentGroupDataSchema = z.object({
+  name: z.string().min(1),
+  parent_id: z.number().int().nullable().optional(),
+  parent_uuid: z.string().nullable().optional(),
+});
 
-  @IsNumber()
-  @IsOptional()
-  parent_id?: number | null;
+const CreateComponentGroupSchema = z.object({
+  component_group: ComponentGroupDataSchema,
+});
 
-  @IsString()
-  @IsOptional()
-  parent_uuid?: string | null;
-}
-
-export class CreateComponentGroupDto {
-  @ValidateNested()
-  @Type(() => ComponentGroupDataDto)
-  component_group!: ComponentGroupDataDto;
-}
+export class CreateComponentGroupDto extends createZodDto(CreateComponentGroupSchema) {}

@@ -4,12 +4,13 @@ import {
   Delete,
   Get,
   HttpCode,
-  NotFoundException,
   Param,
+  ParseIntPipe,
   Post,
   Put,
   Query,
 } from '@nestjs/common';
+import { ResultGuard } from '../shared/result-guard.util';
 import { ApiTags } from '@nestjs/swagger';
 import { Auth } from '../auth/auth.decorator';
 import { DatasourcesService } from './datasources.service';
@@ -23,22 +24,28 @@ export class DatasourceEntriesMapiController {
 
   @Get()
   async list(
-    @Param('spaceId') spaceId: string,
+    @Param('spaceId', ParseIntPipe) spaceId: number,
     @Query('datasource_id') datasourceId?: string,
-    @Query('datasource_slug') datasourceSlug?: string,
-    @Query('dimension') dimensionId?: string,   // numeric ID of dimension
+    @Query('datasource_slug') _datasourceSlug?: string,
+    @Query('dimension') dimensionId?: string, // numeric ID of dimension
     @Query('page') page = '1',
     @Query('per_page') perPage = '25',
     @Query('search') search?: string,
   ) {
-    const { page: parsedPage, perPage: parsedPerPage } = QueryParserUtil.parsePagination(page, perPage);
+    const { page: parsedPage, perPage: parsedPerPage } = QueryParserUtil.parsePagination(
+      page,
+      perPage,
+    );
     const pageNum = parsedPage;
     const perPageNum = Math.min(1000, parsedPerPage);
 
     // Resolve dimension entry_value from numeric dimension ID
     let dimensionEntryValue: string | undefined;
     if (dimensionId && datasourceId) {
-      const ds = await this.datasourcesService.findOne(parseInt(spaceId), parseInt(datasourceId));
+      const ds = await this.datasourcesService.findOne(
+        spaceId,
+        QueryParserUtil.parseOptionalInt(datasourceId) ?? 0,
+      );
       if (ds) {
         const dim = (ds.datasource.dimensions as any[]).find(
           (d: any) => String(d.id) === dimensionId,
@@ -48,8 +55,8 @@ export class DatasourceEntriesMapiController {
     }
 
     return this.datasourcesService.findAllEntries(
-      parseInt(spaceId),
-      datasourceId ? parseInt(datasourceId) : undefined,
+      spaceId,
+      QueryParserUtil.parseOptionalInt(datasourceId),
       pageNum,
       perPageNum,
       { search, dimensionEntryValue },
@@ -58,33 +65,28 @@ export class DatasourceEntriesMapiController {
 
   @Get(':id')
   async getOne(
-    @Param('spaceId') spaceId: string,
-    @Param('id') id: string,
+    @Param('spaceId', ParseIntPipe) spaceId: number,
+    @Param('id', ParseIntPipe) id: number,
     @Query('datasource_id') datasourceId?: string,
   ) {
     if (datasourceId) {
       const result = await this.datasourcesService.findEntry(
-        parseInt(id),
-        parseInt(datasourceId),
+        id,
+        QueryParserUtil.parseOptionalInt(datasourceId) ?? 0,
       );
-      if (!result) throw new NotFoundException('Datasource entry not found');
+      ResultGuard.throwIfNotFound(result, 'Datasource entry not found');
       return result;
     }
-    const all = await this.datasourcesService.findAllEntries(
-      parseInt(spaceId),
-      undefined,
-      1,
-      1000,
-    );
-    const entry = all.datasource_entries.find((e) => e.id === parseInt(id));
-    if (!entry) throw new NotFoundException('Datasource entry not found');
+    const all = await this.datasourcesService.findAllEntries(spaceId, undefined, 1, 1000);
+    const entry = all.datasource_entries.find((e) => e.id === id);
+    ResultGuard.throwIfNotFound(entry, 'Datasource entry not found');
     return { datasource_entry: entry };
   }
 
   @Post()
   @HttpCode(201)
   async create(
-    @Param('spaceId') spaceId: string,
+    @Param('spaceId', ParseIntPipe) spaceId: number,
     @Body()
     body: {
       datasource_entry: {
@@ -95,11 +97,8 @@ export class DatasourceEntriesMapiController {
       };
     },
   ) {
-    const ds = await this.datasourcesService.findOne(
-      parseInt(spaceId),
-      body.datasource_entry.datasource_id,
-    );
-    if (!ds) throw new NotFoundException('Datasource not found');
+    const ds = await this.datasourcesService.findOne(spaceId, body.datasource_entry.datasource_id);
+    ResultGuard.throwIfNotFound(ds, 'Datasource not found');
 
     const entry = await this.datasourcesService.createEntry(
       BigInt(body.datasource_entry.datasource_id),
@@ -114,8 +113,8 @@ export class DatasourceEntriesMapiController {
 
   @Put(':id')
   async update(
-    @Param('spaceId') spaceId: string,
-    @Param('id') id: string,
+    @Param('spaceId', ParseIntPipe) spaceId: number,
+    @Param('id', ParseIntPipe) id: number,
     @Body()
     body: {
       datasource_entry: {
@@ -125,27 +124,24 @@ export class DatasourceEntriesMapiController {
         dimension_value?: string;
         datasource_id?: number;
       };
-      dimension_id?: number;   // root-level, required when updating dimension_value
+      dimension_id?: number; // root-level, required when updating dimension_value
     },
   ) {
     // Resolve datasource_id
     let datasourceId: number | undefined = body.datasource_entry.datasource_id;
     if (!datasourceId) {
-      const all = await this.datasourcesService.findAllEntries(
-        parseInt(spaceId),
-        undefined,
-        1,
-        1000,
+      const all = await this.datasourcesService.findAllEntries(spaceId, undefined, 1, 1000);
+      const found = ResultGuard.throwIfNotFound(
+        all.datasource_entries.find((e) => e.id === id),
+        'Datasource entry not found',
       );
-      const found = all.datasource_entries.find((e) => e.id === parseInt(id));
-      if (!found) throw new NotFoundException('Datasource entry not found');
       datasourceId = found.datasource_id;
     }
 
     // Resolve dimension entry_value from dimension_id
     let dimensionEntryValue: string | undefined;
     if (body.dimension_id && body.datasource_entry.dimension_value !== undefined) {
-      const ds = await this.datasourcesService.findOne(parseInt(spaceId), datasourceId);
+      const ds = await this.datasourcesService.findOne(spaceId, datasourceId);
       if (ds) {
         const dim = (ds.datasource.dimensions as any[]).find(
           (d: any) => d.id === body.dimension_id,
@@ -154,39 +150,32 @@ export class DatasourceEntriesMapiController {
       }
     }
 
-    const entry = await this.datasourcesService.updateEntry(
-      BigInt(id),
-      BigInt(datasourceId),
-      {
-        name: body.datasource_entry.name,
-        value: body.datasource_entry.value,
-        position: body.datasource_entry.position,
-        dimension_value: body.datasource_entry.dimension_value,
-        dimension_entry_value: dimensionEntryValue,
-      },
-    );
-    const full = await this.datasourcesService.findEntry(parseInt(id), datasourceId);
+    const entry = await this.datasourcesService.updateEntry(BigInt(id), BigInt(datasourceId), {
+      name: body.datasource_entry.name,
+      value: body.datasource_entry.value,
+      position: body.datasource_entry.position,
+      dimension_value: body.datasource_entry.dimension_value,
+      dimension_entry_value: dimensionEntryValue,
+    });
+    const full = await this.datasourcesService.findEntry(id, datasourceId);
     return full ?? { datasource_entry: entry };
   }
 
   @Delete(':id')
   @HttpCode(200)
   async remove(
-    @Param('spaceId') spaceId: string,
-    @Param('id') id: string,
+    @Param('spaceId', ParseIntPipe) spaceId: number,
+    @Param('id', ParseIntPipe) id: number,
     @Query('datasource_id') datasourceId?: string,
   ) {
-    let dsId: number | undefined = datasourceId ? parseInt(datasourceId) : undefined;
+    let dsId: number | undefined = QueryParserUtil.parseOptionalInt(datasourceId);
 
     if (!dsId) {
-      const all = await this.datasourcesService.findAllEntries(
-        parseInt(spaceId),
-        undefined,
-        1,
-        1000,
+      const all = await this.datasourcesService.findAllEntries(spaceId, undefined, 1, 1000);
+      const found = ResultGuard.throwIfNotFound(
+        all.datasource_entries.find((e) => e.id === id),
+        'Datasource entry not found',
       );
-      const found = all.datasource_entries.find((e) => e.id === parseInt(id));
-      if (!found) throw new NotFoundException('Datasource entry not found');
       dsId = found.datasource_id;
     }
 

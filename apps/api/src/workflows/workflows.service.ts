@@ -1,7 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, desc, eq, ne, inArray, ilike } from 'drizzle-orm';
+import { escapeLike } from '../shared/query-parser.util';
 import { DB } from '../db/db.module';
-import type { DbType } from '../db/db.module';
+import { DbType } from '../db/db.module';
 import { workflows, workflowStages } from '../db/schema';
 
 @Injectable()
@@ -20,7 +21,7 @@ export class WorkflowsService {
     if (opts?.contentType) {
       wfs = wfs.filter((w) => {
         const ct = w.contentTypes as string[];
-        return ct && ct.includes(opts.contentType!);
+        return ct?.includes(opts.contentType!);
       });
     }
 
@@ -57,8 +58,15 @@ export class WorkflowsService {
     return { workflow: { ...this.formatWorkflow(wf), stages: stages.map(this.formatStage) } };
   }
 
-  async adminCreate(spaceId: number, data: { name: string; contentTypes?: string[]; isDefault?: boolean }) {
-    const existing = await this.db.select({ id: workflows.id }).from(workflows).orderBy(desc(workflows.id)).limit(1);
+  async adminCreate(
+    spaceId: number,
+    data: { name: string; contentTypes?: string[]; isDefault?: boolean },
+  ) {
+    const existing = await this.db
+      .select({ id: workflows.id })
+      .from(workflows)
+      .orderBy(desc(workflows.id))
+      .limit(1);
     const nextId = existing.length > 0 ? (existing[0].id as number) + 1 : 1;
 
     const [created] = await this.db
@@ -75,7 +83,11 @@ export class WorkflowsService {
     return { workflow: { ...this.formatWorkflow(created), stages: [] } };
   }
 
-  async adminUpdate(spaceId: number, id: number, data: { name?: string; contentTypes?: string[]; isDefault?: boolean }) {
+  async adminUpdate(
+    spaceId: number,
+    id: number,
+    data: { name?: string; contentTypes?: string[]; isDefault?: boolean },
+  ) {
     const [updated] = await this.db
       .update(workflows)
       .set({
@@ -224,7 +236,7 @@ export class WorkflowsService {
       conditions.push(inArray(workflowStages.id, opts.byIds));
     }
     if (opts?.search) {
-      conditions.push(ilike(workflowStages.name, `%${opts.search}%`));
+      conditions.push(ilike(workflowStages.name, `%${escapeLike(opts.search)}%`));
     }
     if (opts?.inWorkflow) {
       conditions.push(eq(workflowStages.workflowId, opts.inWorkflow));

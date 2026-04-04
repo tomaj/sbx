@@ -1,41 +1,41 @@
-'use client'
+'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react'
-import { Search, SlidersHorizontal, ChevronDown, X, Plus } from 'lucide-react'
-import { SelectDropdown } from './select-dropdown'
+import { useState, useRef, useEffect } from 'react';
+import { Search, SlidersHorizontal, ChevronDown, X } from 'lucide-react';
+import { SelectDropdown } from './select-dropdown';
 
 export interface SortOption {
-  value: string
-  label: string
+  value: string;
+  label: string;
 }
 
-export type FilterFieldType = 'text' | 'select' | 'date'
+export type FilterFieldType = 'text' | 'select' | 'date';
 
 export interface FilterField {
-  key: string
-  label: string
-  type: FilterFieldType
-  options?: { value: string; label: string }[] // for type='select'
+  key: string;
+  label: string;
+  type: FilterFieldType;
+  options?: { value: string; label: string }[]; // for type='select'
 }
 
 export interface ActiveFilter {
-  key: string
-  label: string
-  type: FilterFieldType
-  value: string
-  options?: { value: string; label: string }[]
+  key: string;
+  label: string;
+  type: FilterFieldType;
+  value: string;
+  options?: { value: string; label: string }[];
 }
 
 interface SearchFilterBarProps {
-  searchPlaceholder?: string
-  search: string
-  onSearchChange: (value: string) => void
-  sortOptions?: SortOption[]
-  sort?: string
-  onSortChange?: (value: string) => void
-  filterFields?: FilterField[]
-  activeFilters?: ActiveFilter[]
-  onFiltersChange?: (filters: ActiveFilter[]) => void
+  searchPlaceholder?: string;
+  search: string;
+  onSearchChange: (value: string) => void;
+  sortOptions?: SortOption[];
+  sort?: string;
+  onSortChange?: (value: string) => void;
+  filterFields?: FilterField[];
+  activeFilters?: ActiveFilter[];
+  onFiltersChange?: (filters: ActiveFilter[]) => void;
 }
 
 export function SearchFilterBar({
@@ -49,41 +49,41 @@ export function SearchFilterBar({
   activeFilters = [],
   onFiltersChange,
 }: SearchFilterBarProps) {
-  const [sortOpen, setSortOpen] = useState(false)
-  const [filterOpen, setFilterOpen] = useState(false)
-  const sortRef = useRef<HTMLDivElement>(null)
-  const filterRef = useRef<HTMLDivElement>(null)
+  const [sortOpen, setSortOpen] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const sortRef = useRef<HTMLDivElement>(null);
+  const filterRef = useRef<HTMLDivElement>(null);
 
   // Close dropdowns on outside click
   useEffect(() => {
     function handleClick(e: MouseEvent) {
-      if (sortRef.current && !sortRef.current.contains(e.target as Node)) setSortOpen(false)
-      if (filterRef.current && !filterRef.current.contains(e.target as Node)) setFilterOpen(false)
+      if (sortRef.current && !sortRef.current.contains(e.target as Node)) setSortOpen(false);
+      if (filterRef.current && !filterRef.current.contains(e.target as Node)) setFilterOpen(false);
     }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [])
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
 
-  const currentSortLabel = sortOptions.find(o => o.value === sort)?.label ?? 'Default'
+  const currentSortLabel = sortOptions.find((o) => o.value === sort)?.label ?? 'Default';
 
   function addFilter(field: FilterField) {
-    if (activeFilters.some(f => f.key === field.key)) return
+    if (activeFilters.some((f) => f.key === field.key)) return;
     onFiltersChange?.([
       ...activeFilters,
       { key: field.key, label: field.label, type: field.type, value: '', options: field.options },
-    ])
-    setFilterOpen(false)
+    ]);
+    setFilterOpen(false);
   }
 
   function removeFilter(key: string) {
-    onFiltersChange?.(activeFilters.filter(f => f.key !== key))
+    onFiltersChange?.(activeFilters.filter((f) => f.key !== key));
   }
 
   function updateFilterValue(key: string, value: string) {
-    onFiltersChange?.(activeFilters.map(f => (f.key === key ? { ...f, value } : f)))
+    onFiltersChange?.(activeFilters.map((f) => (f.key === key ? { ...f, value } : f)));
   }
 
-  const availableFields = filterFields.filter(f => !activeFilters.some(af => af.key === f.key))
+  const availableFields = filterFields.filter((f) => !activeFilters.some((af) => af.key === f.key));
 
   return (
     <div className="flex flex-col gap-2">
@@ -95,7 +95,7 @@ export function SearchFilterBar({
           <input
             type="text"
             value={search}
-            onChange={e => onSearchChange(e.target.value)}
+            onChange={(e) => onSearchChange(e.target.value)}
             placeholder={searchPlaceholder}
             className="w-full pl-9 pr-8 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
           />
@@ -113,7 +113,7 @@ export function SearchFilterBar({
         {filterFields.length > 0 && (
           <div className="relative" ref={filterRef}>
             <button
-              onClick={() => setFilterOpen(o => !o)}
+              onClick={() => setFilterOpen((o) => !o)}
               className={`flex items-center gap-1.5 px-3 py-2 text-sm border rounded-lg transition-colors ${
                 activeFilters.length > 0
                   ? 'border-teal-500 text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950'
@@ -133,7 +133,7 @@ export function SearchFilterBar({
                 <p className="px-3 py-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                   Add filter
                 </p>
-                {availableFields.map(field => (
+                {availableFields.map((field) => (
                   <button
                     key={field.key}
                     onClick={() => addFilter(field)}
@@ -156,7 +156,7 @@ export function SearchFilterBar({
         {sortOptions.length > 0 && onSortChange && (
           <div className="relative" ref={sortRef}>
             <button
-              onClick={() => setSortOpen(o => !o)}
+              onClick={() => setSortOpen((o) => !o)}
               className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 whitespace-nowrap"
             >
               <span>Sort by: {currentSortLabel}</span>
@@ -164,10 +164,13 @@ export function SearchFilterBar({
             </button>
             {sortOpen && (
               <div className="absolute top-full right-0 mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 min-w-[200px]">
-                {sortOptions.map(opt => (
+                {sortOptions.map((opt) => (
                   <button
                     key={opt.value}
-                    onClick={() => { onSortChange(opt.value); setSortOpen(false) }}
+                    onClick={() => {
+                      onSortChange(opt.value);
+                      setSortOpen(false);
+                    }}
                     className={`w-full text-left px-3 py-2 text-sm ${
                       sort === opt.value
                         ? 'text-teal-600 dark:text-teal-400 font-medium'
@@ -189,7 +192,7 @@ export function SearchFilterBar({
       {/* Active filter chips */}
       {activeFilters.length > 0 && (
         <div className="flex flex-wrap gap-2">
-          {activeFilters.map(filter => (
+          {activeFilters.map((filter) => (
             <div
               key={filter.key}
               className="flex items-center gap-1.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1"
@@ -207,14 +210,14 @@ export function SearchFilterBar({
                 <input
                   type="date"
                   value={filter.value}
-                  onChange={e => updateFilterValue(filter.key, e.target.value)}
+                  onChange={(e) => updateFilterValue(filter.key, e.target.value)}
                   className="text-xs text-gray-700 dark:text-gray-300 bg-transparent border-none outline-none"
                 />
               ) : (
                 <input
                   type="text"
                   value={filter.value}
-                  onChange={e => updateFilterValue(filter.key, e.target.value)}
+                  onChange={(e) => updateFilterValue(filter.key, e.target.value)}
                   placeholder="value..."
                   className="text-xs text-gray-700 dark:text-gray-300 bg-transparent border-none outline-none w-24"
                 />
@@ -236,5 +239,5 @@ export function SearchFilterBar({
         </div>
       )}
     </div>
-  )
+  );
 }

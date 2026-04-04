@@ -1,17 +1,20 @@
 import {
-  CanActivate,
-  ExecutionContext,
+  type CanActivate,
+  type ExecutionContext,
   Inject,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
-import { eq, sql } from 'drizzle-orm';
+import type { Reflector } from '@nestjs/core';
+import type { JwtService } from '@nestjs/jwt';
+import { and, eq } from 'drizzle-orm';
 import { timingSafeEqual } from 'crypto';
-import { AUTH_STRATEGIES, AuthStrategy } from './auth.decorator';
+import { AUTH_STRATEGIES, type AuthStrategy } from './auth.decorator';
+import type { TokenBlocklistService } from './token-blocklist.service';
 import { DB } from '../db/db.module';
 import type { DbType } from '../db/db.module';
-import { apiTokens, spaces, users } from '../db/schema';
+import { apiTokens, spaces, spaceMembers, users } from '../db/schema';
+import type { AuthenticatedRequest } from './authenticated-request.interface';
 
 /** Timing-safe string comparison to prevent brute-force via timing side-channel */
 function safeEqual(a: string, b: string): boolean {
@@ -24,15 +27,17 @@ export class UnifiedAuthGuard implements CanActivate {
   constructor(
     private reflector: Reflector,
     @Inject(DB) private db: DbType,
+    private jwtService: JwtService,
+    private tokenBlocklist: TokenBlocklistService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const strategies = this.reflector.getAllAndOverride<AuthStrategy[]>(
-      AUTH_STRATEGIES,
-      [context.getHandler(), context.getClass()],
-    ) ?? ['session-or-token'];
+    const strategies = this.reflector.getAllAndOverride<AuthStrategy[]>(AUTH_STRATEGIES, [
+      context.getHandler(),
+      context.getClass(),
+    ]) ?? ['session-or-token'];
 
-    const req = context.switchToHttp().getRequest();
+    const req = context.switchToHttp().getRequest<AuthenticatedRequest>();
 
     for (const strategy of strategies) {
       try {
@@ -44,10 +49,7 @@ export class UnifiedAuthGuard implements CanActivate {
           case 'session-or-token':
             return await this.authenticateSessionOrToken(req);
         }
-      } catch {
-        // If this strategy failed and there are more to try, continue
-        continue;
-      }
+      } catch {}
     }
 
     throw new UnauthorizedException('No valid authentication provided');
@@ -55,51 +57,75 @@ export class UnifiedAuthGuard implements CanActivate {
 
   // ── Shared token extraction ────────────────────────────────────────────────
 
-  /** Extracts a session token from Authorization header or better-auth cookie */
-  private extractSessionToken(req: any): string | undefined {
-    const authHeader: string = req.headers['authorization'];
-    if (authHeader?.startsWith('Bearer ')) {
+  /** Extracts a JWT from Authorization: Bearer header or sbx.session cookie */
+  private extractSessionToken(req: AuthenticatedRequest): string | undefined {
+    const authHeader = req.headers.authorization;
+    if (typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
       return authHeader.slice(7);
     }
-    const cookieHeader: string = req.headers['cookie'] ?? '';
-    const match = cookieHeader.match(/better-auth\.session_token=([^;]+)/);
+    const cookieHeader = req.headers.cookie ?? '';
+    const match = cookieHeader.match(/sbx\.session=([^;]+)/);
     return match ? decodeURIComponent(match[1]) : undefined;
   }
 
-  /** Validates a session token against the DB and sets req.adminUser */
-  private async validateSession(req: any, token: string): Promise<boolean> {
-    // better-auth stores token as "<rawToken>.<hmacSignature>" in cookie
-    // but the DB only has the raw token part
-    const rawToken = token.split('.')[0];
-
-    const result = await this.db.execute(
-      sql`SELECT s."userId", u.email, u.name
-          FROM session s
-          JOIN "user" u ON s."userId" = u.id
-          WHERE s.token = ${rawToken} AND s."expiresAt" > NOW()
-          LIMIT 1`,
-    );
-
-    if (!result.rows.length)
+  /** Validates a JWT session token and populates req.adminUser */
+  private async validateSession(req: AuthenticatedRequest, token: string): Promise<boolean> {
+    let payload: { sub: number; email: string; iat: number };
+    try {
+      payload = await this.jwtService.verifyAsync(token);
+    } catch {
       throw new UnauthorizedException('Invalid or expired session');
+    }
 
-    req.adminUser = result.rows[0];
+    // iat must be present and a plausible Unix timestamp (after 2001-09-09)
+    if (typeof payload.iat !== 'number' || payload.iat < 1_000_000_000) {
+      throw new UnauthorizedException('Invalid token');
+    }
+
+    // Check token revocation blocklist (set on logout / account disable)
+    if (await this.tokenBlocklist.isRevoked(payload.sub, payload.iat)) {
+      throw new UnauthorizedException('Session has been revoked');
+    }
+
+    const [user] = await this.db
+      .select({
+        id: users.id,
+        email: users.email,
+        firstname: users.firstname,
+        lastname: users.lastname,
+        disabled: users.disabled,
+      })
+      .from(users)
+      .where(eq(users.id, payload.sub))
+      .limit(1);
+
+    if (!user || user.disabled) {
+      throw new UnauthorizedException('User not found or disabled');
+    }
+
+    req.adminUser = {
+      userId: String(user.id),
+      email: user.email,
+      name: [user.firstname, user.lastname].filter(Boolean).join(' ') || user.email,
+      sbxUserId: user.id,
+      firstname: user.firstname,
+      lastname: user.lastname,
+    };
     return true;
   }
 
-  // ── Session strategy ──────────────────────────────────────────────────────
+  // ── Session strategy ───────────────────────────────────────────────────────
 
-  private async authenticateSession(req: any): Promise<boolean> {
+  private async authenticateSession(req: AuthenticatedRequest): Promise<boolean> {
     const token = this.extractSessionToken(req);
     if (!token) throw new UnauthorizedException('No session provided');
     return this.validateSession(req, token);
   }
 
-  // ── Token strategy (from TokenGuard) ──────────────────────────────────────
+  // ── Token strategy ─────────────────────────────────────────────────────────
 
-  private async authenticateToken(req: any): Promise<boolean> {
-    const token: string = req.query.token;
-
+  private async authenticateToken(req: AuthenticatedRequest): Promise<boolean> {
+    const token: string = (req as any).query?.token;
     if (!token) throw new UnauthorizedException('No token provided');
 
     const rows = await this.db
@@ -117,11 +143,11 @@ export class UnifiedAuthGuard implements CanActivate {
     return true;
   }
 
-  // ── Session-or-token strategy (from SessionOrTokenGuard) ──────────────────
+  // ── Session-or-token strategy ──────────────────────────────────────────────
 
-  private async authenticateSessionOrToken(req: any): Promise<boolean> {
-    // 1. Try management token
-    const queryToken: string | undefined = req.query.token;
+  private async authenticateSessionOrToken(req: AuthenticatedRequest): Promise<boolean> {
+    // 1. Try management API token from query param
+    const queryToken: string | undefined = (req as any).query?.token;
     if (queryToken) {
       const rows = await this.db
         .select()
@@ -138,31 +164,42 @@ export class UnifiedAuthGuard implements CanActivate {
       return true;
     }
 
-    // 2. Try session token
+    // 2. Try JWT session token
     const sessionToken = this.extractSessionToken(req);
     if (!sessionToken) throw new UnauthorizedException('No token provided');
 
     await this.validateSession(req, sessionToken);
-
-    // Resolve our internal users.id (bigint) by email — avoids repeated lookups in controllers
-    const [sbxUser] = await this.db
-      .select({ id: users.id })
-      .from(users)
-      .where(eq(users.email, req.adminUser.email as string))
-      .limit(1);
-    req.adminUser.sbxUserId = sbxUser?.id ?? null;
+    // sbxUserId is already set directly from JWT payload.sub — no email lookup needed
 
     // Look up the space from the URL params (spaceId or id)
-    const spaceId = req.params?.spaceId ?? req.params?.id;
-    if (!spaceId) return true; // routes without spaceId param (e.g. GET /v1/spaces) — auth only
+    const params = (req as any).params ?? {};
+    const spaceId = params.spaceId ?? params.id;
+    if (!spaceId) return true; // routes without spaceId param (e.g. GET /v1/spaces)
+
+    const parsedSpaceId = parseInt(spaceId, 10);
+    if (Number.isNaN(parsedSpaceId)) throw new UnauthorizedException('Invalid space ID');
 
     const [space] = await this.db
       .select()
       .from(spaces)
-      .where(eq(spaces.id, parseInt(spaceId)))
+      .where(eq(spaces.id, parsedSpaceId))
       .limit(1);
 
     if (!space) throw new UnauthorizedException('Space not found');
+
+    // Verify user is a member of this space
+    const [membership] = await this.db
+      .select({ id: spaceMembers.id })
+      .from(spaceMembers)
+      .where(
+        and(
+          eq(spaceMembers.spaceId, parsedSpaceId),
+          eq(spaceMembers.userId, req.adminUser!.sbxUserId!),
+        ),
+      )
+      .limit(1);
+
+    if (!membership) throw new UnauthorizedException('Not a member of this space');
 
     req.space = space;
     return true;

@@ -1,84 +1,45 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  HttpCode,
-  Param,
-  Post,
-  Put,
-  Query,
-  Req,
-} from '@nestjs/common';
+import { Controller, Delete, HttpCode, Param, ParseIntPipe, Req } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Auth } from '../auth/auth.decorator';
 import { PresetsService } from './presets.service';
+import { BaseCrudController } from '../shared/base-crud.controller';
 import { ResultGuard } from '../shared/result-guard.util';
+import { BaseCrudService } from '../shared/base-crud.service';
+import { QueryParserUtil } from '../shared/query-parser.util';
+import { AuthenticatedRequest } from '../auth/authenticated-request.interface';
 
 @ApiTags('Presets - MAPI')
 @Controller('v1/spaces/:spaceId/presets')
 @Auth('session-or-token')
-export class PresetsController {
-  constructor(private readonly presetsService: PresetsService) {}
+export class PresetsController extends BaseCrudController<unknown> {
+  constructor(private readonly presetsService: PresetsService) {
+    super();
+  }
 
-  @Get()
-  async getPresets(@Req() req: any, @Query('component_id') componentId?: string) {
+  protected get service(): BaseCrudService<unknown> {
+    // PresetsService is not a BaseCrudService subclass but has compatible findOne/remove signatures
+    return this.presetsService as unknown as BaseCrudService<unknown>;
+  }
+
+  protected async doList(spaceId: number, query: Record<string, string>): Promise<unknown> {
     return this.presetsService.findAll(
-      req.space.id,
-      componentId ? parseInt(componentId) : undefined,
+      spaceId,
+      QueryParserUtil.parseOptionalInt(query.component_id),
     );
   }
 
-  @Get(':id')
-  async getPreset(@Req() req: any, @Param('id') id: string) {
-    return ResultGuard.throwIfNotFound(await this.presetsService.findOne(req.space.id, parseInt(id)));
+  protected async doCreate(spaceId: number, body: any): Promise<unknown> {
+    return this.presetsService.create(spaceId, body.preset);
   }
 
-  @Post()
-  @HttpCode(201)
-  async createPreset(
-    @Req() req: any,
-    @Body()
-    body: {
-      preset: {
-        name: string;
-        component_id: number;
-        preset?: Record<string, any>;
-        image?: string;
-        color?: string;
-        icon?: string;
-        description?: string;
-      };
-    },
-  ) {
-    return this.presetsService.create(req.space.id, body.preset);
+  protected async doUpdate(spaceId: number, id: number, body: any): Promise<unknown> {
+    return ResultGuard.throwIfNotFound(await this.presetsService.update(spaceId, id, body.preset));
   }
 
-  @Put(':id')
-  async updatePreset(
-    @Req() req: any,
-    @Param('id') id: string,
-    @Body()
-    body: {
-      preset: {
-        name?: string;
-        component_id?: number;
-        preset?: Record<string, any>;
-        image?: string | null;
-        color?: string | null;
-        icon?: string | null;
-        description?: string | null;
-      };
-    },
-  ) {
-    return ResultGuard.throwIfNotFound(
-      await this.presetsService.update(req.space.id, parseInt(id), body.preset),
-    );
-  }
-
+  // Presets delete returns 200 with the deleted preset (not 204 empty)
   @Delete(':id')
   @HttpCode(200)
-  async deletePreset(@Req() req: any, @Param('id') id: string) {
-    return ResultGuard.throwIfNotFound(await this.presetsService.remove(req.space.id, parseInt(id)));
+  async remove(@Req() req: AuthenticatedRequest, @Param('id', ParseIntPipe) id: number) {
+    return ResultGuard.throwIfNotFound(await this.presetsService.remove(req.space.id, id));
   }
 }

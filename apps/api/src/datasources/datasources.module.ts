@@ -7,11 +7,7 @@ import { WebhooksModule } from '../webhooks/webhooks.module';
 
 @Module({
   imports: [WebhooksModule],
-  controllers: [
-    DatasourcesController,
-    DatasourcesMapiController,
-    DatasourceEntriesMapiController,
-  ],
+  controllers: [DatasourcesController, DatasourcesMapiController, DatasourceEntriesMapiController],
   providers: [DatasourcesService],
 })
 export class DatasourcesModule {}

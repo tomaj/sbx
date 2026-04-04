@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, desc, eq, gte, lte, sql } from 'drizzle-orm';
 import { DB } from '../db/db.module';
-import type { DbType } from '../db/db.module';
+import { DbType } from '../db/db.module';
 import { apiRequestLogs, assets, statistics } from '../db/schema';
 
 @Injectable()
@@ -33,9 +33,7 @@ export class StatisticsService {
   async pruneOldLogs(olderThanDays = 31): Promise<void> {
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - olderThanDays);
-    await this.db
-      .delete(apiRequestLogs)
-      .where(lte(apiRequestLogs.createdAt, cutoff));
+    await this.db.delete(apiRequestLogs).where(lte(apiRequestLogs.createdAt, cutoff));
   }
 
   /** Atomically increment request count for a space on today's date. */
@@ -89,7 +87,6 @@ export class StatisticsService {
         groupBy = 'month';
         periodLabel = 'last 12 months';
         break;
-      case 'this_month':
       default:
         from = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
         groupBy = 'day';
@@ -126,7 +123,13 @@ export class StatisticsService {
     `);
     const previousTotal = Number(prevRows.rows[0]?.cnt ?? 0);
 
-    return { total, previous_total: previousTotal, period_label: periodLabel, group_by: groupBy, data };
+    return {
+      total,
+      previous_total: previousTotal,
+      period_label: periodLabel,
+      group_by: groupBy,
+      data,
+    };
   }
 
   private fillDateRange(
@@ -137,8 +140,8 @@ export class StatisticsService {
   ): { date: string; count: number }[] {
     const map = new Map(rows.map((r) => [r.period, Number(r.count)]));
     const result: { date: string; count: number }[] = [];
-    const end = new Date(to + 'T12:00:00');
-    const cur = new Date(from + 'T12:00:00');
+    const end = new Date(`${to}T12:00:00`);
+    const cur = new Date(`${from}T12:00:00`);
 
     while (cur <= end) {
       const key =
@@ -158,13 +161,14 @@ export class StatisticsService {
   }
 
   private shiftDate(from: string, to: string, groupBy: 'day' | 'month'): string {
-    const f = new Date(from + 'T12:00:00');
-    const t = new Date(to + 'T12:00:00');
+    const f = new Date(`${from}T12:00:00`);
+    const t = new Date(`${to}T12:00:00`);
     const diffDays = Math.round((t.getTime() - f.getTime()) / 86400000) + 1;
     if (groupBy === 'day') {
       f.setDate(f.getDate() - diffDays);
     } else {
-      const diffMonths = (t.getFullYear() - f.getFullYear()) * 12 + (t.getMonth() - f.getMonth()) + 1;
+      const diffMonths =
+        (t.getFullYear() - f.getFullYear()) * 12 + (t.getMonth() - f.getMonth()) + 1;
       f.setMonth(f.getMonth() - diffMonths);
     }
     return f.toISOString().slice(0, 10);
@@ -202,8 +206,7 @@ export class StatisticsService {
     endDate: string,
     groupBy: 'day' | 'month' | 'year' = 'month',
   ) {
-    const fmt =
-      groupBy === 'day' ? 'YYYY-MM-DD' : groupBy === 'month' ? 'YYYY-MM' : 'YYYY';
+    const fmt = groupBy === 'day' ? 'YYYY-MM-DD' : groupBy === 'month' ? 'YYYY-MM' : 'YYYY';
 
     // Aggregate across all spaces grouped by period
     const byPeriod = await this.db.execute<{
@@ -290,11 +293,13 @@ export class StatisticsService {
         requests_used_last_days: requestsLast7,
         total_requests_per_time_period: totalRequests,
         total_traffic_per_time_period: totalBytes,
-        traffic: byPeriod.rows.map((r: { period: string; api_requests: string; total_bytes: string }) => ({
-          date: r.period,
-          api_requests: Number(r.api_requests),
-          total_bytes: Number(r.total_bytes),
-        })),
+        traffic: byPeriod.rows.map(
+          (r: { period: string; api_requests: string; total_bytes: string }) => ({
+            date: r.period,
+            api_requests: Number(r.api_requests),
+            total_bytes: Number(r.total_bytes),
+          }),
+        ),
       },
       traffic_top_spaces: topSpaces,
       traffic: spaceTraffic,
@@ -344,7 +349,6 @@ export class StatisticsService {
         groupBy = 'month';
         periodLabel = 'last 12 months';
         break;
-      case 'this_month':
       default:
         from = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
         groupBy = 'day';
@@ -381,7 +385,13 @@ export class StatisticsService {
     `);
     const previousTotal = Number(prevRows.rows[0]?.cnt ?? 0);
 
-    return { total, previous_total: previousTotal, period_label: periodLabel, group_by: groupBy, data };
+    return {
+      total,
+      previous_total: previousTotal,
+      period_label: periodLabel,
+      group_by: groupBy,
+      data,
+    };
   }
 
   /** Asset-level bandwidth stats — returns assets with their file size as proxy. */
@@ -403,7 +413,7 @@ export class StatisticsService {
       .where(
         and(
           gte(assets.createdAt, new Date(startDate)),
-          lte(assets.createdAt, new Date(endDate + 'T23:59:59')),
+          lte(assets.createdAt, new Date(`${endDate}T23:59:59`)),
         ),
       )
       .orderBy(desc(assets.createdAt));

@@ -1,31 +1,38 @@
-'use client'
+'use client';
 
-import { useState } from 'react'
-import { Check } from 'lucide-react'
-import { useUnsavedChanges } from '@/hooks/use-unsaved-changes'
-import { UnsavedChangesModal } from '@/components/ui/unsaved-changes-modal'
+import { useState } from 'react';
+import { Check } from 'lucide-react';
+import { useUnsavedChanges } from '@/hooks/use-unsaved-changes';
+import { UnsavedChangesModal } from '@/components/ui/unsaved-changes-modal';
 
 export default function SecurityPage() {
-  const [showPasswordForm, setShowPasswordForm] = useState(false)
-  const [currentPassword, setCurrentPassword] = useState('')
-  const [newPassword, setNewPassword] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
 
-  const isDirty = showPasswordForm && (currentPassword.length > 0 || newPassword.length > 0)
-  const { showModal: showUnsavedModal, handleConfirm: confirmUnsaved, handleCancel: cancelUnsaved } = useUnsavedChanges(isDirty)
+  const isDirty = showPasswordForm && (currentPassword.length > 0 || newPassword.length > 0);
+  const {
+    showModal: showUnsavedModal,
+    handleConfirm: confirmUnsaved,
+    handleCancel: cancelUnsaved,
+  } = useUnsavedChanges(isDirty);
 
   async function handleSavePassword() {
-    if (!newPassword) return
-    setSaving(true)
-    // TODO: wire to better-auth changePassword
-    await new Promise((r) => setTimeout(r, 800))
-    setSaving(false)
-    setSaved(true)
-    setShowPasswordForm(false)
-    setCurrentPassword('')
-    setNewPassword('')
-    setTimeout(() => setSaved(false), 2000)
+    if (!newPassword) return;
+    setSaving(true);
+    await fetch('/api/admin/user/me/password', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+    });
+    setSaving(false);
+    setSaved(true);
+    setShowPasswordForm(false);
+    setCurrentPassword('');
+    setNewPassword('');
+    setTimeout(() => setSaved(false), 2000);
   }
 
   return (
@@ -87,10 +94,16 @@ export default function SecurityPage() {
       </div>
 
       {saved && (
-        <p className="mt-4 text-sm text-teal-600 dark:text-teal-400">Password updated successfully.</p>
+        <p className="mt-4 text-sm text-teal-600 dark:text-teal-400">
+          Password updated successfully.
+        </p>
       )}
 
-      <UnsavedChangesModal open={showUnsavedModal} onConfirm={confirmUnsaved} onCancel={cancelUnsaved} />
+      <UnsavedChangesModal
+        open={showUnsavedModal}
+        onConfirm={confirmUnsaved}
+        onCancel={cancelUnsaved}
+      />
     </div>
-  )
+  );
 }

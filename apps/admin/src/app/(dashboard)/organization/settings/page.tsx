@@ -1,6 +1,6 @@
-import type { Metadata } from 'next'
+import type { Metadata } from 'next';
 
-export const metadata: Metadata = { title: 'Organization Settings' }
+export const metadata: Metadata = { title: 'Organization Settings' };
 
 export default function OrgSettingsPage() {
   const fields = [
@@ -10,11 +10,13 @@ export default function OrgSettingsPage() {
     { label: 'Street', value: '28 Bajkalská' },
     { label: 'Zip', value: '817 62' },
     { label: 'City', value: 'Bratislava' },
-  ]
+  ];
 
   return (
     <div className="p-8 max-w-2xl">
-      <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-8">Organization Details</h1>
+      <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-8">
+        Organization Details
+      </h1>
 
       <div className="space-y-6">
         {fields.map(({ label, value }) => (
@@ -25,5 +27,5 @@ export default function OrgSettingsPage() {
         ))}
       </div>
     </div>
-  )
+  );
 }

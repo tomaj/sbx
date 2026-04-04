@@ -1,15 +1,15 @@
-'use client'
+'use client';
 
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/utils';
 
 interface InputWithCounterProps {
-  value: string
-  onChange: (value: string) => void
-  maxLength: number
-  placeholder?: string
-  id?: string
-  className?: string
-  autoFocus?: boolean
+  value: string;
+  onChange: (value: string) => void;
+  maxLength: number;
+  placeholder?: string;
+  id?: string;
+  className?: string;
+  autoFocus?: boolean;
 }
 
 export function InputWithCounter({
@@ -30,7 +30,6 @@ export function InputWithCounter({
         onChange={(e) => onChange(e.target.value.slice(0, maxLength))}
         maxLength={maxLength}
         placeholder={placeholder}
-        autoFocus={autoFocus}
         className={cn(
           'w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm',
           'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100',
@@ -42,5 +41,5 @@ export function InputWithCounter({
         {value.length}/{maxLength}
       </div>
     </div>
-  )
+  );
 }

@@ -1,3 +1,4 @@
+import { AuthenticatedRequest } from '../auth/authenticated-request.interface';
 import { Controller, Get, Query, Req } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Auth } from '../auth/auth.decorator';
@@ -11,7 +12,7 @@ export class TagsController {
 
   @Get()
   getTags(
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
     @Query('starts_with') startsWith?: string,
     @Query('version') version?: string,
   ) {

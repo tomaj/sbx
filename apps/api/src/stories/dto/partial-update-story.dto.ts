@@ -1,16 +1,12 @@
-import { Type } from 'class-transformer';
-import { IsArray, IsNumber, IsOptional, ValidateNested } from 'class-validator';
+import { z } from 'zod';
+import { createZodDto } from 'nestjs-zod';
 
-export class PartialUpdateStoryDataDto {
-  @IsArray()
-  @IsNumber({}, { each: true })
-  @IsOptional()
-  favourite_for_user_ids?: number[];
-}
+const PartialUpdateStoryDataSchema = z.object({
+  favourite_for_user_ids: z.array(z.number().int()).optional(),
+});
 
-export class PartialUpdateStoryDto {
-  @ValidateNested()
-  @Type(() => PartialUpdateStoryDataDto)
-  @IsOptional()
-  story?: PartialUpdateStoryDataDto;
-}
+const PartialUpdateStorySchema = z.object({
+  story: PartialUpdateStoryDataSchema.optional(),
+});
+
+export class PartialUpdateStoryDto extends createZodDto(PartialUpdateStorySchema) {}

@@ -1,3 +1,4 @@
+import { AuthenticatedRequest } from '../auth/authenticated-request.interface';
 import {
   Body,
   Controller,
@@ -5,6 +6,7 @@ import {
   Get,
   HttpCode,
   Param,
+  ParseIntPipe,
   Post,
   Put,
   Req,
@@ -21,21 +23,19 @@ export class AccessTokensController {
   constructor(private readonly accessTokensService: AccessTokensService) {}
 
   @Get()
-  async getApiKeys(@Req() req: any) {
+  async getApiKeys(@Req() req: AuthenticatedRequest) {
     return this.accessTokensService.findAll(req.space.id);
   }
 
   @Get(':id')
-  async getApiKey(@Req() req: any, @Param('id') id: string) {
-    return ResultGuard.throwIfNotFound(
-      await this.accessTokensService.findOne(req.space.id, parseInt(id)),
-    );
+  async getApiKey(@Req() req: AuthenticatedRequest, @Param('id', ParseIntPipe) id: number) {
+    return ResultGuard.throwIfNotFound(await this.accessTokensService.findOne(req.space.id, id));
   }
 
   @Post()
   @HttpCode(201)
   async createApiKey(
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
     @Body() body: {
       api_key: {
         name?: string;
@@ -56,8 +56,8 @@ export class AccessTokensController {
 
   @Put(':id')
   async updateApiKey(
-    @Req() req: any,
-    @Param('id') id: string,
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseIntPipe) id: number,
     @Body() body: {
       api_key: {
         name?: string;
@@ -68,24 +68,20 @@ export class AccessTokensController {
     },
   ) {
     return ResultGuard.throwIfNotFound(
-      await this.accessTokensService.adminUpdate(
-        req.space.id,
-        parseInt(id),
-        {
-          name: body.api_key?.name,
-          access: body.api_key?.access as 'public' | 'private' | undefined,
-          branchId: body.api_key?.branch_id,
-          minCache: body.api_key?.min_cache ?? undefined,
-        },
-      ),
+      await this.accessTokensService.adminUpdate(req.space.id, id, {
+        name: body.api_key?.name,
+        access: body.api_key?.access as 'public' | 'private' | undefined,
+        branchId: body.api_key?.branch_id,
+        minCache: body.api_key?.min_cache ?? undefined,
+      }),
     );
   }
 
   @Delete(':id')
   @HttpCode(200)
-  async deleteApiKey(@Req() req: any, @Param('id') id: string) {
+  async deleteApiKey(@Req() req: AuthenticatedRequest, @Param('id', ParseIntPipe) id: number) {
     return ResultGuard.throwIfNotFound(
-      await this.accessTokensService.adminDelete(req.space.id, parseInt(id)),
+      await this.accessTokensService.adminDelete(req.space.id, id),
     );
   }
 }

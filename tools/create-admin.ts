@@ -1,32 +1,42 @@
 /**
- * Creates an admin user via better-auth sign-up endpoint.
- * Run this after starting the admin app (pnpm --filter admin dev).
+ * Creates an admin user directly in the database.
+ * Requires a running PostgreSQL instance with DATABASE_URL configured.
  *
  * Usage:
  *   ADMIN_EMAIL=you@example.com ADMIN_PASSWORD=secret \
- *   npx ts-node --transpile-only tools/create-admin.ts
+ *   npx tsx tools/create-admin.ts
  */
+import { Pool } from 'pg';
+import * as argon2 from 'argon2';
 
-const email = process.env.ADMIN_EMAIL ?? 'admin@example.com'
-const password = process.env.ADMIN_PASSWORD ?? 'changeme123'
-const name = process.env.ADMIN_NAME ?? 'Admin'
-const baseUrl = process.env.ADMIN_URL ?? 'http://localhost:3001'
+const email = process.env.ADMIN_EMAIL ?? 'admin@example.com';
+const password = process.env.ADMIN_PASSWORD ?? 'changeme123';
+const name = process.env.ADMIN_NAME ?? 'Admin';
+const databaseUrl = process.env.DATABASE_URL ?? 'postgresql://postgres:postgres@localhost:5432/sbx';
 
 async function main() {
-  const res = await fetch(`${baseUrl}/api/auth/sign-up/email`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password, name }),
-  })
+  const pool = new Pool({ connectionString: databaseUrl });
 
-  const data = await res.json()
+  const passwordHash = await argon2.hash(password);
 
-  if (!res.ok) {
-    console.error('Failed to create user:', data)
-    process.exit(1)
-  }
+  const [firstname, ...rest] = name.split(' ');
+  const lastname = rest.join(' ');
 
-  console.log(`Created admin user: ${email}`)
+  const result = await pool.query(
+    `INSERT INTO users (uuid, email, password_hash, firstname, lastname, created_at, updated_at)
+     VALUES (gen_random_uuid(), $1, $2, $3, $4, NOW(), NOW())
+     ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash, firstname = EXCLUDED.firstname, lastname = EXCLUDED.lastname
+     RETURNING id, email, firstname, lastname`,
+    [email, passwordHash, firstname, lastname],
+  );
+
+  const user = result.rows[0];
+  console.log(`Admin user ready: [${user.id}] ${user.email} (${user.firstname} ${user.lastname})`);
+
+  await pool.end();
 }
 
-main().catch(console.error)
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

@@ -1,3 +1,4 @@
+import { AuthenticatedRequest } from '../auth/authenticated-request.interface';
 import { Controller, Get, Req } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Auth } from '../auth/auth.decorator';
@@ -11,7 +12,7 @@ export class SpacesCdnController {
   constructor(private readonly spacesService: SpacesService) {}
 
   @Get('me')
-  async getMe(@Req() req: any) {
+  async getMe(@Req() req: AuthenticatedRequest) {
     return ResultGuard.throwIfNotFound(await this.spacesService.getSpaceMe(req.space.id));
   }
 }

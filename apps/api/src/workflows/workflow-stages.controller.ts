@@ -1,3 +1,4 @@
+import { AuthenticatedRequest } from '../auth/authenticated-request.interface';
 import {
   Body,
   Controller,
@@ -5,6 +6,7 @@ import {
   Get,
   HttpCode,
   Param,
+  ParseIntPipe,
   Post,
   Put,
   Query,
@@ -24,29 +26,29 @@ export class WorkflowStagesController {
 
   @Get()
   async list(
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
     @Query('exclude_id') excludeId?: string,
     @Query('by_ids') byIds?: string,
     @Query('search') search?: string,
     @Query('in_workflow') inWorkflow?: string,
   ) {
     return this.workflowsService.listStages(req.space.id, {
-      excludeId: excludeId ? parseInt(excludeId) : undefined,
+      excludeId: QueryParserUtil.parseOptionalInt(excludeId),
       byIds: QueryParserUtil.parseCsvToInts(byIds),
       search,
-      inWorkflow: inWorkflow ? parseInt(inWorkflow) : undefined,
+      inWorkflow: QueryParserUtil.parseOptionalInt(inWorkflow),
     });
   }
 
   @Get(':id')
-  async get(@Req() req: any, @Param('id') id: string) {
-    return ResultGuard.throwIfNotFound(await this.workflowsService.getStage(req.space.id, parseInt(id)));
+  async get(@Req() req: AuthenticatedRequest, @Param('id', ParseIntPipe) id: number) {
+    return ResultGuard.throwIfNotFound(await this.workflowsService.getStage(req.space.id, id));
   }
 
   @Post()
   @HttpCode(201)
   async create(
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
     @Body()
     body: {
       workflow_stage: {
@@ -75,8 +77,8 @@ export class WorkflowStagesController {
 
   @Put(':id')
   async update(
-    @Req() req: any,
-    @Param('id') id: string,
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseIntPipe) id: number,
     @Body()
     body: {
       workflow_stage: {
@@ -100,13 +102,14 @@ export class WorkflowStagesController {
     },
   ) {
     return ResultGuard.throwIfNotFound(
-      await this.workflowsService.updateStage(req.space.id, parseInt(id), body.workflow_stage),
+      await this.workflowsService.updateStage(req.space.id, id, body.workflow_stage),
     );
   }
 
   @Delete(':id')
-  @HttpCode(204)
-  async remove(@Req() req: any, @Param('id') id: string) {
-    await this.workflowsService.deleteStage(req.space.id, parseInt(id));
+  @HttpCode(200)
+  async remove(@Req() req: AuthenticatedRequest, @Param('id', ParseIntPipe) id: number) {
+    await this.workflowsService.deleteStage(req.space.id, id);
+    return {};
   }
 }

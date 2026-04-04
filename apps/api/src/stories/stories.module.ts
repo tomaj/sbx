@@ -13,7 +13,19 @@ import { WebhooksModule } from '../webhooks/webhooks.module';
 
 @Module({
   imports: [WebhooksModule],
-  controllers: [StoriesCdnController, LinksCdnController, StoriesController, StoryVersionsController],
-  providers: [StoriesService, StoriesQueryService, StoriesVersionService, StoriesCdnService, LinksCdnService, StoryVersionsService],
+  controllers: [
+    StoriesCdnController,
+    LinksCdnController,
+    StoriesController,
+    StoryVersionsController,
+  ],
+  providers: [
+    StoriesService,
+    StoriesQueryService,
+    StoriesVersionService,
+    StoriesCdnService,
+    LinksCdnService,
+    StoryVersionsService,
+  ],
 })
 export class StoriesModule {}
