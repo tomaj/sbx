@@ -2,9 +2,8 @@
  * Catch-all proxy route handler.
  *
  * Maps admin UI API requests to the NestJS MAPI backend:
- *   /api/admin/<path> -> /v1/<path>        (default)
- *   /api/admin/spaces (no sub-path) -> /v1/admin/spaces
- *   /api/admin/users/... -> /v1/admin/users/...
+ *   /api/admin/<path>       -> /v1/<path>          (default, including spaces)
+ *   /api/admin/users/...    -> /v1/admin/users/...  (org-level user management)
  *
  * Routes with custom body transformation, URL remapping, or multipart
  * uploads are kept as specific route files (Next.js matches them first).
@@ -12,21 +11,9 @@
 import type { NextRequest } from 'next/server';
 import { apiFetch, proxyResponse } from '@/lib/api-server';
 
-/** Top-level admin paths that map to /v1/admin/... instead of /v1/... */
-const ADMIN_PREFIXED = new Set(['spaces', 'users']);
-
 function buildApiPath(segments: string[]): string {
-  const first = segments[0];
-
-  // /api/admin/spaces (no spaceId sub-path) -> /v1/admin/spaces
-  // /api/admin/spaces/123/... -> /v1/spaces/123/...
-  // /api/admin/users/... -> /v1/admin/users/...
-  if (ADMIN_PREFIXED.has(first)) {
-    // "spaces" with a spaceId sub-resource -> /v1/spaces/...
-    if (first === 'spaces' && segments.length > 1) {
-      return `/v1/${segments.join('/')}`;
-    }
-    // "spaces" alone or "users" -> /v1/admin/...
+  // /api/admin/users/... -> /v1/admin/users/...  (no MAPI equivalent)
+  if (segments[0] === 'users') {
     return `/v1/admin/${segments.join('/')}`;
   }
 

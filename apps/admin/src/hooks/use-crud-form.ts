@@ -82,13 +82,15 @@ export function useCrudForm<TItem, TFormValues extends FieldValues>({
   });
 
   useEffect(() => {
-    if (mode === 'edit' && item) {
-      form.reset(getInitialValues(item));
-    } else {
-      form.reset(defaultValues);
+    if (open) {
+      if (mode === 'edit' && item) {
+        form.reset(getInitialValues(item));
+      } else {
+        form.reset(defaultValues);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [item, mode, getInitialValues, form.reset, defaultValues]);
+  }, [open, item, mode]);
 
   const onSubmit = form.handleSubmit(async (values) => {
     const res = await buildRequest(values as TFormValues, mode, item);

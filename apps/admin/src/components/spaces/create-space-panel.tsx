@@ -34,8 +34,7 @@ export function CreateSpacePanel({ open, onClose, onCreated }: CreateSpacePanelP
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: name.trim(),
-          domain: domain.trim() || null,
+          space: { name: name.trim(), domain: domain.trim() || null },
         }),
       });
       if (!res.ok) {

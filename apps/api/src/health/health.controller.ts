@@ -1,6 +1,6 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { HealthCheck, type HealthCheckService, type HealthCheckResult } from '@nestjs/terminus';
+import { HealthCheck, HealthCheckService, type HealthCheckResult } from '@nestjs/terminus';
 import { RateLimit } from '../throttler/throttler.module';
 import { DbHealthIndicator } from './db.health';
 import { RedisHealthIndicator } from './redis.health';

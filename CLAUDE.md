@@ -185,9 +185,8 @@ Golden dáta: `golden/{space_id}/`
 - Dokumentácia jednotlivých MAPI zdrojov je v `docs/mapi/` — vždy sa nimi riaď
 - Admin Next.js route handlery (`apps/admin/src/app/api/admin/...`) sú len thin proxy na MAPI — žiadna transformácia, žiadna business logika
 - **Admin UI používa výlučne MAPI** (`/v1/spaces/:id/...`) — žiadne custom admin-only endpointy pre bežné CRUD operácie
-- Custom `/v1/admin/...` endpointy existujú **len pre tieto org-level operácie bez MAPI ekvivalentu**:
-  - `GET/POST /v1/admin/spaces` — list všetkých spaces a vytvorenie space (org-level, nie space-scoped)
-  - `GET/POST/PATCH/DELETE /v1/admin/users` — správa všetkých používateľov organizácie
+- Custom `/v1/admin/...` endpointy existujú **len pre tieto operácie bez MAPI ekvivalentu**:
+  - `GET/POST/PATCH/DELETE /v1/admin/users` — správa všetkých používateľov organizácie (org-level, nie per-space collaborators)
   - `GET /v1/admin/spaces/:id/users/search` — vyhľadávanie používateľov pre space (výber collaboratorov)
   - `GET/POST/PUT/DELETE /v1/admin/spaces/:id/assets` — upload assetov (multipart + file validation)
   - `GET/POST/PUT/DELETE /v1/admin/field-types` — správa field types (org-level, nie v MAPI)
@@ -285,10 +284,8 @@ pnpm drizzle-kit migrate    # ekvivalent vyššie
 
 - Väčšina route handlerov je nahradená **catch-all proxy** v `apps/admin/src/app/api/admin/[...path]/route.ts`
 - Catch-all mapovanie:
-  - `/api/admin/spaces` (bez sub-path) → `/v1/admin/spaces`
-  - `/api/admin/spaces/123/...` → `/v1/spaces/123/...`
-  - `/api/admin/users/...` → `/v1/admin/users/...`
-  - Všetko ostatné: `/api/admin/X` → `/v1/X`
+  - `/api/admin/users/...` → `/v1/admin/users/...` (org-level user management, bez MAPI ekvivalentu)
+  - Všetko ostatné: `/api/admin/X` → `/v1/X` (vrátane `spaces/`, `spaces/123/...`)
 - Špecifické route súbory (Next.js ich matchne **pred** catch-all):
   - `auth/` — login/logout (session management)
   - `activities/` — URL remap: `?spaceId=X` query param → `/v1/spaces/X/activities` path param

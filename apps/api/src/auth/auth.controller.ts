@@ -1,10 +1,10 @@
 import { Body, Controller, HttpCode, Post, Req } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import type { AuthService } from './auth.service';
-import type { TokenBlocklistService } from './token-blocklist.service';
+import { AuthService } from './auth.service';
+import { TokenBlocklistService } from './token-blocklist.service';
 import { Auth } from './auth.decorator';
 import { RateLimit } from '../throttler/throttler.module';
-import type { LoginDto } from './dto/login.dto';
+import { LoginDto } from './dto/login.dto';
 import type { AuthenticatedRequest } from './authenticated-request.interface';
 
 @ApiTags('Auth')

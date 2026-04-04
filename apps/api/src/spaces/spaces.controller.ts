@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Put } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, ParseIntPipe, Post, Put } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Auth } from '../auth/auth.decorator';
 import { SpacesService } from './spaces.service';
@@ -13,6 +13,12 @@ export class SpacesController {
   @Get()
   async list() {
     return this.spacesService.getAllSpaces();
+  }
+
+  @Post()
+  @HttpCode(201)
+  async create(@Body() body: { space: { name: string; domain?: string | null } }) {
+    return this.spacesService.createSpace({ name: body.space.name, domain: body.space.domain });
   }
 
   @Get(':id')

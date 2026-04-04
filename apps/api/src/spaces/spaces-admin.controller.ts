@@ -13,17 +13,15 @@ import { ApiTags } from '@nestjs/swagger';
 import { Auth } from '../auth/auth.decorator';
 import { SpacesService } from './spaces.service';
 import { UsersService } from '../users/users.service';
-import { SpaceRolesService } from '../space-roles/space-roles.service';
 import { BaseAdminController } from '../shared/base-admin.controller';
 
-@ApiTags('Spaces - Admin')
+@ApiTags('Users - Admin')
 @Controller('v1/admin')
 @Auth('session')
 export class SpacesAdminController extends BaseAdminController {
   constructor(
     private readonly spacesService: SpacesService,
     private readonly usersService: UsersService,
-    private readonly spaceRolesService: SpaceRolesService,
   ) {
     super();
   }
@@ -31,16 +29,6 @@ export class SpacesAdminController extends BaseAdminController {
   @Get('spaces')
   getAllSpaces() {
     return this.spacesService.getAllSpaces();
-  }
-
-  @Post('spaces')
-  createSpace(@Body() body: { name: string; domain?: string | null }) {
-    return this.spacesService.createSpace({ name: body.name, domain: body.domain });
-  }
-
-  @Get('spaces/:id/roles')
-  getSpaceRoles(@Param('id', ParseIntPipe) id: number) {
-    return this.spaceRolesService.findAll(id);
   }
 
   @Get('spaces/:id/users/search')

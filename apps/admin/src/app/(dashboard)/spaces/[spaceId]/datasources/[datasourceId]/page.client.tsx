@@ -20,7 +20,7 @@ interface EntryRowProps {
   onDelete: (entry: DatasourceEntry) => void;
   dragging: boolean;
   isDropTarget: boolean;
-  onDragStart: () => void;
+  onDragStart: (e: React.DragEvent) => void;
   onDragOver: (e: React.DragEvent) => void;
   onDrop: () => void;
   onDragEnd: () => void;
@@ -42,18 +42,38 @@ function EntryRow({
   const [saving, setSaving] = useState(false);
   const isDirty = name !== entry.name || value !== entry.value;
 
+  // Sync from props only when the entry identity changes (not on every re-render from parent)
+  const prevIdRef = useRef(entry.id);
+  useEffect(() => {
+    if (prevIdRef.current !== entry.id) {
+      setName(entry.name);
+      setValue(entry.value);
+      prevIdRef.current = entry.id;
+    }
+  }, [entry.id, entry.name, entry.value]);
+
   async function handleSave() {
     setSaving(true);
     await onSave(entry.id, name, value);
     setSaving(false);
   }
 
+  const isDraggingViaGrip = useRef(false);
+
   return (
     <div
       draggable
-      onDragStart={onDragStart}
+      onDragStart={(e) => {
+        if (!isDraggingViaGrip.current) {
+          e.preventDefault();
+          return;
+        }
+        isDraggingViaGrip.current = false;
+        onDragStart(e);
+      }}
       onDragOver={(e) => {
         e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
         onDragOver(e);
       }}
       onDrop={onDrop}
@@ -66,7 +86,12 @@ function EntryRow({
             : 'border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50'
       }`}
     >
-      <div className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-400 shrink-0">
+      <div
+        onMouseDown={() => {
+          isDraggingViaGrip.current = true;
+        }}
+        className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-400 shrink-0"
+      >
         <GripVertical className="size-4" />
       </div>
 
@@ -192,12 +217,17 @@ export default function DatasourceDetailPage({
   }
 
   async function handleSaveEntry(id: number, name: string, value: string) {
-    await fetch(`/api/admin/spaces/${spaceId}/datasource_entries/${id}`, {
+    const res = await fetch(`/api/admin/spaces/${spaceId}/datasource_entries/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ datasource_entry: { name, value } }),
+      body: JSON.stringify({
+        datasource_entry: { name, value, datasource_id: parseInt(datasourceId, 10) },
+      }),
     });
-    fetchEntries();
+    if (res.ok) {
+      // Update just this entry in local state — don't refetch to preserve other dirty rows
+      setEntries((prev) => prev.map((e) => (e.id === id ? { ...e, name, value } : e)));
+    }
   }
 
   function openEdit() {
@@ -234,9 +264,10 @@ export default function DatasourceDetailPage({
     }
   }
 
-  function handleDragStart(index: number) {
+  function handleDragStart(index: number, e: React.DragEvent) {
     dragIndex.current = index;
     setDragSourceIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
   }
 
   function handleDragOver(index: number) {
@@ -249,16 +280,33 @@ export default function DatasourceDetailPage({
     setDragOverIndex(null);
     dragIndex.current = null;
     if (from === null || from === dropIndex) return;
+
+    // Optimistic reorder
+    const original = [...entries];
     const reordered = [...entries];
     const [moved] = reordered.splice(from, 1);
     reordered.splice(dropIndex, 0, moved);
     setEntries(reordered);
-    await fetch(`/api/admin/spaces/${spaceId}/datasources/${datasourceId}/entries/reorder`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ids: reordered.map((e) => e.id) }),
-    });
-    fetchEntries();
+
+    // Persist positions via MAPI — update only entries whose position changed
+    const idsToUpdate: { id: number; position: number }[] = [];
+    for (let i = 0; i < reordered.length; i++) {
+      if (reordered[i].id !== original[i]?.id) {
+        idsToUpdate.push({ id: reordered[i].id, position: i });
+      }
+    }
+
+    await Promise.all(
+      idsToUpdate.map(({ id, position }) =>
+        fetch(`/api/admin/spaces/${spaceId}/datasource_entries/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            datasource_entry: { position, datasource_id: parseInt(datasourceId, 10) },
+          }),
+        }),
+      ),
+    );
   }
 
   return (
@@ -354,7 +402,7 @@ export default function DatasourceDetailPage({
                 onDelete={entryDelete.confirm}
                 dragging={dragSourceIndex === index}
                 isDropTarget={dragOverIndex === index && dragSourceIndex !== index}
-                onDragStart={() => handleDragStart(index)}
+                onDragStart={(e) => handleDragStart(index, e)}
                 onDragOver={() => handleDragOver(index)}
                 onDrop={() => handleDrop(index)}
                 onDragEnd={() => {

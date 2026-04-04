@@ -57,7 +57,7 @@ catalog:
   "@types/node": "^22.10.7"
   "@types/pg": "^8.20.0"
   "@types/supertest": "^6.0.2"
-  "typescript": "^6.0.2"
+  "typescript": "^5.9.3"
 
   # ── Dev – Build toolchain (SWC) ───────────────────────────────────────────
   "@swc/cli": "^0.8.1"

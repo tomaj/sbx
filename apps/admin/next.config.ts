@@ -12,7 +12,7 @@ const isDev = process.env.NODE_ENV !== 'production';
 
 const cspDirectives = [
   "default-src 'self'",
-  `script-src 'self'${isDev ? " 'unsafe-eval'" : ''}`,
+  `script-src 'self'${isDev ? " 'unsafe-eval' 'unsafe-inline'" : ''}`,
   "style-src 'self' 'unsafe-inline'",
   `img-src 'self' data: blob: ${cdnUrl}`,
   `connect-src 'self' ${apiUrl} ${appUrl} ${cdnUrl}`,

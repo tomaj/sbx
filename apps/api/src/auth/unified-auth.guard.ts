@@ -5,12 +5,12 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
-import type { Reflector } from '@nestjs/core';
-import type { JwtService } from '@nestjs/jwt';
+import { Reflector } from '@nestjs/core';
+import { JwtService } from '@nestjs/jwt';
 import { and, eq } from 'drizzle-orm';
 import { timingSafeEqual } from 'crypto';
 import { AUTH_STRATEGIES, type AuthStrategy } from './auth.decorator';
-import type { TokenBlocklistService } from './token-blocklist.service';
+import { TokenBlocklistService } from './token-blocklist.service';
 import { DB } from '../db/db.module';
 import type { DbType } from '../db/db.module';
 import { apiTokens, spaces, spaceMembers, users } from '../db/schema';
