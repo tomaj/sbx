@@ -1,6 +1,7 @@
-import { Controller, Get, Inject, NotFoundException, Param, Res, UseGuards } from '@nestjs/common';
+import { Controller, Get, Inject, NotFoundException, Param, Res } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
+import { Auth } from '../auth/auth.decorator';
 import type { Response } from 'express';
-import { SessionGuard } from '../auth/session.guard';
 import { DB } from '../db/db.module';
 import type { DbType } from '../db/db.module';
 import { apiTokens } from '../db/schema';
@@ -101,6 +102,7 @@ const BRIDGE_SCRIPT = `(function () {
 })();
 `;
 
+@ApiTags('Bridge')
 @Controller()
 export class BridgeController {
   constructor(@Inject(DB) private db: DbType) {}
@@ -114,7 +116,7 @@ export class BridgeController {
   }
 
   @Get('v1/admin/spaces/:spaceId/preview-token')
-  @UseGuards(SessionGuard)
+  @Auth('session')
   async getPreviewToken(@Param('spaceId') spaceId: string) {
     const spaceIdNum = parseInt(spaceId, 10);
     const timestamp = Math.floor(Date.now() / 1000);

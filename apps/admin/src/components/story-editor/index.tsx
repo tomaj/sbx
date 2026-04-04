@@ -7,7 +7,7 @@ import {
   Pencil, Info, Diamond, MessageSquare, SlidersHorizontal,
   Monitor, FileText, Layers, LayoutList,
   Smartphone, Maximize2, Settings, ExternalLink, Calendar,
-  MoreHorizontal, Image, Database, Tag, AppWindow,
+  MoreHorizontal, Image, Database, Tag, AppWindow, Blocks,
 } from 'lucide-react'
 import { EditTab } from './edit-tab'
 import { InfoTab } from './info-tab'
@@ -16,7 +16,10 @@ import { CommentTab } from './comment-tab'
 import { FieldDiscussionPanel } from './field-discussion-panel'
 import { LayersPanel } from './layers-panel'
 import { StoryHistoryPanel } from './story-history-panel'
+import { BlockLibraryModal } from './block-library-modal'
 import type { ComponentMeta, ComponentGroup, StoryDetail } from './types'
+import { useUnsavedChanges } from '@/hooks/use-unsaved-changes'
+import { UnsavedChangesModal } from '@/components/ui/unsaved-changes-modal'
 
 interface PreviewUrl {
   name: string
@@ -81,17 +84,38 @@ export function StoryEditor({
   const [story, setStory] = useState<StoryDetail | null>(initialStory)
   const [content, setContent] = useState<Record<string, any>>(initialStory?.content ?? {})
   const [isDirty, setIsDirty] = useState(false)
+  const { showModal: showUnsavedModal, handleConfirm: confirmUnsaved, handleCancel: cancelUnsaved, guardNavigate } = useUnsavedChanges(isDirty)
+  // Guard against field-initialization false positives (e.g. richtext normalisation on mount)
+  const canMarkDirtyRef = useRef(false)
   const [isSaving, setIsSaving] = useState(false)
   const [isPublishing, setIsPublishing] = useState(false)
   const [activePanel, setActivePanel] = useState<PanelTab>('edit')
   const [showPublishMenu, setShowPublishMenu] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Form-only mode: parent folder has disabled the visual editor
-  const isFormOnly = parentDisableFEEditor
+  // Form-only mode: parent folder OR story itself has disabled the visual editor
+  const isFormOnly = parentDisableFEEditor || (story?.disable_fe_editor ?? false)
 
   const [showPreview, setShowPreview] = useState(!isFormOnly)
+
+  // Sync preview visibility when disable_fe_editor changes via config save
+  useEffect(() => {
+    setShowPreview(!isFormOnly)
+  }, [isFormOnly])
+
+  // When switching to form mode (no preview), Edit tab moves to center — deselect it from right panel
+  useEffect(() => {
+    if (!showPreview && activePanel === 'edit') {
+      setActivePanel('config')
+    }
+    if (showPreview && activePanel !== 'edit') {
+      // Restore Edit as default right panel tab when going back to visual
+      setActivePanel('edit')
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showPreview])
   const [activeLeftPanel, setActiveLeftPanel] = useState<LeftPanel>(null)
+  const [showBlockLibrary, setShowBlockLibrary] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>('desktop')
   const previewStorageKey = `sbx-preview-url-${spaceId}`
   const [selectedPreviewKey, setSelectedPreviewKey] = useState<string>(
@@ -121,6 +145,14 @@ export function StoryEditor({
       setContent(initialStory.content ?? {})
     }
   }, [initialStory, story])
+
+  // Delay enabling dirty tracking to avoid false positives from field initialization
+  // (e.g. richtext editor normalising null → empty doc on mount)
+  useEffect(() => {
+    canMarkDirtyRef.current = false
+    const t = setTimeout(() => { canMarkDirtyRef.current = true }, 400)
+    return () => clearTimeout(t)
+  }, [story?.id])
 
   // Build preview URL params for visual editor bridge
   const previewParams = useMemo(() => {
@@ -258,7 +290,7 @@ export function StoryEditor({
 
   const handleFieldChange = useCallback((key: string, value: any) => {
     setContent((prev) => ({ ...prev, [key]: value }))
-    setIsDirty(true)
+    if (canMarkDirtyRef.current) setIsDirty(true)
   }, [])
 
   async function save(): Promise<StoryDetail | null> {
@@ -388,7 +420,8 @@ export function StoryEditor({
             const base = parentId
               ? `/spaces/${spaceId}/content?parent_id=${parentId}`
               : `/spaces/${spaceId}/content`
-            router.push(releaseId != null ? `${base}${parentId ? '&' : '?'}release_id=${releaseId}` : base)
+            const href = releaseId != null ? `${base}${parentId ? '&' : '?'}release_id=${releaseId}` : base
+            guardNavigate(href)
           }}
           className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors flex-shrink-0"
         >
@@ -615,6 +648,16 @@ export function StoryEditor({
           >
             <LayoutList className="w-4 h-4" />
             <span className="text-[10px] font-medium">Content</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowBlockLibrary(true)}
+            title="Blocks"
+            className="flex flex-col items-center gap-0.5 w-full py-2 px-1 rounded-lg transition-colors text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800/50"
+          >
+            <Blocks className="w-4 h-4" />
+            <span className="text-[10px] font-medium">Blocks</span>
           </button>
 
           {/* More menu */}
@@ -844,11 +887,31 @@ export function StoryEditor({
           </div>
         )}
 
-        {/* Right panel */}
-        <div className={`flex ${showPreview ? 'flex-shrink-0' : 'flex-1'}`} style={showPreview ? { width: 520 } : undefined}>
-          <div className={`flex-1 flex flex-col overflow-hidden ${showPreview ? 'border-r border-gray-200 dark:border-gray-700' : ''}`}>
-            <div className={`flex-1 flex flex-col overflow-hidden ${!showPreview ? 'max-w-3xl mx-auto w-full' : ''}`}>
-              {activePanel === 'edit' && (
+        {/* Edit form in center — shown when preview is hidden */}
+        {!showPreview && (
+          <div className="flex-1 overflow-hidden bg-white dark:bg-gray-900 flex flex-col">
+            <div className="flex-1 flex flex-col overflow-hidden max-w-3xl mx-auto w-full">
+              <EditTab
+                spaceId={spaceId}
+                schema={componentSchema}
+                content={content}
+                allComponents={allComponents}
+                allGroups={allGroups}
+                onChange={handleFieldChange}
+                loading={!story}
+                onOpenDiscussion={story ? (fk, rect) => { setActiveDiscussionField(fk); setActiveDiscussionRect(rect) } : undefined}
+                activeDiscussionField={activeDiscussionField}
+                discussionCounts={discussionCounts}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Right panel — always visible */}
+        <div className="flex flex-shrink-0" style={{ width: 520 }}>
+          <div className="flex-1 flex flex-col overflow-hidden border-l border-r border-gray-200 dark:border-gray-700">
+            <div className="flex-1 flex flex-col overflow-hidden">
+              {showPreview && activePanel === 'edit' && (
                 <EditTab
                   spaceId={spaceId}
                   schema={componentSchema}
@@ -884,7 +947,7 @@ export function StoryEditor({
               )}
               {activePanel === 'config' && (
                 story
-                  ? <ConfigTab story={story} onSave={handleConfigSave} isFormOnly={isFormOnly} />
+                  ? <ConfigTab spaceId={spaceId} story={story} onSave={handleConfigSave} isFormOnly={isFormOnly} />
                   : <SkeletonFields rows={[70, 50, 90, 40, 65]} tall />
               )}
             </div>
@@ -892,7 +955,7 @@ export function StoryEditor({
 
           {/* Vertical tab icons (far right) */}
           <div className="w-14 flex flex-col items-center py-3 gap-1 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 flex-shrink-0">
-            {PANEL_TABS.map(({ id, label, Icon }) => (
+            {PANEL_TABS.filter(({ id }) => showPreview || id !== 'edit').map(({ id, label, Icon }) => (
               <button
                 key={id}
                 type="button"
@@ -1015,6 +1078,7 @@ export function StoryEditor({
           spaceId={spaceId}
           storyId={story.id}
           storyName={story.name}
+          storySlug={story.full_slug}
           previewUrl={fullPreviewUrl || undefined}
           onClose={() => setShowHistory(false)}
           onRestore={() => { setStory(null); router.refresh() }}
@@ -1033,6 +1097,20 @@ export function StoryEditor({
           onDiscussionChange={refreshDiscussionCounts}
         />
       )}
+
+      {/* Block library modal */}
+      {showBlockLibrary && (
+        <BlockLibraryModal
+          spaceId={spaceId}
+          onClose={() => setShowBlockLibrary(false)}
+        />
+      )}
+
+      <UnsavedChangesModal
+        open={showUnsavedModal}
+        onConfirm={confirmUnsaved}
+        onCancel={cancelUnsaved}
+      />
     </div>
   )
 }

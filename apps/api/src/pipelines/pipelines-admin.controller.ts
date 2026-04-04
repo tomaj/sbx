@@ -3,17 +3,18 @@ import {
   Controller,
   Delete,
   Get,
-  NotFoundException,
   Param,
   Patch,
   Post,
-  UseGuards,
 } from '@nestjs/common';
-import { SessionGuard } from '../auth/session.guard';
+import { ApiTags } from '@nestjs/swagger';
+import { Auth } from '../auth/auth.decorator';
 import { PipelinesService } from './pipelines.service';
+import { ResultGuard } from '../shared/result-guard.util';
 
+@ApiTags('Pipelines - Admin')
 @Controller('v1/admin/spaces/:spaceId/pipelines')
-@UseGuards(SessionGuard)
+@Auth('session')
 export class PipelinesAdminController {
   constructor(private readonly pipelinesService: PipelinesService) {}
 
@@ -36,15 +37,15 @@ export class PipelinesAdminController {
     @Param('id') id: string,
     @Body() body: { name?: string; preview_url?: string; source_of_sync?: string },
   ) {
-    const result = await this.pipelinesService.update(parseInt(spaceId), parseInt(id), body);
-    if (!result) throw new NotFoundException();
-    return result;
+    return ResultGuard.throwIfNotFound(
+      await this.pipelinesService.update(parseInt(spaceId), parseInt(id), body),
+    );
   }
 
   @Delete(':id')
   async remove(@Param('spaceId') spaceId: string, @Param('id') id: string) {
-    const result = await this.pipelinesService.remove(parseInt(spaceId), parseInt(id));
-    if (!result) throw new NotFoundException();
-    return result;
+    return ResultGuard.throwIfNotFound(
+      await this.pipelinesService.remove(parseInt(spaceId), parseInt(id)),
+    );
   }
 }

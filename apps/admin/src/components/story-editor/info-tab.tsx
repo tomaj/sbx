@@ -1,6 +1,7 @@
 'use client'
 
 import type { StoryDetail } from './types'
+import { formatDate } from '@/lib/date'
 
 function formatDistanceToNow(date: Date): string {
   const now = Date.now()
@@ -33,7 +34,7 @@ function RelativeDate({ iso }: { iso: string | null }) {
   const d = new Date(iso)
   return (
     <span title={d.toLocaleString()}>
-      {d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+      {formatDate(d)}
       {' '}
       <span className="text-gray-400">({formatDistanceToNow(d)})</span>
     </span>

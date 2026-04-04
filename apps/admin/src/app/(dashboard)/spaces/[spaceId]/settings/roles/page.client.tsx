@@ -1,9 +1,14 @@
 'use client'
 
-import { useState, useEffect, use, useRef, useCallback } from 'react'
+import { useState, useEffect, use, useRef } from 'react'
 import { Plus, Settings, Trash2, ChevronDown, ChevronRight, Lock, X, Check } from 'lucide-react'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
 import { RightSidebar } from '@/components/ui/right-sidebar'
+import { UnsavedChangesModal } from '@/components/ui/unsaved-changes-modal'
+import { useUnsavedChanges } from '@/hooks/use-unsaved-changes'
+import { PageLayout } from '@/components/ui/page-layout'
+import { useApi } from '@/lib/swr'
+import type { SpaceRole, Datasource, AssetFolder } from '@sbx/types'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -11,33 +16,6 @@ interface DefaultRole {
   role: string
   subtitle: string
   user_count: number
-}
-
-interface SpaceRole {
-  id: number
-  role: string
-  subtitle: string | null
-  permissions: string[]
-  allowed_paths: number[]
-  blocked_paths: number[]
-  datasource_ids: number[]
-  blocked_datasource_ids: number[]
-  asset_folder_ids: number[]
-  blocked_asset_folder_ids: number[]
-  allowed_languages: string[]
-  blocked_languages: string[]
-  user_count: number
-}
-
-interface Datasource {
-  id: number
-  name: string
-  slug: string
-}
-
-interface AssetFolder {
-  id: number
-  name: string
 }
 
 // ─── Permission definitions ───────────────────────────────────────────────────
@@ -335,6 +313,8 @@ function RoleForm({ spaceId, role, open, onClose, onSaved }: RoleFormProps) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [isDirty, setIsDirty] = useState(false)
+  const { showModal: showUnsavedModal, handleConfirm: confirmUnsaved, handleCancel: cancelUnsaved } = useUnsavedChanges(isDirty)
   const [datasources, setDatasources] = useState<Datasource[]>([])
   const [assetFolders, setAssetFolders] = useState<AssetFolder[]>([])
 
@@ -364,6 +344,7 @@ function RoleForm({ spaceId, role, open, onClose, onSaved }: RoleFormProps) {
     setPermTab('general')
     setExpandedGroups(new Set(['Content & Editor']))
     setError(null)
+    setIsDirty(false)
   }, [role, open])
 
   // Fetch supporting data once when form opens
@@ -381,6 +362,7 @@ function RoleForm({ spaceId, role, open, onClose, onSaved }: RoleFormProps) {
 
   function set<K extends keyof FormState>(key: K, val: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: val }))
+    setIsDirty(true)
   }
 
   function toggleGroup(label: string) {
@@ -428,6 +410,7 @@ function RoleForm({ spaceId, role, open, onClose, onSaved }: RoleFormProps) {
         body: JSON.stringify(buildPayload()),
       })
       if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.message ?? 'Failed to save') }
+      setIsDirty(false)
       onSaved()
     } catch (e: any) { setError(e.message) }
     finally { setSaving(false) }
@@ -753,6 +736,8 @@ function RoleForm({ spaceId, role, open, onClose, onSaved }: RoleFormProps) {
         onConfirm={handleDelete}
         onCancel={() => setConfirmDelete(false)}
       />
+
+      <UnsavedChangesModal open={showUnsavedModal} onConfirm={confirmUnsaved} onCancel={cancelUnsaved} />
     </>
   )
 }
@@ -851,33 +836,24 @@ function CustomRoleRow({ role, onEdit, onDelete }: CustomRoleRowProps) {
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
+interface RolesApiResponse {
+  default_roles: DefaultRole[]
+  space_roles: SpaceRole[]
+}
+
 export default function RolesPage({ params }: { params: Promise<{ spaceId: string }> }) {
   const { spaceId } = use(params)
-  const [defaultRoleCounts, setDefaultRoleCounts] = useState<Record<string, number>>({ Admin: 0, Editor: 0 })
-  const [spaceRoles, setSpaceRoles] = useState<SpaceRole[]>([])
-  const [loading, setLoading] = useState(true)
   const [selectedRole, setSelectedRole] = useState<SpaceRole | null>(null)
   const [panelOpen, setPanelOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<SpaceRole | null>(null)
 
-  async function load() {
-    setLoading(true)
-    try {
-      const res = await fetch(`/api/admin/spaces/${spaceId}/roles`)
-      const data = await res.json()
-      // Backend provides default role user counts
-      const counts: Record<string, number> = { Admin: 0, Editor: 0 }
-      for (const dr of data.default_roles ?? []) {
-        counts[dr.role] = dr.user_count ?? 0
-      }
-      setDefaultRoleCounts(counts)
-      setSpaceRoles(data.space_roles ?? [])
-    } finally {
-      setLoading(false)
-    }
-  }
+  const { data, isLoading: loading, mutate } = useApi<RolesApiResponse>(`/api/admin/spaces/${spaceId}/roles`)
 
-  useEffect(() => { load() }, [spaceId])
+  const defaultRoleCounts: Record<string, number> = { Admin: 0, Editor: 0 }
+  for (const dr of data?.default_roles ?? []) {
+    defaultRoleCounts[dr.role] = dr.user_count ?? 0
+  }
+  const spaceRoles = data?.space_roles ?? []
 
   function openNew() { setSelectedRole(null); setPanelOpen(true) }
   function openEdit(r: SpaceRole) { setSelectedRole(r); setPanelOpen(true) }
@@ -885,24 +861,21 @@ export default function RolesPage({ params }: { params: Promise<{ spaceId: strin
   async function handleDelete(r: SpaceRole) {
     await fetch(`/api/admin/spaces/${spaceId}/roles/${r.id}`, { method: 'DELETE' })
     setDeleteTarget(null)
-    load()
+    mutate()
   }
 
   return (
-    <div className="max-w-3xl px-10 py-8">
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Roles</h1>
+    <PageLayout
+      title="Roles"
+      description="Roles are for giving certain permissions to various types of users in your space. It gives the space owner and admins greater control over who can publish what, especially for bigger projects."
+      action={
         <button onClick={openNew}
           className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-teal-700 hover:bg-teal-800 rounded-lg transition-colors">
           <Plus className="w-4 h-4" />
           Add new role
         </button>
-      </div>
-
-      <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-        Roles are for giving certain permissions to various types of users in your space. It gives the space owner and admins greater control over who can publish what, especially for bigger projects.
-      </p>
-
+      }
+    >
       {/* Table header */}
       <div className="flex items-center px-4 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
         <div className="flex-1">Name</div>
@@ -952,7 +925,7 @@ export default function RolesPage({ params }: { params: Promise<{ spaceId: strin
         role={selectedRole}
         open={panelOpen}
         onClose={() => setPanelOpen(false)}
-        onSaved={() => { setPanelOpen(false); load() }}
+        onSaved={() => { setPanelOpen(false); mutate() }}
       />
 
       <ConfirmModal
@@ -964,6 +937,6 @@ export default function RolesPage({ params }: { params: Promise<{ spaceId: strin
         onConfirm={() => deleteTarget && handleDelete(deleteTarget)}
         onCancel={() => setDeleteTarget(null)}
       />
-    </div>
+    </PageLayout>
   )
 }

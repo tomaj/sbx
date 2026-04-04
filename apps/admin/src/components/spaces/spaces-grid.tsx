@@ -5,20 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Star, ChevronDown, ChevronRight, Search, Plus } from 'lucide-react'
 import { SpaceCard } from './space-card'
 import { CreateSpacePanel } from './create-space-panel'
-
-interface Member {
-  firstname: string
-  lastname: string
-  avatar: string | null
-}
-
-interface Space {
-  id: number
-  name: string
-  updated_at: string
-  last_activity_at: string | null
-  members: Member[]
-}
+import type { Space } from '@sbx/types'
 
 function SectionHeader({
   label,

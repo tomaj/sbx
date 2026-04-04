@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { asc, desc, eq, and, gte, lte, isNull } from 'drizzle-orm';
+import { asc, desc, eq, and, gte, lte, isNull, sql } from 'drizzle-orm';
 import { DB } from '../db/db.module';
 import type { DbType } from '../db/db.module';
 import { webhookEndpoints, webhookLogs } from '../db/schema';
@@ -49,14 +49,9 @@ export class WebhooksService {
       activated?: boolean;
     },
   ) {
-    // Use a simple auto-increment ID via max+1 since the table uses integer PK
-    const existing = await this.db
-      .select({ id: webhookEndpoints.id })
-      .from(webhookEndpoints)
-      .orderBy(desc(webhookEndpoints.id))
-      .limit(1);
-
-    const nextId = existing.length > 0 ? (existing[0].id as number) + 1 : 1;
+    const [{ nextId }] = await this.db.execute<{ nextId: number }>(
+      sql`SELECT nextval('webhook_endpoints_id_seq')::int AS "nextId"`,
+    ).then(r => r.rows as any[]);
 
     const [created] = await this.db
       .insert(webhookEndpoints)
@@ -222,18 +217,31 @@ export class WebhooksService {
         ),
       );
 
+    // Use a single timestamp for all jobs in this dispatch batch so that
+    // the same event produces the same set of jobIds if retried within the
+    // same millisecond (BullMQ deduplicates by jobId).
+    const eventTs = Date.now();
+
     for (const endpoint of endpoints) {
       const actions = endpoint.actions as string[];
       if (!actions.includes(action)) continue;
 
-      await this.jobs.webhooks.dispatch({
-        spaceId,
-        webhookEndpointId: endpoint.id,
-        endpoint: endpoint.endpoint,
-        secret: endpoint.secret ?? null,
-        action,
-        payload,
-      });
+      // Deterministic jobId prevents duplicate dispatches for the same event.
+      // Format: wh-{endpointId}-{action}-{spaceId}-{storyId|0}-{timestamp}
+      const storyId = (payload as any).story_id ?? (payload as any).story?.id ?? 0;
+      const jobId = `wh-${endpoint.id}-${action}-${spaceId}-${storyId}-${eventTs}`;
+
+      await this.jobs.webhooks.dispatch(
+        {
+          spaceId,
+          webhookEndpointId: endpoint.id,
+          endpoint: endpoint.endpoint,
+          secret: endpoint.secret ?? null,
+          action,
+          payload,
+        },
+        { jobId },
+      );
     }
   }
 

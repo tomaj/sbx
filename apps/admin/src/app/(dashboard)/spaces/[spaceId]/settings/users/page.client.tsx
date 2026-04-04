@@ -3,34 +3,7 @@
 import { useState, useEffect, use, useRef } from 'react'
 import { Plus, Search, MoreHorizontal, X, ChevronDown, AlertCircle } from 'lucide-react'
 import { UserAvatar } from '@/components/ui/user-avatar'
-
-interface SpaceRole {
-  id: number
-  role: string
-}
-
-interface Collaborator {
-  id: number
-  userId: number
-  role: string
-  spaceRoleId: number | null
-  user: {
-    id: number
-    firstname: string
-    lastname: string
-    email: string
-    avatar: string | null
-    disabled: boolean
-  }
-}
-
-interface UserSearchResult {
-  id: number
-  firstname: string
-  lastname: string
-  email: string
-  avatar: string | null
-}
+import type { SpaceRoleRef, Collaborator, UserSearchResult } from '@sbx/types'
 
 
 function RoleBadge({ role }: { role: string }) {
@@ -69,7 +42,7 @@ function AddUserPanel({
   onAdded,
 }: {
   spaceId: string
-  roles: SpaceRole[]
+  roles: SpaceRoleRef[]
   onClose: () => void
   onAdded: () => void
 }) {
@@ -410,7 +383,7 @@ export default function UsersPage({ params }: { params: Promise<{ spaceId: strin
   const { spaceId } = use(params)
 
   const [collaborators, setCollaborators] = useState<Collaborator[]>([])
-  const [roles, setRoles] = useState<SpaceRole[]>([])
+  const [roles, setRoles] = useState<SpaceRoleRef[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [showAddPanel, setShowAddPanel] = useState(false)

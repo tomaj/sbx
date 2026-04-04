@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, count, desc, eq, gte, inArray, lte } from 'drizzle-orm';
+import { and, count, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
 import { DB } from '../db/db.module';
 import type { DbType } from '../db/db.module';
 import { activities } from '../db/schema';
@@ -101,6 +101,110 @@ export class ActivitiesService {
       page,
       perPage,
     };
+  }
+
+  async getStats(spaceId: number, period = 'last_14_days') {
+    const now = new Date();
+    const today = now.toISOString().slice(0, 10);
+    let from: string;
+    let to: string = today;
+    let groupBy: 'day' | 'month' = 'day';
+    let periodLabel: string;
+
+    switch (period) {
+      case 'last_7_days':
+        from = new Date(now.getTime() - 6 * 86400000).toISOString().slice(0, 10);
+        periodLabel = 'last 7 days';
+        break;
+      case 'last_month': {
+        const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        from = lm.toISOString().slice(0, 10);
+        to = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().slice(0, 10);
+        periodLabel = 'last month';
+        break;
+      }
+      case 'last_3_months':
+        from = new Date(now.getFullYear(), now.getMonth() - 2, 1).toISOString().slice(0, 10);
+        groupBy = 'month';
+        periodLabel = 'last 3 months';
+        break;
+      case 'last_6_months':
+        from = new Date(now.getFullYear(), now.getMonth() - 5, 1).toISOString().slice(0, 10);
+        groupBy = 'month';
+        periodLabel = 'last 6 months';
+        break;
+      case 'last_12_months':
+        from = new Date(now.getFullYear(), now.getMonth() - 11, 1).toISOString().slice(0, 10);
+        groupBy = 'month';
+        periodLabel = 'last 12 months';
+        break;
+      case 'this_month':
+        from = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+        periodLabel = 'this month';
+        break;
+      case 'last_14_days':
+      default:
+        from = new Date(now.getTime() - 13 * 86400000).toISOString().slice(0, 10);
+        periodLabel = 'last 14 days';
+        break;
+    }
+
+    // Use hardcoded format strings to avoid Drizzle creating separate $N params
+    // for GROUP BY vs SELECT which causes PostgreSQL 42803 error
+    const bucketExpr = groupBy === 'day'
+      ? sql<string>`to_char(${activities.createdAt}, 'YYYY-MM-DD')`
+      : sql<string>`to_char(${activities.createdAt}, 'YYYY-MM')`;
+
+    const rows = await this.db
+      .select({ bucket: bucketExpr, count: count() })
+      .from(activities)
+      .where(
+        and(
+          eq(activities.spaceId, spaceId),
+          gte(activities.createdAt, new Date(from)),
+          lte(activities.createdAt, new Date(to + 'T23:59:59')),
+        ),
+      )
+      .groupBy(sql`1`)
+      .orderBy(sql`1`);
+
+    const map = new Map(rows.map((r) => [r.bucket, Number(r.count)]));
+
+    // Build full date range with zeros filled
+    const data: { date: string; count: number }[] = [];
+    const end = new Date(to + 'T12:00:00');
+    const cur = new Date(from + 'T12:00:00');
+    while (cur <= end) {
+      const key =
+        groupBy === 'day'
+          ? cur.toISOString().slice(0, 10)
+          : `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}`;
+      if (!data.length || data[data.length - 1].date !== key) {
+        data.push({ date: key, count: map.get(key) ?? 0 });
+      }
+      if (groupBy === 'day') cur.setDate(cur.getDate() + 1);
+      else cur.setMonth(cur.getMonth() + 1);
+    }
+
+    const total = data.reduce((s, r) => s + r.count, 0);
+
+    // Previous period total
+    const span = new Date(to + 'T12:00:00').getTime() - new Date(from + 'T12:00:00').getTime();
+    const prevTo = new Date(new Date(from + 'T12:00:00').getTime() - 86400000);
+    const prevFrom = new Date(prevTo.getTime() - span);
+    const [prevResult] = await this.db
+      .select({ cnt: count() })
+      .from(activities)
+      .where(
+        and(
+          eq(activities.spaceId, spaceId),
+          gte(activities.createdAt, prevFrom),
+          lte(activities.createdAt, prevTo),
+        ),
+      );
+    const previousTotal = Number(prevResult?.cnt ?? 0);
+
+    return { total, previous_total: previousTotal, period_label: periodLabel, group_by: groupBy, data };
   }
 
   async findOne(spaceId: number, activityId: number) {

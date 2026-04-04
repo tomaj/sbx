@@ -24,12 +24,18 @@ import { BridgeModule } from './bridge/bridge.module';
 import { WorkflowStageChangesModule } from './workflow-stage-changes/workflow-stage-changes.module';
 import { ApprovalsModule } from './approvals/approvals.module';
 import { DiscussionsModule } from './discussions/discussions.module';
+import { ConfigModule } from './config/config.module';
+import { LoggingModule } from './logging/logging.module';
 import { JobsModule } from './jobs/jobs.module';
 import { InternalTagsModule } from './internal-tags/internal-tags.module';
 import { StorySchedulingsModule } from './story-schedulings/story-schedulings.module';
 import { StatisticsModule } from './statistics/statistics.module';
+import { ThrottlerModule } from './throttler/throttler.module';
+import { HealthModule } from './health/health.module';
+import { TelemetryModule } from './telemetry/telemetry.module';
+import { AiConfigurationsModule } from './ai-configurations/ai-configurations.module';
 
 @Module({
-  imports: [JobsModule, DbModule, StorageModule, AuthModule, DatasourcesModule, SpacesModule, UsersModule, TagsModule, ComponentsModule, AccessTokensModule, SpaceRolesModule, WebhooksModule, PresetsModule, ActivitiesModule, PersonalTokensModule, AssetsModule, BranchesModule, ReleasesModule, StoriesModule, TasksModule, WorkflowsModule, FieldTypesModule, BridgeModule, WorkflowStageChangesModule, ApprovalsModule, DiscussionsModule, InternalTagsModule, StorySchedulingsModule, StatisticsModule],
+  imports: [ConfigModule, LoggingModule, ThrottlerModule, JobsModule, DbModule, StorageModule, AuthModule, DatasourcesModule, SpacesModule, UsersModule, TagsModule, ComponentsModule, AccessTokensModule, SpaceRolesModule, WebhooksModule, PresetsModule, ActivitiesModule, PersonalTokensModule, AssetsModule, BranchesModule, ReleasesModule, StoriesModule, TasksModule, WorkflowsModule, FieldTypesModule, BridgeModule, WorkflowStageChangesModule, ApprovalsModule, DiscussionsModule, InternalTagsModule, StorySchedulingsModule, StatisticsModule, HealthModule, TelemetryModule, AiConfigurationsModule],
 })
 export class AppModule {}

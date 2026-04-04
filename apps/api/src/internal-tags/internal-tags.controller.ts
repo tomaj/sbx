@@ -1,9 +1,11 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
-import { SessionOrTokenGuard } from '../auth/session-or-token.guard';
+import { Body, Controller, Delete, Get, HttpCode, Param, Post, Put, Query } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
+import { Auth } from '../auth/auth.decorator';
 import { InternalTagsService } from './internal-tags.service';
 
+@ApiTags('Internal Tags - MAPI')
 @Controller('v1/spaces/:spaceId')
-@UseGuards(SessionOrTokenGuard)
+@Auth('session-or-token')
 export class InternalTagsController {
   constructor(private readonly service: InternalTagsService) {}
 

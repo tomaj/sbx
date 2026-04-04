@@ -5,20 +5,7 @@ import Link from 'next/link'
 import { Star } from 'lucide-react'
 import { TimeAgo } from '@/components/ui/time-ago'
 import { UserAvatar } from '@/components/ui/user-avatar'
-
-interface Member {
-  firstname: string
-  lastname: string
-  avatar: string | null
-}
-
-interface Space {
-  id: number
-  name: string
-  updated_at: string
-  last_activity_at: string | null
-  members: Member[]
-}
+import type { Space } from '@sbx/types'
 
 interface SpaceCardProps {
   space: Space

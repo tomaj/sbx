@@ -10,14 +10,16 @@ import {
   Put,
   Query,
   Req,
-  UseGuards,
 } from '@nestjs/common';
-import { SessionOrTokenGuard } from '../auth/session-or-token.guard';
+import { Auth } from '../auth/auth.decorator';
 import { UsersService } from './users.service';
+import { AddCollaboratorDto } from './dto/add-collaborator.dto';
+import { UpdateCollaboratorDto } from './dto/update-collaborator.dto';
+import { QueryParserUtil } from '../shared/query-parser.util';
 
 // MAPI endpoint - uses same token guard (management token)
 @Controller('v1/spaces/:spaceId/collaborators')
-@UseGuards(SessionOrTokenGuard)
+@Auth('session-or-token')
 export class CollaboratorsController {
   constructor(private readonly usersService: UsersService) {}
 
@@ -27,15 +29,16 @@ export class CollaboratorsController {
     @Query('page') page?: string,
     @Query('per_page') perPage?: string,
   ) {
+    const { page: parsedPage, perPage: parsedPerPage } = QueryParserUtil.parsePagination(page, perPage);
     return this.usersService.getCollaborators(req.space.id, {
-      page: page ? parseInt(page) : 1,
-      perPage: perPage ? parseInt(perPage) : 25,
+      page: parsedPage,
+      perPage: parsedPerPage,
     });
   }
 
   @Post()
   @HttpCode(201)
-  async addCollaborator(@Req() req: any, @Body() body: any) {
+  async addCollaborator(@Req() req: any, @Body() body: AddCollaboratorDto) {
     // Accept both root-level fields (standard) and wrapped in "collaborator" (SSO)
     const data = body.collaborator ?? body;
     const spaceId: number = req.space.id;
@@ -62,7 +65,7 @@ export class CollaboratorsController {
   async updateCollaborator(
     @Req() req: any,
     @Param('id') id: string,
-    @Body() body: { collaborator: any },
+    @Body() body: UpdateCollaboratorDto,
   ) {
     const data = body.collaborator ?? {};
     const memberId = parseInt(id);

@@ -3,18 +3,13 @@
 import { use, useState, useEffect, useCallback } from 'react'
 import { usePerPage } from '@/hooks/use-per-page'
 import { useRouter } from 'next/navigation'
+import { formatDate } from '@/lib/date'
 import { Plus, Trash2 } from 'lucide-react'
 import { SearchBar } from '@/components/ui/search-bar'
 import { DataTable, type Column, type SortState } from '@/components/ui/data-table'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
-
-interface Datasource {
-  id: number
-  name: string
-  slug: string
-  created_at: string
-  updated_at: string
-}
+import { PageLayout } from '@/components/ui/page-layout'
+import type { Datasource } from '@sbx/types'
 
 interface ApiResponse {
   datasources: Datasource[]
@@ -223,7 +218,7 @@ export default function DatasourcesPage({ params }: { params: Promise<{ spaceId:
       sortable: true,
       render: (ds) => (
         <span className="text-sm text-gray-400">
-          {new Date(ds.created_at).toLocaleDateString()}
+          {formatDate(ds.created_at)}
         </span>
       ),
     },
@@ -244,43 +239,42 @@ export default function DatasourcesPage({ params }: { params: Promise<{ spaceId:
   ]
 
   return (
-    <>
-      <div className="flex flex-col min-h-full">
-        <div className="px-8 pt-8 pb-4">
-          <div className="flex items-center justify-between mb-6">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Datasources</h1>
-            <button
-              onClick={() => setShowCreate(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium rounded-md transition-colors"
-            >
-              <Plus className="size-4" />
-              New Datasource
-            </button>
-          </div>
-          <SearchBar
-            value={search}
-            onChange={(v) => { setSearch(v); setPage(1) }}
-            placeholder="Search datasources..."
-          />
-        </div>
-
-        <DataTable
-          columns={columns as unknown as Column<Record<string, unknown>>[]}
-          data={(data?.datasources ?? []) as unknown as Record<string, unknown>[]}
-          keyField="id"
-          sort={sort}
-          onSort={(field, direction) => { setSort({ field, direction }); setPage(1) }}
-          isLoading={isLoading}
-          pagination={{
-            total: data?.total ?? 0,
-            page,
-            perPage,
-            onPageChange: setPage,
-            onPerPageChange: (n) => { setPerPage(n); setPage(1) },
-            storageKey: 'perPage:datasources',
-          }}
+    <PageLayout
+      title="Datasources"
+      action={
+        <button
+          onClick={() => setShowCreate(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium rounded-md transition-colors"
+        >
+          <Plus className="size-4" />
+          New Datasource
+        </button>
+      }
+    >
+      <div className="mb-4">
+        <SearchBar
+          value={search}
+          onChange={(v) => { setSearch(v); setPage(1) }}
+          placeholder="Search datasources..."
         />
       </div>
+
+      <DataTable
+        columns={columns as unknown as Column<Record<string, unknown>>[]}
+        data={(data?.datasources ?? []) as unknown as Record<string, unknown>[]}
+        keyField="id"
+        sort={sort}
+        onSort={(field, direction) => { setSort({ field, direction }); setPage(1) }}
+        isLoading={isLoading}
+        pagination={{
+          total: data?.total ?? 0,
+          page,
+          perPage,
+          onPageChange: setPage,
+          onPerPageChange: (n) => { setPerPage(n); setPage(1) },
+          storageKey: 'perPage:datasources',
+        }}
+      />
 
       <NewDatasourceModal
         open={showCreate}
@@ -297,6 +291,6 @@ export default function DatasourcesPage({ params }: { params: Promise<{ spaceId:
         onConfirm={handleDelete}
         onCancel={() => setDeleteTarget(null)}
       />
-    </>
+    </PageLayout>
   )
 }

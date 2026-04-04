@@ -85,7 +85,7 @@ export class StoryVersionsService {
         id: r.id,
         created_at: r.createdAt,
         user_id: r.userId ?? null,
-        user: userObj?.name ?? null,         // Storyblok returns name string, not object
+        user: userObj ?? null,
         story_id: r.storyId,
         meta_data: {},                        // Storyblok compat
         parent_id: null,                      // Storyblok compat

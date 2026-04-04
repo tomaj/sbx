@@ -7,29 +7,17 @@ import { ArrowLeft, GripVertical, Trash2 } from 'lucide-react'
 import { SearchBar } from '@/components/ui/search-bar'
 import { RightSidebar } from '@/components/ui/right-sidebar'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
+import { UnsavedChangesModal } from '@/components/ui/unsaved-changes-modal'
+import { useUnsavedChanges } from '@/hooks/use-unsaved-changes'
 import { Pagination } from '@/components/ui/pagination'
-
-interface Entry {
-  id: number
-  name: string
-  value: string
-  position: number
-  datasource_id: number
-}
-
-interface Datasource {
-  id: number
-  name: string
-  slug: string
-  dimensions: { id: number; name: string; entry_value: string }[]
-}
+import type { DatasourceEntry, DatasourceWithDimensions } from '@sbx/types'
 
 // ---- Entry row ----
 
 interface EntryRowProps {
-  entry: Entry
+  entry: DatasourceEntry
   onSave: (id: number, name: string, value: string) => Promise<void>
-  onDelete: (entry: Entry) => void
+  onDelete: (entry: DatasourceEntry) => void
   dragging: boolean
   isDropTarget: boolean
   onDragStart: () => void
@@ -122,8 +110,8 @@ export default function DatasourceDetailPage({
 }) {
   const { spaceId, datasourceId } = use(params)
 
-  const [datasource, setDatasource] = useState<Datasource | null>(null)
-  const [entries, setEntries] = useState<Entry[]>([])
+  const [datasource, setDatasource] = useState<DatasourceWithDimensions | null>(null)
+  const [entries, setEntries] = useState<DatasourceEntry[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = usePerPage('perPage:datasource-entries', 25)
@@ -139,8 +127,10 @@ export default function DatasourceDetailPage({
   const [editSlug, setEditSlug] = useState('')
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
+  const [editIsDirty, setEditIsDirty] = useState(false)
+  const { showModal: showUnsavedModal, handleConfirm: confirmUnsaved, handleCancel: cancelUnsaved } = useUnsavedChanges(editIsDirty)
 
-  const [deleteTarget, setDeleteTarget] = useState<Entry | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<DatasourceEntry | null>(null)
 
   const dragIndex = useRef<number | null>(null)
   const [dragSourceIndex, setDragSourceIndex] = useState<number | null>(null)
@@ -221,6 +211,7 @@ export default function DatasourceDetailPage({
     setEditName(datasource.name)
     setEditSlug(datasource.slug)
     setEditError(null)
+    setEditIsDirty(false)
     setSidebarOpen(true)
   }
 
@@ -236,6 +227,7 @@ export default function DatasourceDetailPage({
       })
       const data = await res.json()
       if (res.ok) {
+        setEditIsDirty(false)
         setSidebarOpen(false)
         fetchDatasource()
       } else {
@@ -428,7 +420,7 @@ export default function DatasourceDetailPage({
           <input
             type="text"
             value={editName}
-            onChange={(e) => setEditName(e.target.value)}
+            onChange={(e) => { setEditName(e.target.value); setEditIsDirty(true) }}
             className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-md text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
           />
         </div>
@@ -439,7 +431,7 @@ export default function DatasourceDetailPage({
           <input
             type="text"
             value={editSlug}
-            onChange={(e) => setEditSlug(e.target.value)}
+            onChange={(e) => { setEditSlug(e.target.value); setEditIsDirty(true) }}
             className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-md text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
           />
         </div>
@@ -453,6 +445,8 @@ export default function DatasourceDetailPage({
         onConfirm={handleDeleteEntry}
         onCancel={() => setDeleteTarget(null)}
       />
+
+      <UnsavedChangesModal open={showUnsavedModal} onConfirm={confirmUnsaved} onCancel={cancelUnsaved} />
     </>
   )
 }

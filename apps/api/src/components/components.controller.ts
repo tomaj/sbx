@@ -4,20 +4,24 @@ import {
   Delete,
   Get,
   HttpCode,
-  NotFoundException,
   Param,
   Post,
   Put,
   Query,
   Req,
-  UseGuards,
 } from '@nestjs/common';
-import { SessionOrTokenGuard } from '../auth/session-or-token.guard';
+import { Auth } from '../auth/auth.decorator';
 import { ComponentsService } from './components.service';
 import { ComponentVersionsService } from './component-versions.service';
+import { CreateComponentDto } from './dto/create-component.dto';
+import { UpdateComponentDto } from './dto/update-component.dto';
+import { CreateComponentGroupDto } from './dto/create-component-group.dto';
+import { UpdateComponentGroupDto } from './dto/update-component-group.dto';
+import { QueryParserUtil } from '../shared/query-parser.util';
+import { ResultGuard } from '../shared/result-guard.util';
 
 @Controller('v1/spaces/:spaceId')
-@UseGuards(SessionOrTokenGuard)
+@Auth('session-or-token')
 export class ComponentsController {
   constructor(
     private readonly componentsService: ComponentsService,
@@ -37,15 +41,15 @@ export class ComponentsController {
 
   @Get('component_groups/:id')
   async getComponentGroup(@Req() req: any, @Param('id') id: string) {
-    const result = await this.componentsService.findOneComponentGroup(req.space.id, parseInt(id));
-    if (!result) throw new NotFoundException();
-    return result;
+    return ResultGuard.throwIfNotFound(
+      await this.componentsService.findOneComponentGroup(req.space.id, parseInt(id)),
+    );
   }
 
   @Post('component_groups')
   async createComponentGroup(
     @Req() req: any,
-    @Body() body: { component_group: { name: string; parent_id?: number | null; parent_uuid?: string | null } },
+    @Body() body: CreateComponentGroupDto,
   ) {
     const group = await this.componentsService.createComponentGroup(req.space.id, body.component_group);
     return { component_group: group };
@@ -55,7 +59,7 @@ export class ComponentsController {
   async updateComponentGroup(
     @Req() req: any,
     @Param('id') id: string,
-    @Body() body: { component_group: { name?: string; parent_id?: number | null } },
+    @Body() body: UpdateComponentGroupDto,
   ) {
     const group = await this.componentsService.updateComponentGroup(
       req.space.id,
@@ -86,7 +90,7 @@ export class ComponentsController {
     return this.componentsService.findAllComponents(req.space.id, {
       search,
       in_group: inGroup,
-      is_root: isRoot !== undefined ? isRoot === 'true' || isRoot === '1' : undefined,
+      is_root: isRoot !== undefined ? QueryParserUtil.parseBoolean(isRoot) : undefined,
       by_ids: byIds,
       sort_by: sortBy,
     });
@@ -99,30 +103,17 @@ export class ComponentsController {
 
   @Get('components/:id')
   async getComponent(@Req() req: any, @Param('id') id: string) {
-    const result = await this.componentsService.findOneComponent(req.space.id, parseInt(id));
-    if (!result) throw new NotFoundException();
-    return result;
+    return ResultGuard.throwIfNotFound(
+      await this.componentsService.findOneComponent(req.space.id, parseInt(id)),
+    );
   }
 
   @Post('components')
   async createComponent(
     @Req() req: any,
-    @Body()
-    body: {
-      component: {
-        name: string;
-        display_name?: string | null;
-        schema?: any;
-        is_root?: boolean;
-        is_nestable?: boolean;
-        color?: string | null;
-        icon?: string | null;
-        description?: string | null;
-        component_group_uuid?: string | null;
-      };
-    },
+    @Body() body: CreateComponentDto,
   ) {
-    const u1 = req.user;
+    const u1 = req.adminUser;
     const authorName1 = u1 ? ([u1.firstname, u1.lastname].filter(Boolean).join(' ') || u1.email || null) : null;
     return this.componentsService.createComponent(req.space.id, body.component, u1?.id ?? null, authorName1);
   }
@@ -131,22 +122,9 @@ export class ComponentsController {
   async updateComponent(
     @Req() req: any,
     @Param('id') id: string,
-    @Body()
-    body: {
-      component: {
-        name?: string;
-        display_name?: string | null;
-        schema?: any;
-        is_root?: boolean;
-        is_nestable?: boolean;
-        color?: string | null;
-        icon?: string | null;
-        description?: string | null;
-        component_group_uuid?: string | null;
-      };
-    },
+    @Body() body: UpdateComponentDto,
   ) {
-    const u2 = req.user;
+    const u2 = req.adminUser;
     const authorName2 = u2 ? ([u2.firstname, u2.lastname].filter(Boolean).join(' ') || u2.email || null) : null;
     return this.componentsService.updateComponent(req.space.id, parseInt(id), body.component, u2?.id ?? null, authorName2);
   }
@@ -169,11 +147,12 @@ export class ComponentsController {
     @Query('per_page') perPage = '25',
   ) {
     if (model === 'components') {
+      const { page: parsedPage, perPage: parsedPerPage } = QueryParserUtil.parsePagination(page, perPage);
       return this.componentVersionsService.listVersions({
         spaceId: req.space.id,
         componentId: parseInt(modelId),
-        page: Math.max(1, parseInt(page) || 1),
-        perPage: Math.min(100, parseInt(perPage) || 25),
+        page: parsedPage,
+        perPage: parsedPerPage,
       });
     }
     return { versions: [] };
@@ -198,7 +177,7 @@ export class ComponentsController {
       req.space.id,
       parseInt(id),
       parseInt(versionId),
-      req.user?.id ?? null,
+      req.adminUser?.id ?? null,
     );
   }
 }

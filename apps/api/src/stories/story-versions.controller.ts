@@ -1,10 +1,13 @@
-import { Controller, Get, Param, Query, Res, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Query, Res } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
+import { Auth } from '../auth/auth.decorator';
 import type { Response } from 'express';
-import { SessionOrTokenGuard } from '../auth/session-or-token.guard';
 import { StoryVersionsService } from './story-versions.service';
+import { QueryParserUtil } from '../shared/query-parser.util';
 
+@ApiTags('Story Versions - MAPI')
 @Controller('v1/spaces/:spaceId/story_versions')
-@UseGuards(SessionOrTokenGuard)
+@Auth('session-or-token')
 export class StoryVersionsController {
   constructor(private readonly storyVersionsService: StoryVersionsService) {}
 
@@ -18,12 +21,13 @@ export class StoryVersionsController {
     @Query('show_content') showContent?: string,
     @Res() res?: Response,
   ) {
-    const resolvedPerPage = Math.min(100, parseInt(perPage) || 25);
+    const { page: parsedPage, perPage: parsedPerPage } = QueryParserUtil.parsePagination(page, perPage);
+    const resolvedPerPage = parsedPerPage;
     const result = await this.storyVersionsService.listVersions({
       spaceId: parseInt(spaceId),
       storyId: parseInt(byStoryId),
       releaseId: byReleaseId !== undefined ? parseInt(byReleaseId) : undefined,
-      page: Math.max(1, parseInt(page) || 1),
+      page: parsedPage,
       perPage: resolvedPerPage,
       showContent: showContent === 'true',
     });

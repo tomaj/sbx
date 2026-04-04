@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Inject,
   Injectable,
   NotFoundException,
@@ -7,6 +8,8 @@ import { and, asc, desc, count, eq, ilike, isNull, isNotNull, or, sql } from 'dr
 import { DB } from '../db/db.module';
 import type { DbType } from '../db/db.module';
 import { assets, assetFolders, internalTags } from '../db/schema';
+import { AiService } from '../ai/ai.service';
+import { AiConfigurationsService } from '../ai-configurations/ai-configurations.service';
 import { inArray } from 'drizzle-orm';
 import { StorageService } from '../storage/storage.service';
 import { WebhooksService } from '../webhooks/webhooks.service';
@@ -18,6 +21,8 @@ export class AssetsService {
     @Inject(DB) private db: DbType,
     private readonly storage: StorageService,
     private readonly webhooks: WebhooksService,
+    private readonly ai: AiService,
+    private readonly aiConfigurations: AiConfigurationsService,
   ) {}
 
   // ─── Folders ────────────────────────────────────────────────────────────────
@@ -460,6 +465,45 @@ export class AssetsService {
       .update(assets)
       .set({ deletedAt: null, updatedAt: new Date() })
       .where(and(eq(assets.spaceId, spaceId), inArray(assets.id, ids), isNotNull(assets.deletedAt)));
+  }
+
+  async generateAltText(assetId: number, spaceId: number): Promise<{ alt_text: string }> {
+    // Load asset
+    const [asset] = await this.db
+      .select()
+      .from(assets)
+      .where(and(eq(assets.id, assetId), eq(assets.spaceId, spaceId)))
+      .limit(1);
+    if (!asset) throw new NotFoundException('Asset not found');
+
+    // Only image assets can have alt text generated
+    if (!asset.contentType?.startsWith('image/')) {
+      throw new BadRequestException('Alt text generation is only supported for images');
+    }
+
+    // Load active AI configuration and branding rule
+    const config = await this.aiConfigurations.getActiveConfigWithCredentials(spaceId);
+    if (!config) throw new BadRequestException('AI is not configured for this space. Configure a provider in Settings → AI Settings.');
+    const branding = await this.aiConfigurations.getActiveBrandingRule(spaceId);
+
+    // Normalize filename (handles migrated Storyblok URLs), then strip /f/ to get MinIO key
+    const normalizedFilename = this.normalizeFilename(asset.filename);
+    const storageKey = normalizedFilename.replace(/^\/f\//, '');
+
+    let imageBuffer: Buffer;
+    const file = await this.storage.getObject(storageKey);
+    if (file) {
+      imageBuffer = file.body;
+    } else {
+      // Fallback to Storyblok origin for assets not yet migrated to local storage
+      const originUrl = `https://a.storyblok.com/f/${storageKey}`;
+      const response = await fetch(originUrl);
+      if (!response.ok) throw new NotFoundException('Asset file not found in storage or origin');
+      imageBuffer = Buffer.from(await response.arrayBuffer());
+    }
+
+    const altText = await this.ai.generateAltText(config, branding, imageBuffer, asset.contentType, spaceId);
+    return { alt_text: altText };
   }
 
   private normalizeFilename(filename: string): string {

@@ -8,6 +8,7 @@ import {
   text,
   boolean,
   timestamp,
+  date,
   unique,
   index,
   uniqueIndex,
@@ -38,6 +39,8 @@ export const spaces = pgTable('spaces', {
   visualEditorDisabled: boolean('visual_editor_disabled').notNull().default(false),
   // Asset Library settings
   assetLibrarySettings: json('asset_library_settings').notNull().default({}),
+  // AI settings (provider config + branding context)
+  aiSettings: json('ai_settings').notNull().default({}),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
@@ -757,4 +760,61 @@ export const storySchedulings = pgTable(
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },
   (t) => [index('idx_story_schedulings_space_id').on(t.spaceId)],
+);
+
+export const statistics = pgTable(
+  'statistics',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    spaceId: integer('space_id').notNull().references(() => spaces.id, { onDelete: 'cascade' }),
+    counting: integer('counting').notNull().default(0),
+    totalBytes: bigint('total_bytes', { mode: 'number' }).notNull().default(0),
+    createdAt: date('created_at').notNull(),
+  },
+  (t) => [
+    index('idx_statistics_space_id').on(t.spaceId),
+    index('idx_statistics_created_at').on(t.createdAt),
+    unique('unq_statistics_space_date').on(t.spaceId, t.createdAt),
+  ],
+);
+
+export const apiRequestLogs = pgTable(
+  'api_request_logs',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    spaceId: integer('space_id').notNull().references(() => spaces.id, { onDelete: 'cascade' }),
+    userId: bigint('user_id', { mode: 'number' }),
+    method: text('method').notNull(),
+    path: text('path').notNull(),
+    statusCode: integer('status_code'),
+    responseTimeMs: integer('response_time_ms'),
+    tokenType: text('token_type'),   // 'session' | 'management' | 'public' | 'preview'
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (t) => [
+    index('idx_api_request_logs_space_id').on(t.spaceId),
+    index('idx_api_request_logs_created_at').on(t.createdAt),
+    index('idx_api_request_logs_user_id').on(t.userId),
+  ],
+);
+
+export const aiLogs = pgTable(
+  'ai_logs',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    spaceId: integer('space_id').notNull(),
+    operation: text('operation').notNull(),
+    providerName: text('provider_name').notNull(),
+    modelIdentifier: text('model_identifier').notNull(),
+    inputTokens: integer('input_tokens'),
+    outputTokens: integer('output_tokens'),
+    totalTokens: integer('total_tokens'),
+    status: text('status').notNull().default('success'),
+    errorMessage: text('error_message'),
+    durationMs: integer('duration_ms'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (t) => [
+    index('idx_ai_logs_space_created').on(t.spaceId, t.createdAt),
+  ],
 );

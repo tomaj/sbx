@@ -1,9 +1,12 @@
-import { Controller, Get, Param, Query, Req, UseGuards } from '@nestjs/common';
-import { TokenGuard } from '../auth/token.guard';
+import { Controller, Get, Param, Query, Req } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
+import { Auth } from '../auth/auth.decorator';
 import { LinksCdnService } from './links-cdn.service';
+import { QueryParserUtil } from '../shared/query-parser.util';
 
+@ApiTags('Links - CDN')
 @Controller('v2/cdn/links')
-@UseGuards(TokenGuard)
+@Auth('token')
 export class LinksCdnController {
   constructor(private readonly linksCdnService: LinksCdnService) {}
 
@@ -17,13 +20,14 @@ export class LinksCdnController {
     @Query('page') page?: string,
     @Query('per_page') perPage?: string,
   ) {
+    const { page: parsedPage, perPage: parsedPerPage } = QueryParserUtil.parsePagination(page, perPage);
     return this.linksCdnService.listLinks(req.space.id, {
       version: version === 'draft' ? 'draft' : 'published',
       startsWith,
       withParent: withParent !== undefined ? parseInt(withParent) : undefined,
       includeDates: includeDates === '1',
-      page: Math.max(1, parseInt(page ?? '1') || 1),
-      perPage: Math.min(1000, parseInt(perPage ?? '25') || 25),
+      page: parsedPage,
+      perPage: Math.min(1000, parsedPerPage),
     });
   }
 

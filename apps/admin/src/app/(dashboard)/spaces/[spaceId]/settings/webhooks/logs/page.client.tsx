@@ -3,25 +3,12 @@
 import { useState, useEffect, use } from 'react'
 import { ArrowLeft, RotateCcw, ChevronRight } from 'lucide-react'
 import Link from 'next/link'
+import type { WebhookLog, WebhookLogDetail } from '@sbx/types'
+import { formatDateTime } from '@/lib/date'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface WebhookLog {
-  id: number
-  webhookEndpointId: number
-  webhookName: string | null
-  action: string
-  status: string
-  responseStatus: number | null
-  executedAt: string
-}
-
-interface WebhookLogDetail extends WebhookLog {
-  requestBody: any
-  responseBody: string | null
-}
-
-interface Webhook {
+interface WebhookRef {
   id: number
   name: string
 }
@@ -56,10 +43,6 @@ function LogDetailModal({
     await fetch(`/api/admin/spaces/${spaceId}/webhooks/logs/${logId}`, { method: 'POST' })
     setRetrying(false)
     setRetried(true)
-  }
-
-  function formatDate(iso: string) {
-    return new Date(iso).toLocaleString()
   }
 
   return (
@@ -108,7 +91,7 @@ function LogDetailModal({
                     Executed at
                   </p>
                   <p className="text-sm text-gray-900 dark:text-gray-100">
-                    {formatDate(log.executedAt)}
+                    {formatDateTime(log.executedAt)}
                   </p>
                 </div>
                 <div>
@@ -189,7 +172,7 @@ function LogDetailModal({
 export default function WebhookLogsPage({ params }: { params: Promise<{ spaceId: string }> }) {
   const { spaceId } = use(params)
   const [logs, setLogs] = useState<WebhookLog[]>([])
-  const [webhooks, setWebhooks] = useState<Webhook[]>([])
+  const [webhooks, setWebhooks] = useState<WebhookRef[]>([])
   const [loading, setLoading] = useState(true)
   const [filterWebhookId, setFilterWebhookId] = useState('')
   const [fromDate, setFromDate] = useState('')
@@ -220,10 +203,6 @@ export default function WebhookLogsPage({ params }: { params: Promise<{ spaceId:
     loadWebhooks()
     loadLogs()
   }, [spaceId])
-
-  function formatDate(iso: string) {
-    return new Date(iso).toLocaleString()
-  }
 
   return (
     <div className="max-w-4xl px-10 py-8">
@@ -340,7 +319,7 @@ export default function WebhookLogsPage({ params }: { params: Promise<{ spaceId:
                     </span>
                   </td>
                   <td className="px-4 py-3 text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                    {formatDate(log.executedAt)}
+                    {formatDateTime(log.executedAt)}
                   </td>
                   <td className="px-4 py-3">
                     <ChevronRight className="w-4 h-4 text-gray-400" />

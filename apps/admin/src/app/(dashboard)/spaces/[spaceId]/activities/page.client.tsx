@@ -13,32 +13,14 @@ import {
   activityKeyColor,
   resolveItemName,
 } from '@/components/activities/activity-utils'
+import type { ActivityRow } from '@sbx/types'
 
-interface User {
+interface ActivityUser {
   id: number
   firstname: string
   lastname: string
   email: string
   avatar: string | null
-}
-
-interface ActivityRow {
-  id: number
-  activity: {
-    id: number
-    key: string
-    trackable_id: number | null
-    trackable_type: string | null
-    created_at: string
-    space_id: number
-  }
-  trackable: { id: string | number; name: string; slug: string } | null
-  user: {
-    id: number
-    userid: string
-    friendly_name: string
-    avatar: string | null
-  } | null
 }
 
 export default function SpaceActivitiesPage({ params }: { params: Promise<{ spaceId: string }> }) {
@@ -51,7 +33,7 @@ export default function SpaceActivitiesPage({ params }: { params: Promise<{ spac
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = usePerPage('perPage:activities', 25)
 
-  const [users, setUsers] = useState<User[]>([])
+  const [users, setUsers] = useState<ActivityUser[]>([])
   const [rows, setRows] = useState<ActivityRow[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(false)

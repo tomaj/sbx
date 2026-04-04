@@ -9,15 +9,16 @@ import {
   Query,
   UploadedFile,
   UploadedFiles,
-  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
-import { SessionGuard } from '../auth/session.guard';
+import { Auth } from '../auth/auth.decorator';
 import { AssetsService } from './assets.service';
+import { UpdateAssetAdminDto } from './dto/update-asset.dto';
+import { QueryParserUtil } from '../shared/query-parser.util';
 
 @Controller('v1/admin/spaces/:spaceId/assets')
-@UseGuards(SessionGuard)
+@Auth('session')
 export class AssetsAdminController {
   constructor(private readonly assetsService: AssetsService) {}
 
@@ -74,9 +75,10 @@ export class AssetsAdminController {
     @Query('deleted') deleted?: string,
     @Query('content_type') contentType?: string,
   ) {
+    const { page: parsedPage, perPage: parsedPerPage } = QueryParserUtil.parsePagination(page, perPage);
     return this.assetsService.listAssets(parseInt(spaceId), {
-      page: Math.max(1, parseInt(page) || 1),
-      perPage: Math.min(100, parseInt(perPage) || 24),
+      page: parsedPage,
+      perPage: parsedPerPage,
       search,
       folderId: folderId === 'null' ? null : folderId ? parseInt(folderId) : undefined,
       sortField,
@@ -109,17 +111,7 @@ export class AssetsAdminController {
   update(
     @Param('spaceId') spaceId: string,
     @Param('assetId') assetId: string,
-    @Body() body: {
-      title?: string | null;
-      alt?: string | null;
-      copyright?: string | null;
-      focus?: string | null;
-      expire_at?: string | null;
-      locked?: boolean;
-      folder_id?: number | null;
-      meta_data?: Record<string, any>;
-      internal_tag_ids?: number[];
-    },
+    @Body() body: UpdateAssetAdminDto,
   ) {
     return this.assetsService.updateAsset(parseInt(assetId), parseInt(spaceId), body);
   }
@@ -148,6 +140,14 @@ export class AssetsAdminController {
     @Param('assetId') assetId: string,
   ) {
     return this.assetsService.restoreAsset(parseInt(assetId), parseInt(spaceId));
+  }
+
+  @Post(':assetId/ai/alt-text')
+  generateAltText(
+    @Param('spaceId') spaceId: string,
+    @Param('assetId') assetId: string,
+  ) {
+    return this.assetsService.generateAltText(parseInt(assetId), parseInt(spaceId));
   }
 
 }

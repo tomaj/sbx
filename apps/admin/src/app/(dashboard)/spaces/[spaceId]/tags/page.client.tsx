@@ -1,23 +1,31 @@
 'use client'
 
-import { useState, useCallback, useEffect, use } from 'react'
+import { use, useEffect, useState } from 'react'
+import { useForm, Controller } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
 import { Plus, Tag } from 'lucide-react'
 import { DataTable, type Column, type SortState } from '@/components/ui/data-table'
 import { SearchBar } from '@/components/ui/search-bar'
 import { RightSidebar } from '@/components/ui/right-sidebar'
 import { InputWithCounter } from '@/components/ui/input-with-counter'
+import { PageLayout } from '@/components/ui/page-layout'
+import { useApi } from '@/lib/swr'
+import { useCrudSidebar } from '@/hooks/use-crud-sidebar'
+import { UnsavedChangesModal } from '@/components/ui/unsaved-changes-modal'
+import { useUnsavedChanges } from '@/hooks/use-unsaved-changes'
+import type { TagWithCount } from '@sbx/types'
 
-interface TagItem {
-  name: string
-  taggings_count: number
-  [key: string]: unknown
-}
+const tagSchema = z.object({
+  name: z.string().min(1, 'Name is required').max(60),
+})
+type TagFormValues = z.infer<typeof tagSchema>
 
 interface ApiResponse {
-  tags: TagItem[]
+  tags: TagWithCount[]
 }
 
-const COLUMNS: Column<TagItem>[] = [
+const COLUMNS: Column<TagWithCount>[] = [
   {
     key: 'name',
     label: 'Name',
@@ -39,94 +47,72 @@ const COLUMNS: Column<TagItem>[] = [
 export default function TagsPage({ params }: { params: Promise<{ spaceId: string }> }) {
   const { spaceId } = use(params)
 
-  const [tags, setTags] = useState<TagItem[]>([])
-  const [total, setTotal] = useState(0)
-  const [isLoading, setIsLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState<SortState>({ field: 'name', direction: 'asc' })
 
-  const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [sidebarMode, setSidebarMode] = useState<'create' | 'edit'>('create')
-  const [selectedTag, setSelectedTag] = useState<TagItem | null>(null)
-  const [editName, setEditName] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [saveError, setSaveError] = useState<string | null>(null)
+  const qs = new URLSearchParams()
+  if (search) qs.set('search', search)
+  if (sort.field && sort.direction) qs.set('sort_by', `${sort.field}:${sort.direction}`)
 
-  const load = useCallback(async () => {
-    setIsLoading(true)
-    try {
-      const qs = new URLSearchParams()
-      if (search) qs.set('search', search)
-      if (sort.field && sort.direction) qs.set('sort_by', `${sort.field}:${sort.direction}`)
-      const res = await fetch(`/api/admin/spaces/${spaceId}/tags?${qs}`)
-      const data: ApiResponse = await res.json()
-      setTags(data.tags ?? [])
-      setTotal(data.tags?.length ?? 0)
-    } finally {
-      setIsLoading(false)
-    }
-  }, [spaceId, search, sort])
+  const { data, isLoading, mutate } = useApi<ApiResponse>(`/api/admin/spaces/${spaceId}/tags?${qs}`)
+  const tags = data?.tags ?? []
+  const total = tags.length
+
+  const { open: sidebarOpen, mode: sidebarMode, selected: selectedTag, openCreate: openCreateRaw, openEdit: openEditRaw, close: closeSidebarRaw } = useCrudSidebar<TagWithCount>()
+
+  const { handleSubmit, reset, control, formState: { errors, isSubmitting, isDirty }, setError } = useForm<TagFormValues>({
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-expect-error — zod v4 minor version literal mismatch with @hookform/resolvers types
+    resolver: zodResolver(tagSchema),
+    defaultValues: { name: '' },
+  })
+
+  const { showModal: showUnsavedModal, handleConfirm: confirmUnsaved, handleCancel: cancelUnsaved } = useUnsavedChanges(isDirty)
 
   useEffect(() => {
-    load()
-  }, [load])
+    if (sidebarMode === 'edit' && selectedTag) {
+      reset({ name: selectedTag.name })
+    } else {
+      reset({ name: '' })
+    }
+  }, [sidebarOpen, selectedTag, sidebarMode, reset])
 
   function openCreate() {
-    setSidebarMode('create')
-    setSelectedTag(null)
-    setEditName('')
-    setSaveError(null)
-    setSidebarOpen(true)
+    openCreateRaw()
   }
 
-  function openEdit(tag: TagItem) {
-    setSidebarMode('edit')
-    setSelectedTag(tag)
-    setEditName(tag.name)
-    setSaveError(null)
-    setSidebarOpen(true)
+  function openEdit(tag: TagWithCount) {
+    openEditRaw(tag)
   }
 
   function closeSidebar() {
-    setSidebarOpen(false)
-    setSelectedTag(null)
+    closeSidebarRaw()
   }
 
-  async function handleSave() {
-    setSaving(true)
-    setSaveError(null)
-    try {
-      const url =
-        sidebarMode === 'create'
-          ? `/api/admin/spaces/${spaceId}/tags`
-          : `/api/admin/spaces/${spaceId}/tags/${encodeURIComponent(selectedTag!.name)}`
-      const res = await fetch(url, {
-        method: sidebarMode === 'create' ? 'POST' : 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: editName }),
-      })
-      if (!res.ok) {
-        const err = await res.json()
-        setSaveError(err?.message ?? 'Failed to save')
-        return
-      }
-      closeSidebar()
-      load()
-    } finally {
-      setSaving(false)
+  async function onSubmit(values: TagFormValues) {
+    const url =
+      sidebarMode === 'create'
+        ? `/api/admin/spaces/${spaceId}/tags`
+        : `/api/admin/spaces/${spaceId}/tags/${encodeURIComponent(selectedTag!.name)}`
+    const res = await fetch(url, {
+      method: sidebarMode === 'create' ? 'POST' : 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: values.name }),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      setError('root', { message: err?.message ?? 'Failed to save' })
+      return
     }
+    closeSidebar()
+    mutate()
   }
 
   return (
-    <div className="p-8 max-w-5xl">
-      {/* Header */}
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Tags</h1>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            New tags can be created in the &quot;Entry Configuration&quot; section of a content item or by clicking the &quot;New Tag&quot; button.
-          </p>
-        </div>
+    <PageLayout
+      title="Tags"
+      description='New tags can be created in the "Entry Configuration" section of a content item or by clicking the "New Tag" button.'
+      action={
         <button
           onClick={openCreate}
           className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium rounded-lg transition-colors shrink-0"
@@ -134,8 +120,8 @@ export default function TagsPage({ params }: { params: Promise<{ spaceId: string
           <Plus className="size-4" />
           New Tag
         </button>
-      </div>
-
+      }
+    >
       {/* Search */}
       <div className="mb-6">
         <SearchBar value={search} onChange={setSearch} placeholder="Search tags..." />
@@ -173,37 +159,54 @@ export default function TagsPage({ params }: { params: Promise<{ spaceId: string
         footer={
           <div className="flex items-center gap-3 w-full justify-end">
             <button
+              type="button"
               onClick={closeSidebar}
               className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
             >
               Cancel
             </button>
             <button
-              onClick={handleSave}
-              disabled={saving || !editName.trim()}
+              type="submit"
+              form="tag-form"
+              disabled={isSubmitting}
               className="px-4 py-2 text-sm font-medium bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white rounded-lg transition-colors"
             >
-              {saving ? 'Saving…' : 'Save'}
+              {isSubmitting ? 'Saving…' : 'Save'}
             </button>
           </div>
         }
       >
-        <div>
+        <form id="tag-form" onSubmit={handleSubmit(onSubmit)}>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
             Name <span className="text-red-500">*</span>
           </label>
-          <InputWithCounter
-            value={editName}
-            onChange={setEditName}
-            maxLength={60}
-            placeholder="Tag name"
-            autoFocus
+          <Controller
+            name="name"
+            control={control}
+            render={({ field }) => (
+              <InputWithCounter
+                value={field.value}
+                onChange={field.onChange}
+                maxLength={60}
+                placeholder="Tag name"
+                autoFocus
+              />
+            )}
           />
-          {saveError && (
-            <p className="mt-2 text-sm text-red-500">{saveError}</p>
+          {errors.name && (
+            <p className="mt-2 text-sm text-red-500">{errors.name.message}</p>
           )}
-        </div>
+          {errors.root && (
+            <p className="mt-2 text-sm text-red-500">{errors.root.message}</p>
+          )}
+        </form>
       </RightSidebar>
-    </div>
+
+      <UnsavedChangesModal
+        open={showUnsavedModal}
+        onConfirm={confirmUnsaved}
+        onCancel={cancelUnsaved}
+      />
+    </PageLayout>
   )
 }

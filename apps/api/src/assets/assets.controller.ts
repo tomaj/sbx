@@ -9,13 +9,21 @@ import {
   Post,
   Put,
   Query,
-  UseGuards,
 } from '@nestjs/common';
-import { SessionOrTokenGuard } from '../auth/session-or-token.guard';
+import { Auth } from '../auth/auth.decorator';
 import { AssetsService } from './assets.service';
+import {
+  UpdateAssetDto,
+  SignUploadDto,
+  BulkUpdateDto,
+  BulkIdsDto,
+  CreateAssetFolderDto,
+  UpdateAssetFolderDto,
+} from './dto/update-asset.dto';
+import { QueryParserUtil } from '../shared/query-parser.util';
 
 @Controller('v1/spaces/:spaceId')
-@UseGuards(SessionOrTokenGuard)
+@Auth('session-or-token')
 export class AssetsController {
   constructor(private readonly assetsService: AssetsService) {}
 
@@ -29,7 +37,7 @@ export class AssetsController {
     @Query('with_parent') withParent?: string,
   ) {
     return this.assetsService.listFolders(parseInt(spaceId), {
-      byIds: byIds ? byIds.split(',').map((id) => parseInt(id.trim())).filter((id) => !isNaN(id)) : undefined,
+      byIds: QueryParserUtil.parseCsvToInts(byIds),
       search,
       withParent: withParent !== undefined ? parseInt(withParent) : undefined,
     });
@@ -47,7 +55,7 @@ export class AssetsController {
   @Post('asset_folders')
   async createFolder(
     @Param('spaceId') spaceId: string,
-    @Body() body: { asset_folder: { name: string; parent_id?: number | null } },
+    @Body() body: CreateAssetFolderDto,
   ) {
     const folder = await this.assetsService.createFolder(parseInt(spaceId), body.asset_folder);
     return { asset_folder: folder };
@@ -57,7 +65,7 @@ export class AssetsController {
   async updateFolder(
     @Param('spaceId') spaceId: string,
     @Param('id') id: string,
-    @Body() body: { asset_folder: { name?: string; parent_id?: number | null } },
+    @Body() body: UpdateAssetFolderDto,
   ) {
     const folder = await this.assetsService.updateFolder(parseInt(id), parseInt(spaceId), body.asset_folder);
     return { asset_folder: folder };
@@ -94,14 +102,15 @@ export class AssetsController {
     let sortField: string | undefined;
     let sortDir: 'asc' | 'desc' | undefined;
     if (sortBy) {
-      const [field, dir] = sortBy.split(':');
-      sortField = field === 'short_filename' ? 'short_filename' : field;
-      sortDir = dir === 'asc' ? 'asc' : 'desc';
+      const parsed = QueryParserUtil.parseSortBy(sortBy);
+      sortField = parsed.field;
+      sortDir = parsed.dir;
     }
 
+    const { page: parsedPage, perPage: parsedPerPage } = QueryParserUtil.parsePagination(page, perPage);
     const result = await this.assetsService.listAssets(parseInt(spaceId), {
-      page: Math.max(1, parseInt(page) || 1),
-      perPage: Math.min(100, parseInt(perPage) || 25),
+      page: parsedPage,
+      perPage: parsedPerPage,
       search,
       folderId: inFolder !== undefined && inFolder !== '-1' ? (inFolder === 'null' ? null : parseInt(inFolder)) : undefined,
       deleted: inFolder === '-1',
@@ -120,7 +129,7 @@ export class AssetsController {
   @Post('assets')
   async signUpload(
     @Param('spaceId') spaceId: string,
-    @Body() body: { filename: string; size: number; content_type?: string },
+    @Body() body: SignUploadDto,
   ) {
     const id = Date.now() * 1000 + Math.floor(Math.random() * 1000);
     const safeName = (body.filename ?? 'upload').replace(/[^a-zA-Z0-9._-]/g, '_');
@@ -148,21 +157,7 @@ export class AssetsController {
   async updateAsset(
     @Param('spaceId') spaceId: string,
     @Param('id') id: string,
-    @Body() body: {
-      asset?: {
-        title?: string | null;
-        alt?: string | null;
-        copyright?: string | null;
-        focus?: string | null;
-        expire_at?: string | null;
-        locked?: boolean;
-        asset_folder_id?: number | null;
-        is_private?: boolean;
-        meta_data?: Record<string, any>;
-        internal_tag_ids?: number[];
-        publish_at?: string | null;
-      };
-    },
+    @Body() body: UpdateAssetDto,
   ) {
     const data = body.asset ?? {};
     const asset = await this.assetsService.updateAsset(parseInt(id), parseInt(spaceId), {
@@ -204,7 +199,7 @@ export class AssetsController {
   @HttpCode(HttpStatus.OK)
   async bulkUpdate(
     @Param('spaceId') spaceId: string,
-    @Body() body: { asset_folder_id: number; ids: number[] },
+    @Body() body: BulkUpdateDto,
   ) {
     await this.assetsService.bulkUpdate(parseInt(spaceId), body.ids, body.asset_folder_id);
     return {};
@@ -214,7 +209,7 @@ export class AssetsController {
   @HttpCode(HttpStatus.OK)
   async bulkDestroy(
     @Param('spaceId') spaceId: string,
-    @Body() body: { ids: number[] },
+    @Body() body: BulkIdsDto,
   ) {
     await this.assetsService.bulkDestroy(parseInt(spaceId), body.ids);
     return {};
@@ -224,7 +219,7 @@ export class AssetsController {
   @HttpCode(HttpStatus.OK)
   async bulkRestore(
     @Param('spaceId') spaceId: string,
-    @Body() body: { ids: number[] },
+    @Body() body: BulkIdsDto,
   ) {
     await this.assetsService.bulkRestore(parseInt(spaceId), body.ids);
     return {};

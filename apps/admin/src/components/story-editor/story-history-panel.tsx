@@ -1,8 +1,10 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { X, RotateCcw, ChevronDown, ArrowLeftRight } from 'lucide-react'
+import React, { useState, useEffect, useCallback } from 'react'
+import { X, RotateCcw, ChevronDown, ChevronUp, ArrowLeftRight, Eye, Columns2, ExternalLink } from 'lucide-react'
 import { UserAvatar } from '@/components/ui/user-avatar'
+import { PreviewFrame } from './preview-frame'
+import { formatDateTime as formatDate } from '@/lib/date'
 
 interface StoryVersion {
   id: number
@@ -33,23 +35,26 @@ interface CompareResult {
   changes: CompareChange[]
 }
 
+/** A group of consecutive versions by the same user */
+interface VersionGroup {
+  user: StoryVersion['user']
+  userId: number | null
+  versions: StoryVersion[]
+  /** The most recent/prominent version in the group (first by date) */
+  primary: StoryVersion
+}
+
 interface Props {
   spaceId: string
   storyId: number
   storyName: string
+  storySlug?: string
   previewUrl?: string
   onClose: () => void
   onRestore?: () => void
 }
 
 type Tab = 'history' | 'visual' | 'compare'
-
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleString('en-US', {
-    month: 'short', day: 'numeric', year: 'numeric',
-    hour: 'numeric', minute: '2-digit', hour12: true,
-  })
-}
 
 function actionLabel(v: StoryVersion) {
   const who = v.user?.name ?? 'Unknown'
@@ -59,18 +64,65 @@ function actionLabel(v: StoryVersion) {
   return `${who} Saved ${v.name}`
 }
 
-function actionShortLabel(v: StoryVersion) {
-  const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
-  return cap(v.action === 'save' ? 'Saved' : v.action + 'd')
+function actionVerb(action: string) {
+  if (action === 'publish') return 'Published'
+  if (action === 'unpublish') return 'Unpublished'
+  if (action === 'create') return 'Created'
+  return 'Edited'
 }
 
-export function StoryHistoryPanel({ spaceId, storyId, storyName, previewUrl, onClose, onRestore }: Props) {
+/** Group consecutive versions by the same user */
+function groupVersions(versions: StoryVersion[]): VersionGroup[] {
+  const groups: VersionGroup[] = []
+  for (const v of versions) {
+    const last = groups[groups.length - 1]
+    if (last && last.userId === (v.user_id ?? null)) {
+      last.versions.push(v)
+    } else {
+      groups.push({
+        user: v.user,
+        userId: v.user_id ?? null,
+        versions: [v],
+        primary: v,
+      })
+    }
+  }
+  return groups
+}
+
+/** Parse a dot-notation path like "body.0.columns.1.title" into breadcrumb segments */
+function parseBreadcrumb(path: string): string[] {
+  return path.split('.').filter((seg) => !/^\d+$/.test(seg))
+}
+
+/** Render a value with appropriate formatting based on type */
+function renderChangeValue(val: any): React.ReactNode {
+  if (val === null || val === undefined) return <span className="text-gray-400 italic">empty</span>
+  if (typeof val === 'boolean') {
+    return (
+      <span className={`inline-flex items-center px-2 py-0.5 text-xs font-medium rounded ${val ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'}`}>
+        {val ? 'True' : 'False'}
+      </span>
+    )
+  }
+  if (typeof val === 'string') return <span className="break-all">{val}</span>
+  if (typeof val === 'number') return <span>{val}</span>
+  // Objects and arrays
+  return (
+    <pre className="text-xs font-mono bg-gray-50 dark:bg-gray-800 rounded p-2 overflow-x-auto max-h-48 whitespace-pre-wrap break-all">
+      {JSON.stringify(val, null, 2)}
+    </pre>
+  )
+}
+
+export function StoryHistoryPanel({ spaceId, storyId, storyName, storySlug, previewUrl, onClose, onRestore }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>('history')
   const [versions, setVersions] = useState<StoryVersion[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [selectedVersion, setSelectedVersion] = useState<StoryVersion | null>(null)
   const [restoring, setRestoring] = useState(false)
+  const [expandedGroups, setExpandedGroups] = useState<Set<number>>(new Set())
 
   // Compare state
   const [compareLeft, setCompareLeft] = useState<StoryVersion | null>(null)
@@ -110,7 +162,6 @@ export function StoryHistoryPanel({ spaceId, storyId, storyName, previewUrl, onC
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ story: { content: v.name, name: v.name } }),
       })
-      // After restore, reload versions and notify parent
       if (res.ok) {
         onRestore?.()
         onClose()
@@ -141,8 +192,20 @@ export function StoryHistoryPanel({ spaceId, storyId, storyName, previewUrl, onC
     }
   }, [activeTab, compareLeft?.id, compareRight?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  const groups = groupVersions(versions)
+
+  function toggleGroup(groupIdx: number) {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev)
+      if (next.has(groupIdx)) next.delete(groupIdx)
+      else next.add(groupIdx)
+      return next
+    })
+  }
+
+  // Build preview URL for a specific version
   const previewUrlForVersion = selectedVersion && previewUrl
-    ? previewUrl
+    ? `${previewUrl}${previewUrl.includes('?') ? '&' : '?'}_storyblok_version=${selectedVersion.id}`
     : undefined
 
   return (
@@ -174,14 +237,14 @@ export function StoryHistoryPanel({ spaceId, storyId, storyName, previewUrl, onC
                     : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
                 }`}
               >
-                {tab}
+                {tab === 'visual' ? 'Visual' : tab.charAt(0).toUpperCase() + tab.slice(1)}
               </button>
             ))}
           </div>
 
           {/* Tab content */}
           <div className="flex-1 overflow-y-auto">
-            {/* ── HISTORY TAB ── */}
+            {/* -- HISTORY TAB -- */}
             {activeTab === 'history' && (
               <div>
                 {loading ? (
@@ -192,37 +255,79 @@ export function StoryHistoryPanel({ spaceId, storyId, storyName, previewUrl, onC
                     <p className="text-sm">No version history yet</p>
                   </div>
                 ) : (
-                  versions.map((v) => (
-                    <div
-                      key={v.id}
-                      className="flex items-center gap-4 px-6 py-4 border-b border-gray-100 dark:border-gray-800 group hover:bg-gray-50 dark:hover:bg-gray-900"
-                    >
-                      <UserAvatar
-                        name={v.user?.name ?? '?'}
-                        src={v.user?.avatar_url ?? null}
-                        size="sm"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                          {actionLabel(v)}
-                        </p>
-                        <p className="text-xs text-gray-400 mt-0.5">at {formatDate(v.created_at)}</p>
+                  groups.map((group, gi) => {
+                    const isExpanded = expandedGroups.has(gi)
+                    const hasSubVersions = group.versions.length > 1
+                    const primary = group.primary
+
+                    return (
+                      <div key={`g-${gi}`}>
+                        {/* Primary version (always shown) */}
+                        <div className="flex items-center gap-4 px-6 py-4 border-b border-gray-100 dark:border-gray-800 group hover:bg-gray-50 dark:hover:bg-gray-900">
+                          <UserAvatar
+                            name={group.user?.name ?? '?'}
+                            src={group.user?.avatar_url ?? null}
+                            size="sm"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                              {actionLabel(primary)}
+                            </p>
+                            <p className="text-xs text-gray-400 mt-0.5">at {formatDate(primary.created_at)}</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {hasSubVersions && (
+                              <button
+                                onClick={() => toggleGroup(gi)}
+                                className="flex items-center gap-1 px-2 py-1 text-xs text-gray-400 rounded hover:bg-gray-100 dark:hover:bg-gray-800"
+                              >
+                                {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                                {group.versions.length - 1} more
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleRestore(primary)}
+                              disabled={restoring}
+                              className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-500 border border-gray-200 dark:border-gray-700 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-gray-100 dark:hover:bg-gray-800"
+                            >
+                              <RotateCcw className="w-3.5 h-3.5" />
+                              Restore
+                            </button>
+                          </div>
+                        </div>
+                        {/* Sub-versions (only when expanded) */}
+                        {isExpanded && hasSubVersions && group.versions.slice(1).map((v) => (
+                          <div
+                            key={v.id}
+                            className="flex items-center gap-4 pl-16 pr-6 py-3 border-b border-gray-50 dark:border-gray-900 group hover:bg-gray-50 dark:hover:bg-gray-900"
+                          >
+                            <UserAvatar
+                              name={group.user?.name ?? '?'}
+                              src={group.user?.avatar_url ?? null}
+                              size="xs"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs text-gray-500">{formatDate(v.created_at)}</p>
+                              <p className="text-xs text-gray-400">{actionVerb(v.action)} by {v.user?.name ?? 'Unknown'}</p>
+                            </div>
+                            <button
+                              onClick={() => handleRestore(v)}
+                              disabled={restoring}
+                              className="flex items-center gap-1.5 px-2.5 py-1 text-xs text-gray-500 border border-gray-200 dark:border-gray-700 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-gray-100 dark:hover:bg-gray-800"
+                            >
+                              <RotateCcw className="w-3 h-3" />
+                              Restore
+                            </button>
+                          </div>
+                        ))}
                       </div>
-                      <button
-                        onClick={() => handleRestore(v)}
-                        disabled={restoring}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-500 border border-gray-200 dark:border-gray-700 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-gray-100 dark:hover:bg-gray-800"
-                      >
-                        <RotateCcw className="w-3.5 h-3.5" />
-                        Restore
-                      </button>
-                    </div>
-                  ))
+                    )
+                  })
                 )}
               </div>
             )}
 
-            {/* ── VISUAL TAB ── */}
+            {/* -- VISUAL TAB -- */}
             {activeTab === 'visual' && (
               <div className="flex flex-col h-full">
                 {selectedVersion && (
@@ -232,29 +337,27 @@ export function StoryHistoryPanel({ spaceId, storyId, storyName, previewUrl, onC
                       src={selectedVersion.user?.avatar_url ?? null}
                       size="sm"
                     />
-                    <div>
-                      <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{actionLabel(selectedVersion)}</p>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{actionLabel(selectedVersion)}</p>
                       <p className="text-xs text-gray-400">at {formatDate(selectedVersion.created_at)}</p>
                     </div>
+                    {selectedVersion.id !== versions[0]?.id && (
+                      <button
+                        onClick={() => handleRestore(selectedVersion)}
+                        disabled={restoring}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors disabled:opacity-50"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        Restore
+                      </button>
+                    )}
                   </div>
                 )}
-                <div className="flex-1 relative bg-gray-100 dark:bg-gray-900">
-                  {previewUrlForVersion ? (
-                    <iframe
-                      src={previewUrlForVersion}
-                      className="w-full h-full border-0"
-                      title="Version preview"
-                    />
-                  ) : (
-                    <div className="flex items-center justify-center h-full text-gray-400 text-sm">
-                      No preview URL configured
-                    </div>
-                  )}
-                </div>
+                <PreviewFrame url={previewUrlForVersion} className="flex-1" />
               </div>
             )}
 
-            {/* ── COMPARE TAB ── */}
+            {/* -- COMPARE TAB -- */}
             {activeTab === 'compare' && (
               <div className="flex flex-col h-full">
                 {/* Version selectors */}
@@ -281,9 +384,7 @@ export function StoryHistoryPanel({ spaceId, storyId, storyName, previewUrl, onC
                 {/* Diff content */}
                 <div className="flex-1 overflow-y-auto">
                   {compareLoading ? (
-                    <div className="flex items-center justify-center py-20 text-gray-400 text-sm">
-                      Comparing versions...
-                    </div>
+                    <CompareSkeleton />
                   ) : !compareResult ? null
                   : compareResult.changes.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-20 text-gray-400">
@@ -299,8 +400,8 @@ export function StoryHistoryPanel({ spaceId, storyId, storyName, previewUrl, onC
                           {compareResult.latest && (
                             <>
                               <UserAvatar name={compareLeft?.user?.name ?? '?'} src={compareLeft?.user?.avatar_url ?? null} size="sm" />
-                              <div>
-                                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{compareLeft ? actionLabel(compareLeft) : ''}</p>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{compareLeft ? actionLabel(compareLeft) : ''}</p>
                                 <p className="text-xs text-gray-400">{compareLeft ? `at ${formatDate(compareLeft.created_at)}` : ''}</p>
                               </div>
                             </>
@@ -310,31 +411,50 @@ export function StoryHistoryPanel({ spaceId, storyId, storyName, previewUrl, onC
                           {compareResult.target && (
                             <>
                               <UserAvatar name={compareRight?.user?.name ?? '?'} src={compareRight?.user?.avatar_url ?? null} size="sm" />
-                              <div>
-                                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{compareRight ? actionLabel(compareRight) : ''}</p>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{compareRight ? actionLabel(compareRight) : ''}</p>
                                 <p className="text-xs text-gray-400">{compareRight ? `at ${formatDate(compareRight.created_at)}` : ''}</p>
                               </div>
                             </>
                           )}
                         </div>
                       </div>
-                      {/* Change rows */}
-                      {compareResult.changes.map((change, i) => (
-                        <div key={i} className="grid grid-cols-2 divide-x divide-gray-200 dark:divide-gray-700">
-                          <div className="px-6 py-4">
-                            <p className="text-xs text-gray-400 mb-1 font-mono">{change.path}</p>
-                            <p className="text-sm text-blue-600 dark:text-blue-400 break-all">
-                              {renderValue(change.new)}
-                            </p>
+                      {/* Change rows — field-by-field */}
+                      {compareResult.changes.map((change, i) => {
+                        const breadcrumbs = parseBreadcrumb(change.path)
+                        const fieldName = breadcrumbs[breadcrumbs.length - 1] ?? change.path
+
+                        return (
+                          <div key={i}>
+                            {/* Breadcrumb path */}
+                            <div className="px-6 pt-4 pb-2">
+                              <div className="flex items-center gap-1 text-xs text-gray-400">
+                                {breadcrumbs.map((seg, si) => (
+                                  <span key={si} className="flex items-center gap-1">
+                                    {si > 0 && <ChevronDown className="w-3 h-3 -rotate-90" />}
+                                    <span className={si === breadcrumbs.length - 1 ? 'text-gray-600 dark:text-gray-300 font-medium' : ''}>{seg}</span>
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                            {/* Two-column diff */}
+                            <div className="grid grid-cols-2 divide-x divide-gray-200 dark:divide-gray-700">
+                              <div className="px-6 pb-4">
+                                <p className="text-xs font-medium text-gray-500 mb-1.5">{fieldName} <span className="text-gray-400 font-normal">({typeof change.new === 'object' && change.new !== null ? (Array.isArray(change.new) ? 'array' : 'object') : typeof change.new})</span></p>
+                                <div className="text-sm text-gray-900 dark:text-gray-100 rounded-md p-2 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-900">
+                                  {renderChangeValue(change.new)}
+                                </div>
+                              </div>
+                              <div className="px-6 pb-4">
+                                <p className="text-xs font-medium text-gray-500 mb-1.5">{fieldName} <span className="text-gray-400 font-normal">({typeof change.old === 'object' && change.old !== null ? (Array.isArray(change.old) ? 'array' : 'object') : typeof change.old})</span></p>
+                                <div className="text-sm text-gray-500 rounded-md p-2 bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
+                                  {renderChangeValue(change.old)}
+                                </div>
+                              </div>
+                            </div>
                           </div>
-                          <div className="px-6 py-4">
-                            <p className="text-xs text-gray-400 mb-1 font-mono">{change.path}</p>
-                            <p className="text-sm text-gray-500 break-all">
-                              {renderValue(change.old)}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
+                        )
+                      })}
                     </div>
                   )}
                 </div>
@@ -352,41 +472,132 @@ export function StoryHistoryPanel({ spaceId, storyId, storyName, previewUrl, onC
             {loading ? (
               <SidebarSkeleton />
             ) : (
-              versions.map((v) => (
-                <button
-                  key={v.id}
-                  onClick={() => {
-                    setSelectedVersion(v)
-                    if (activeTab === 'history') setActiveTab('history')
-                  }}
-                  className={`w-full flex items-start gap-2 px-3 py-3 border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900 text-left transition-colors ${
-                    selectedVersion?.id === v.id ? 'bg-green-50 dark:bg-green-950 border-l-2 border-l-green-600' : ''
-                  }`}
-                >
-                  <div className="flex items-center gap-1 mt-0.5 flex-shrink-0">
-                    <ChevronDown className="w-3 h-3 text-gray-400" />
-                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                      v.status === 'published' ? 'bg-green-500' : 'bg-gray-300'
-                    }`} />
+              groups.map((group, gi) => {
+                const isExpanded = expandedGroups.has(gi)
+                const primary = group.primary
+                const hasSubVersions = group.versions.length > 1
+
+                return (
+                  <div key={`sg-${gi}`}>
+                    {/* Primary version card */}
+                    <div
+                      onClick={() => {
+                        setSelectedVersion(primary)
+                      }}
+                      className={`group/card w-full flex items-start gap-2 px-3 py-3 border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900 text-left transition-colors cursor-pointer ${
+                        selectedVersion?.id === primary.id ? 'bg-green-50 dark:bg-green-950 border-l-2 border-l-green-600' : ''
+                      }`}
+                    >
+                      <div className="flex items-center gap-1 mt-0.5 flex-shrink-0">
+                        {hasSubVersions ? (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); toggleGroup(gi) }}
+                            className="text-gray-400 hover:text-gray-600"
+                          >
+                            {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                          </button>
+                        ) : (
+                          <span className="w-3" />
+                        )}
+                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                          primary.status === 'published' ? 'bg-green-500' : 'bg-gray-300'
+                        }`} />
+                      </div>
+                      <UserAvatar
+                        name={group.user?.name ?? '?'}
+                        src={group.user?.avatar_url ?? null}
+                        size="xs"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-medium text-gray-900 dark:text-gray-100 truncate leading-tight">
+                          {actionLabel(primary)}
+                        </p>
+                        <p className="text-xs text-gray-500 leading-tight">{formatDate(primary.created_at)}</p>
+                        <p className="text-xs text-gray-400 leading-tight">
+                          {actionVerb(primary.action)} by {primary.user?.name ?? 'Unknown'}
+                        </p>
+                      </div>
+                      {/* Hover action buttons */}
+                      <div className="flex items-center gap-0.5 opacity-0 group-hover/card:opacity-100 transition-opacity flex-shrink-0 mt-0.5 border border-gray-200 dark:border-gray-700 rounded-md overflow-hidden">
+                        {gi > 0 && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleRestore(primary) }}
+                            disabled={restoring}
+                            className="p-1.5 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+                            title="Restore this version"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setSelectedVersion(primary); setActiveTab('visual') }}
+                          className="p-1.5 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+                          title="Preview this version"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                        </button>
+                        {gi > 0 && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setCompareRight(primary); if (versions.length > 0) setCompareLeft(versions[0]); setActiveTab('compare') }}
+                            className="p-1.5 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+                            title="Compare with latest"
+                          >
+                            <Columns2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Sub-versions in sidebar */}
+                    {isExpanded && hasSubVersions && group.versions.slice(1).map((v) => (
+                      <div
+                        key={v.id}
+                        onClick={() => setSelectedVersion(v)}
+                        className={`group/subcard w-full flex items-start gap-2 pl-8 pr-3 py-2.5 border-b border-gray-50 dark:border-gray-900 hover:bg-gray-50 dark:hover:bg-gray-900 text-left transition-colors cursor-pointer ${
+                          selectedVersion?.id === v.id ? 'bg-green-50 dark:bg-green-950 border-l-2 border-l-green-600' : ''
+                        }`}
+                      >
+                        <UserAvatar
+                          name={group.user?.name ?? '?'}
+                          src={group.user?.avatar_url ?? null}
+                          size="xs"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs text-gray-500 leading-tight">{formatDate(v.created_at)}</p>
+                          <p className="text-xs text-gray-400 leading-tight">
+                            {actionVerb(v.action)} by {v.user?.name ?? 'Unknown'}
+                          </p>
+                        </div>
+                        {/* Hover action buttons */}
+                        <div className="flex items-center gap-0.5 opacity-0 group-hover/subcard:opacity-100 transition-opacity flex-shrink-0 border border-gray-200 dark:border-gray-700 rounded-md overflow-hidden">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleRestore(v) }}
+                            disabled={restoring}
+                            className="p-1 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+                            title="Restore this version"
+                          >
+                            <RotateCcw className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setSelectedVersion(v); setActiveTab('visual') }}
+                            className="p-1 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+                            title="Preview this version"
+                          >
+                            <Eye className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setCompareRight(v); if (versions.length > 0) setCompareLeft(versions[0]); setActiveTab('compare') }}
+                            className="p-1 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+                            title="Compare with latest"
+                          >
+                            <Columns2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  <UserAvatar
-                    name={v.user?.name ?? '?'}
-                    src={v.user?.avatar_url ?? null}
-                    size="xs"
-                  />
-                  <div className="min-w-0 flex-1">
-                    {(v.action === 'publish' || v.action === 'create') && (
-                      <p className="text-xs font-medium text-gray-900 dark:text-gray-100 truncate leading-tight">
-                        {actionLabel(v)}
-                      </p>
-                    )}
-                    <p className="text-xs text-gray-500 leading-tight">{formatDate(v.created_at)}</p>
-                    <p className="text-xs text-gray-400 leading-tight">
-                      {v.action === 'publish' ? 'Published' : v.action === 'unpublish' ? 'Unpublished' : 'Saved'} by {v.user?.name ?? 'Unknown'}
-                    </p>
-                  </div>
-                </button>
-              ))
+                )
+              })
             )}
           </div>
         </div>
@@ -427,10 +638,39 @@ function VersionSelect({
   )
 }
 
-function renderValue(val: any): string {
-  if (val === null || val === undefined) return '—'
-  if (typeof val === 'string') return val
-  return JSON.stringify(val, null, 2)
+function CompareSkeleton() {
+  return (
+    <div className="divide-y divide-gray-100 dark:divide-gray-800">
+      {/* Version headers skeleton */}
+      <div className="grid grid-cols-2 divide-x divide-gray-200 dark:divide-gray-700">
+        {[0, 1].map((col) => (
+          <div key={col} className="px-6 py-4 flex items-center gap-3 animate-pulse">
+            <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex-shrink-0" />
+            <div className="flex-1">
+              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mb-2" />
+              <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded w-1/2" />
+            </div>
+          </div>
+        ))}
+      </div>
+      {/* Change rows skeleton */}
+      {[...Array(4)].map((_, i) => (
+        <div key={i} className="animate-pulse">
+          <div className="px-6 pt-4 pb-2">
+            <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded w-1/3" />
+          </div>
+          <div className="grid grid-cols-2 divide-x divide-gray-200 dark:divide-gray-700">
+            {[0, 1].map((col) => (
+              <div key={col} className="px-6 pb-4">
+                <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/4 mb-2" />
+                <div className="h-16 bg-gray-100 dark:bg-gray-800 rounded" />
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
 }
 
 function HistorySkeleton() {

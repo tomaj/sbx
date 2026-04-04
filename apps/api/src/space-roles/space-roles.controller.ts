@@ -4,19 +4,20 @@ import {
   Delete,
   Get,
   HttpCode,
-  NotFoundException,
   Param,
   Post,
   Put,
   Query,
   Req,
-  UseGuards,
 } from '@nestjs/common';
-import { SessionOrTokenGuard } from '../auth/session-or-token.guard';
+import { ApiTags } from '@nestjs/swagger';
+import { Auth } from '../auth/auth.decorator';
 import { SpaceRolesService } from './space-roles.service';
+import { ResultGuard } from '../shared/result-guard.util';
 
+@ApiTags('Space Roles - MAPI')
 @Controller('v1/spaces/:spaceId/space_roles')
-@UseGuards(SessionOrTokenGuard)
+@Auth('session-or-token')
 export class SpaceRolesController {
   constructor(private readonly spaceRolesService: SpaceRolesService) {}
 
@@ -31,9 +32,7 @@ export class SpaceRolesController {
 
   @Get(':id')
   async getSpaceRole(@Req() req: any, @Param('id') id: string) {
-    const result = await this.spaceRolesService.adminFindOne(req.space.id, parseInt(id));
-    if (!result) throw new NotFoundException();
-    return result;
+    return ResultGuard.throwIfNotFound(await this.spaceRolesService.adminFindOne(req.space.id, parseInt(id)));
   }
 
   @Post()
@@ -48,20 +47,14 @@ export class SpaceRolesController {
     @Param('id') id: string,
     @Body() body: { space_role: any },
   ) {
-    const result = await this.spaceRolesService.update(
-      req.space.id,
-      parseInt(id),
-      body.space_role ?? {},
+    return ResultGuard.throwIfNotFound(
+      await this.spaceRolesService.update(req.space.id, parseInt(id), body.space_role ?? {}),
     );
-    if (!result) throw new NotFoundException();
-    return result;
   }
 
   @Delete(':id')
   @HttpCode(200)
   async deleteSpaceRole(@Req() req: any, @Param('id') id: string) {
-    const result = await this.spaceRolesService.remove(req.space.id, parseInt(id));
-    if (!result) throw new NotFoundException();
-    return result;
+    return ResultGuard.throwIfNotFound(await this.spaceRolesService.remove(req.space.id, parseInt(id)));
   }
 }

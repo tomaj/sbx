@@ -4,15 +4,9 @@ import { useState, useEffect, use } from 'react'
 import { Settings, Trash2, GripVertical } from 'lucide-react'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
 import { RightSidebar } from '@/components/ui/right-sidebar'
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface Branch {
-  id: number
-  name: string
-  url: string | null
-  position: number
-}
+import { UnsavedChangesModal } from '@/components/ui/unsaved-changes-modal'
+import { useUnsavedChanges } from '@/hooks/use-unsaved-changes'
+import type { Branch } from '@sbx/types'
 
 // ─── Edit form (inside RightSidebar) ─────────────────────────────────────────
 
@@ -30,11 +24,14 @@ function BranchForm({ spaceId, branch, open, onClose, onSaved }: BranchFormProps
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [isDirty, setIsDirty] = useState(false)
+  const { showModal: showUnsavedModal, handleConfirm: confirmUnsaved, handleCancel: cancelUnsaved } = useUnsavedChanges(isDirty)
 
   useEffect(() => {
     setName(branch?.name ?? '')
     setUrl(branch?.url ?? '')
     setError(null)
+    setIsDirty(false)
   }, [branch, open])
 
   async function handleSave() {
@@ -109,7 +106,7 @@ function BranchForm({ spaceId, branch, open, onClose, onSaved }: BranchFormProps
           <input
             type="text"
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => { setName(e.target.value); setIsDirty(true) }}
             placeholder="Production"
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-teal-500"
           />
@@ -120,7 +117,7 @@ function BranchForm({ spaceId, branch, open, onClose, onSaved }: BranchFormProps
           <input
             type="url"
             value={url}
-            onChange={(e) => setUrl(e.target.value)}
+            onChange={(e) => { setUrl(e.target.value); setIsDirty(true) }}
             placeholder="https://example.com/"
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-teal-500"
           />
@@ -135,6 +132,12 @@ function BranchForm({ spaceId, branch, open, onClose, onSaved }: BranchFormProps
         dangerous
         onConfirm={handleDelete}
         onCancel={() => setConfirmDelete(false)}
+      />
+
+      <UnsavedChangesModal
+        open={showUnsavedModal}
+        onConfirm={confirmUnsaved}
+        onCancel={cancelUnsaved}
       />
     </>
   )

@@ -4,20 +4,21 @@ import {
   Delete,
   Get,
   HttpCode,
-  NotFoundException,
   Param,
   Post,
   Put,
   Query,
   Req,
-  UseGuards,
 } from '@nestjs/common';
-import { SessionOrTokenGuard } from '../auth/session-or-token.guard';
+import { ApiTags } from '@nestjs/swagger';
+import { Auth } from '../auth/auth.decorator';
 import { WebhooksService } from './webhooks.service';
 import { ALL_WEBHOOK_ACTIONS } from './webhook-actions';
+import { ResultGuard } from '../shared/result-guard.util';
 
+@ApiTags('Webhooks - MAPI')
 @Controller('v1/spaces/:spaceId/webhook_endpoints')
-@UseGuards(SessionOrTokenGuard)
+@Auth('session-or-token')
 export class WebhooksController {
   constructor(private readonly webhooksService: WebhooksService) {}
 
@@ -41,16 +42,12 @@ export class WebhooksController {
 
   @Get('logs/:logId')
   async getLog(@Req() req: any, @Param('logId') logId: string) {
-    const result = await this.webhooksService.getLog(req.space.id, parseInt(logId));
-    if (!result) throw new NotFoundException();
-    return result;
+    return ResultGuard.throwIfNotFound(await this.webhooksService.getLog(req.space.id, parseInt(logId)));
   }
 
   @Post('logs/:logId/retry')
   async retryLog(@Req() req: any, @Param('logId') logId: string) {
-    const result = await this.webhooksService.retryLog(req.space.id, parseInt(logId));
-    if (!result) throw new NotFoundException();
-    return result;
+    return ResultGuard.throwIfNotFound(await this.webhooksService.retryLog(req.space.id, parseInt(logId)));
   }
 
   @Get('actions')
@@ -65,9 +62,7 @@ export class WebhooksController {
 
   @Get(':id')
   async getWebhook(@Req() req: any, @Param('id') id: string) {
-    const result = await this.webhooksService.findOne(req.space.id, parseInt(id));
-    if (!result) throw new NotFoundException();
-    return result;
+    return ResultGuard.throwIfNotFound(await this.webhooksService.findOne(req.space.id, parseInt(id)));
   }
 
   @Post()
@@ -114,9 +109,9 @@ export class WebhooksController {
       };
     },
   ) {
-    const result = await this.webhooksService.adminUpdate(req.space.id, parseInt(id), body.webhook_endpoint);
-    if (!result) throw new NotFoundException();
-    return { webhook_endpoint: result.webhook };
+    return { webhook_endpoint: ResultGuard.throwIfNotFound(
+      await this.webhooksService.adminUpdate(req.space.id, parseInt(id), body.webhook_endpoint),
+    ).webhook };
   }
 
   @Delete(':id')

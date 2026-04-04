@@ -4,6 +4,8 @@ import { useState, useEffect, useRef } from 'react'
 import { authClient } from '@/lib/auth-client'
 import { Check, HelpCircle } from 'lucide-react'
 import { UserAvatar } from '@/components/ui/user-avatar'
+import { useUnsavedChanges } from '@/hooks/use-unsaved-changes'
+import { UnsavedChangesModal } from '@/components/ui/unsaved-changes-modal'
 
 const ROLES = [
   { value: 'developer', label: '💻 Developer' },
@@ -22,6 +24,8 @@ export default function AccountPage() {
   const [avatar, setAvatar] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [isDirty, setIsDirty] = useState(false)
+  const { showModal: showUnsavedModal, handleConfirm: confirmUnsaved, handleCancel: cancelUnsaved } = useUnsavedChanges(isDirty)
 
   useEffect(() => {
     if (session?.user?.name) {
@@ -55,6 +59,7 @@ export default function AccountPage() {
     setSaving(true)
     await authClient.updateUser({ name: `${firstname} ${lastname}`.trim() })
     setSaving(false)
+    setIsDirty(false)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }
@@ -122,7 +127,7 @@ export default function AccountPage() {
           <input
             type="text"
             value={firstname}
-            onChange={(e) => setFirstname(e.target.value)}
+            onChange={(e) => { setFirstname(e.target.value); setIsDirty(true) }}
             className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-md text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
           />
         </div>
@@ -135,7 +140,7 @@ export default function AccountPage() {
           <input
             type="text"
             value={lastname}
-            onChange={(e) => setLastname(e.target.value)}
+            onChange={(e) => { setLastname(e.target.value); setIsDirty(true) }}
             className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-md text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
           />
         </div>
@@ -149,7 +154,7 @@ export default function AccountPage() {
             {ROLES.map((r) => (
               <button
                 key={r.value}
-                onClick={() => setRole(r.value)}
+                onClick={() => { setRole(r.value); setIsDirty(true) }}
                 className={cn(
                   'px-4 py-2.5 text-sm rounded-md border transition-colors text-left',
                   role === r.value
@@ -164,6 +169,12 @@ export default function AccountPage() {
         </div>
 
       </div>
+
+      <UnsavedChangesModal
+        open={showUnsavedModal}
+        onConfirm={confirmUnsaved}
+        onCancel={cancelUnsaved}
+      />
     </div>
   )
 }

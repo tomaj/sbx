@@ -1,16 +1,17 @@
-import { Controller, Get, NotFoundException, Req, UseGuards } from '@nestjs/common';
-import { TokenGuard } from '../auth/token.guard';
+import { Controller, Get, Req } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
+import { Auth } from '../auth/auth.decorator';
 import { SpacesService } from './spaces.service';
+import { ResultGuard } from '../shared/result-guard.util';
 
+@ApiTags('Spaces - CDN')
 @Controller('v2/cdn/spaces')
-@UseGuards(TokenGuard)
+@Auth('token')
 export class SpacesCdnController {
   constructor(private readonly spacesService: SpacesService) {}
 
   @Get('me')
   async getMe(@Req() req: any) {
-    const result = await this.spacesService.getSpaceMe(req.space.id);
-    if (!result) throw new NotFoundException();
-    return result;
+    return ResultGuard.throwIfNotFound(await this.spacesService.getSpaceMe(req.space.id));
   }
 }

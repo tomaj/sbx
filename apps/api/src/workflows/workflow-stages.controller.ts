@@ -4,19 +4,21 @@ import {
   Delete,
   Get,
   HttpCode,
-  NotFoundException,
   Param,
   Post,
   Put,
   Query,
   Req,
-  UseGuards,
 } from '@nestjs/common';
-import { SessionOrTokenGuard } from '../auth/session-or-token.guard';
+import { ApiTags } from '@nestjs/swagger';
+import { Auth } from '../auth/auth.decorator';
 import { WorkflowsService } from './workflows.service';
+import { QueryParserUtil } from '../shared/query-parser.util';
+import { ResultGuard } from '../shared/result-guard.util';
 
+@ApiTags('Workflow Stages - MAPI')
 @Controller('v1/spaces/:spaceId/workflow_stages')
-@UseGuards(SessionOrTokenGuard)
+@Auth('session-or-token')
 export class WorkflowStagesController {
   constructor(private readonly workflowsService: WorkflowsService) {}
 
@@ -30,7 +32,7 @@ export class WorkflowStagesController {
   ) {
     return this.workflowsService.listStages(req.space.id, {
       excludeId: excludeId ? parseInt(excludeId) : undefined,
-      byIds: byIds ? byIds.split(',').map(Number) : undefined,
+      byIds: QueryParserUtil.parseCsvToInts(byIds),
       search,
       inWorkflow: inWorkflow ? parseInt(inWorkflow) : undefined,
     });
@@ -38,9 +40,7 @@ export class WorkflowStagesController {
 
   @Get(':id')
   async get(@Req() req: any, @Param('id') id: string) {
-    const result = await this.workflowsService.getStage(req.space.id, parseInt(id));
-    if (!result) throw new NotFoundException();
-    return result;
+    return ResultGuard.throwIfNotFound(await this.workflowsService.getStage(req.space.id, parseInt(id)));
   }
 
   @Post()
@@ -99,9 +99,9 @@ export class WorkflowStagesController {
       };
     },
   ) {
-    const result = await this.workflowsService.updateStage(req.space.id, parseInt(id), body.workflow_stage);
-    if (!result) throw new NotFoundException();
-    return result;
+    return ResultGuard.throwIfNotFound(
+      await this.workflowsService.updateStage(req.space.id, parseInt(id), body.workflow_stage),
+    );
   }
 
   @Delete(':id')

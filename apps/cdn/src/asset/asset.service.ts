@@ -1,7 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, PayloadTooLargeException } from '@nestjs/common';
 import { StorageService } from '../storage/storage.service';
 import { splitOnMarker, parseOperations } from './url-parser';
 import { processImage, ProcessResult } from './sharp-processor';
+
+/** Maximum asset size: 100 MB — prevents memory exhaustion from oversized files */
+const MAX_ASSET_SIZE = 100 * 1024 * 1024;
 
 // Extensions handled by the Sharp image processor
 const IMAGE_EXTENSIONS = new Set([
@@ -123,7 +126,14 @@ export class AssetService {
     try {
       return await this.storage.getObject(objectKey);
     } catch (err) {
-      if (!(err instanceof NotFoundException)) throw err;
+      // Fall through to origin fallback for any storage error:
+      // - NotFoundException: object not in MinIO
+      // - Connection errors: MinIO is down (ECONNRESET, ECONNREFUSED, etc.)
+      if (err instanceof NotFoundException || (err as any)?.code === 'ECONNRESET' || (err as any)?.code === 'ECONNREFUSED' || (err as any)?.name === 'TimeoutError') {
+        // continue to origin fallback below
+      } else {
+        throw err;
+      }
     }
 
     // Origin fallback: reconstruct Storyblok URL from the /f/<spaceId>/... path
@@ -132,7 +142,17 @@ export class AssetService {
     if (!response.ok) {
       throw new NotFoundException(`Asset not found in storage or origin: ${objectKey}`);
     }
-    return Buffer.from(await response.arrayBuffer());
+
+    const contentLength = Number(response.headers.get('content-length') ?? 0);
+    if (contentLength > MAX_ASSET_SIZE) {
+      throw new PayloadTooLargeException(`Asset too large: ${contentLength} bytes (max ${MAX_ASSET_SIZE})`);
+    }
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+    if (buffer.length > MAX_ASSET_SIZE) {
+      throw new PayloadTooLargeException(`Asset too large: ${buffer.length} bytes (max ${MAX_ASSET_SIZE})`);
+    }
+    return buffer;
   }
 }
 

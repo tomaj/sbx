@@ -9,13 +9,15 @@ import {
   Put,
   Query,
   Req,
-  UseGuards,
 } from '@nestjs/common';
-import { SessionOrTokenGuard } from '../auth/session-or-token.guard';
+import { ApiTags } from '@nestjs/swagger';
+import { Auth } from '../auth/auth.decorator';
 import { TagsService } from './tags.service';
+import { QueryParserUtil } from '../shared/query-parser.util';
 
+@ApiTags('Tags - MAPI')
 @Controller('v1/spaces/:spaceId/tags')
-@UseGuards(SessionOrTokenGuard)
+@Auth('session-or-token')
 export class TagsMAPIController {
   constructor(private readonly tagsService: TagsService) {}
 
@@ -28,12 +30,13 @@ export class TagsMAPIController {
     @Query('page') page?: string,
     @Query('per_page') perPage?: string,
   ) {
+    const { page: parsedPage, perPage: parsedPerPage } = QueryParserUtil.parsePagination(page, perPage);
     return this.tagsService.listMapi(req.space.id, {
       search,
       sortBy,
       allTags: allTags !== undefined,
-      page: page ? parseInt(page) : 1,
-      perPage: perPage ? parseInt(perPage) : 25,
+      page: parsedPage,
+      perPage: parsedPerPage,
     });
   }
 

@@ -1,3 +1,4 @@
+import { createHmac } from 'crypto';
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Inject, Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
@@ -26,13 +27,31 @@ export class WebhooksProcessor extends WorkerHost {
     let responseStatus: number | null = null;
 
     try {
+      const bodyStr = JSON.stringify(payload);
+
+      // Build signing headers when a secret is configured
+      const signingHeaders: Record<string, string> = {};
+      if (secret) {
+        const timestamp = Math.floor(Date.now() / 1000);
+        const signature = createHmac('sha256', secret)
+          .update(`${timestamp}.${bodyStr}`)
+          .digest('hex');
+
+        signingHeaders['X-Webhook-Signature'] = `sha256=${signature}`;
+        signingHeaders['X-Webhook-Timestamp'] = String(timestamp);
+        // Deprecated: kept for backwards compatibility with consumers that
+        // still verify the plaintext secret header. Will be removed in a
+        // future release — migrate to X-Webhook-Signature HMAC verification.
+        signingHeaders['Webhook-Secret'] = secret;
+      }
+
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(secret ? { 'Webhook-Secret': secret } : {}),
+          ...signingHeaders,
         },
-        body: JSON.stringify(payload),
+        body: bodyStr,
         signal: AbortSignal.timeout(15_000),
       });
 

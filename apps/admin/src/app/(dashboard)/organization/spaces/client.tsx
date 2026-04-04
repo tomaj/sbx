@@ -7,20 +7,7 @@ import { Plus, Search, MoreHorizontal, ChevronDown, ChevronUp } from 'lucide-rea
 import { TimeAgo } from '@/components/ui/time-ago'
 import { UserAvatar } from '@/components/ui/user-avatar'
 import { CreateSpacePanel } from '@/components/spaces/create-space-panel'
-
-interface Member {
-  firstname: string
-  lastname: string
-  avatar: string | null
-}
-
-interface Space {
-  id: number
-  name: string
-  updated_at: string
-  last_activity_at: string | null
-  members: Member[]
-}
+import type { Space } from '@sbx/types'
 
 function OrgSpaceCard({ space }: { space: Space }) {
   const owner = space.members[0] ?? null

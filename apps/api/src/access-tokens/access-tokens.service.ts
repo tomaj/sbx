@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, desc, eq } from 'drizzle-orm';
+import { and, asc, eq, sql } from 'drizzle-orm';
 import { randomBytes } from 'crypto';
 import { DB } from '../db/db.module';
 import type { DbType } from '../db/db.module';
@@ -45,12 +45,9 @@ export class AccessTokensService {
     spaceId: number,
     data: { name?: string; access: 'public' | 'private'; branchId?: number | null; minCache?: number },
   ) {
-    const existing = await this.db
-      .select({ id: apiTokens.id })
-      .from(apiTokens)
-      .orderBy(desc(apiTokens.id))
-      .limit(1);
-    const nextId = existing.length > 0 ? (existing[0].id as number) + 1 : 1;
+    const [{ nextId }] = await this.db.execute<{ nextId: number }>(
+      sql`SELECT nextval('api_tokens_id_seq')::int AS "nextId"`,
+    ).then(r => r.rows as any[]);
 
     const token = randomBytes(18).toString('base64url').slice(0, 24);
     const [created] = await this.db

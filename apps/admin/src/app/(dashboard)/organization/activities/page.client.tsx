@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState } from 'react'
 import { usePerPage } from '@/hooks/use-per-page'
 import { Activity } from 'lucide-react'
 import { DataTable, type Column } from '@/components/ui/data-table'
@@ -8,6 +8,7 @@ import { SelectDropdown } from '@/components/ui/select-dropdown'
 import { CheckboxDropdown } from '@/components/ui/checkbox-dropdown'
 import { DateField } from '@/components/ui/date-field'
 import { UserAvatar } from '@/components/ui/user-avatar'
+import { useApi } from '@/lib/swr'
 import {
   ACTIVITY_TYPES,
   formatActivityKey,
@@ -15,37 +16,19 @@ import {
   activityKeyColor,
   resolveItemName,
 } from '@/components/activities/activity-utils'
+import type { ActivityRow } from '@sbx/types'
 
-interface Space {
+interface ActivitySpace {
   id: number
   name: string
 }
 
-interface User {
+interface ActivityUser {
   id: number
   firstname: string
   lastname: string
   email: string
   avatar: string | null
-}
-
-interface ActivityRow {
-  id: number
-  activity: {
-    id: number
-    key: string
-    trackable_id: number | null
-    trackable_type: string | null
-    created_at: string
-    space_id: number
-  }
-  trackable: { id: string | number; name: string; slug: string } | null
-  user: {
-    id: number
-    userid: string
-    friendly_name: string
-    avatar: string | null
-  } | null
 }
 
 export default function OrgActivitiesPage() {
@@ -57,35 +40,27 @@ export default function OrgActivitiesPage() {
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = usePerPage('perPage:org-activities', 25)
 
-  const [spaces, setSpaces] = useState<Space[]>([])
-  const [users, setUsers] = useState<User[]>([])
-  const [rows, setRows] = useState<ActivityRow[]>([])
-  const [total, setTotal] = useState(0)
-  const [loading, setLoading] = useState(false)
+  const { data: spacesData } = useApi<{ spaces: ActivitySpace[] }>('/api/admin/spaces')
+  const { data: usersData } = useApi<{ users: ActivityUser[] }>('/api/admin/users?per_page=100&filter=all')
 
-  useEffect(() => {
-    fetch('/api/admin/spaces').then((r) => r.json()).then((d) => setSpaces(d.spaces ?? []))
-    fetch('/api/admin/users?per_page=100&filter=all').then((r) => r.json()).then((d) => setUsers(d.users ?? []))
-  }, [])
+  const spaces = spacesData?.spaces ?? []
+  const users = usersData?.users ?? []
 
-  const fetchActivities = useCallback(async () => {
-    if (!spaceId) return
-    setLoading(true)
-    const params = new URLSearchParams({ spaceId, page: String(page), per_page: String(perPage) })
-    if (activityKeys.length) params.set('types', activityKeys.join(','))
-    if (userIds.length) params.set('by_owner_ids', userIds.join(','))
-    if (dateFrom) params.set('created_at_gte', dateFrom)
-    if (dateTo) params.set('created_at_lte', dateTo)
-    const res = await fetch(`/api/admin/activities?${params}`)
-    if (res.ok) {
-      const data = await res.json()
-      setRows(data.activities ?? [])
-      setTotal(data.total ?? 0)
-    }
-    setLoading(false)
-  }, [spaceId, page, perPage, activityKeys, userIds, dateFrom, dateTo])
+  const activitiesParams = spaceId
+    ? (() => {
+        const params = new URLSearchParams({ spaceId, page: String(page), per_page: String(perPage) })
+        if (activityKeys.length) params.set('types', activityKeys.join(','))
+        if (userIds.length) params.set('by_owner_ids', userIds.join(','))
+        if (dateFrom) params.set('created_at_gte', dateFrom)
+        if (dateTo) params.set('created_at_lte', dateTo)
+        return `/api/admin/activities?${params}`
+      })()
+    : null
 
-  useEffect(() => { fetchActivities() }, [fetchActivities])
+  const { data: activitiesData, isLoading: loading } = useApi<{ activities: ActivityRow[]; total: number }>(activitiesParams)
+
+  const rows = activitiesData?.activities ?? []
+  const total = activitiesData?.total ?? 0
 
   const selectedSpace = spaces.find((s) => String(s.id) === spaceId)
 

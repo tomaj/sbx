@@ -198,3 +198,112 @@ cd apps/api
 pnpm drizzle-kit generate   # generovanie migrácie
 pnpm drizzle-kit migrate    # spustenie migrácie
 ```
+
+## Env premenné a validácia
+
+- Env premenné sa validujú pri štarte cez **Zod schema** v `apps/api/src/config/env.schema.ts`
+- Ak chýba povinná premenná alebo má nesprávny formát, app **crashne s jasným error message**
+- Pri pridávaní novej env premennej vždy aktualizuj Zod schema v `env.schema.ts`
+- `JWT_SECRET` musí mať min. 16 znakov — žiadny hardcoded fallback
+- `ConfigModule` sa loaduje ako prvý modul v `AppModule`
+
+## Security konvencie (apps/api)
+
+- **Helmet** — vždy zapnutý v `main.ts`, generuje security headers (X-Frame-Options, CSP, HSTS...)
+- **CORS** — restrict na `localhost:3001`, `localhost:3003` + `CORS_ORIGINS` env var. Nikdy `origin: '*'`
+- **ValidationPipe** — globálny, `whitelist: true` (stripuje neznáme properties), `transform: true`
+- **Rate limiting** — `@nestjs/throttler` globálne (20 req/s, 200 req/min). Login endpoint má prísnejší limit (5 req/s, 10 req/min). Na CDN endpointy sa dá použiť `@SkipThrottle()` ak treba
+- **sql.raw()** — nikdy bez validácie inputu. Každý field name musí prejsť `/^\w+$/` testom. Preferuj Drizzle query builder
+- **BigInt** — serializuje sa ako Number ak `Number.isSafeInteger()`, inak ako String
+
+## Logging (apps/api)
+
+- Používame **Pino** cez `nestjs-pino` — štruktúrovaný JSON logging
+- V dev prostredí `pino-pretty` s farbami, v produkcii raw JSON
+- Každý request má **request ID** (`x-request-id` header alebo auto-generated UUID)
+- Health check endpointy (`/health`) sa nelogujú (šum)
+- Konfigurácia v `apps/api/src/logging/logging.module.ts`
+- Namiesto `console.log` používaj NestJS `Logger` z `@nestjs/common`
+
+## Error handling (apps/api)
+
+- Globálny **AllExceptionsFilter** v `apps/api/src/filters/all-exceptions.filter.ts`
+- Každá error response obsahuje `correlationId` (z `x-request-id` headeru)
+- 500+ errory sa logujú so stack trace
+- Formát error response: `{ statusCode, message, correlationId }`
+
+## Health checks
+
+- `GET /health` — kontroluje DB + Redis konektivitu (via `@nestjs/terminus`)
+- `GET /health/liveness` — jednoduchý `{ status: 'ok' }` pre k8s liveness probe
+- Implementácia v `apps/api/src/health/`
+
+## Admin route handlery (apps/admin)
+
+- Väčšina route handlerov je nahradená **catch-all proxy** v `apps/admin/src/app/api/admin/[...path]/route.ts`
+- Catch-all mapuje URL path na MAPI: `/api/admin/spaces/123/stories` → `/v1/spaces/123/stories`
+- Routy s **custom logikou** (body transformácia, URL remapping, multipart upload) majú vlastný route file — Next.js ich matchne pred catch-all
+- Pri pridávaní nového MAPI proxy endpointu: ak je to jednoduchý pass-through, catch-all ho obslúži automaticky. Ak treba body wrapping alebo URL remapping, vytvor špecifický route file
+
+## Data fetching v admin (SWR)
+
+- Používame **SWR** (`useSWR`) pre client-side data fetching — hook `useApi<T>()` z `@/lib/swr`
+- `SWRProvider` je v root layoute — globálny config s `revalidateOnFocus: false`
+- Po mutáciách (create, update, delete) volaj `mutate()` na revalidáciu dát
+- Pre stránkovanie používaj dynamický SWR key: `useApi<T>(\`/api/admin/...?page=${page}\`)`
+- Nepoužívaj manuálne `useState` + `useEffect` + `fetch()` pre data loading — vždy `useApi()`
+
+## Formuláre v admin (react-hook-form + zod)
+
+- Používame **react-hook-form** s **zod** validáciou (`@hookform/resolvers/zod`)
+- Zod schémy definuj na **module level** (mimo komponentu)
+- Pre jednoduché inputy používaj `register('fieldName')`
+- Pre komplexné inputy (SelectDropdown, Toggle, custom) používaj `Controller` z react-hook-form
+- `isSubmitting` namiesto custom `saving` useState
+- `errors.root` pre server-side errory namiesto custom `error` useState
+- Pri editácii existujúceho záznamu volaj `reset(existingData)` v useEffect
+- UI state (modaly, dropdowny, selectedIds) ostáva ako `useState` — nepatrí do formu
+
+## Swagger / API docs
+
+- **Swagger UI** na `http://localhost:3000/docs` (len v development mode)
+- Každý controller má `@ApiTags('...')` dekorátor — grouping podľa domény a typu (CDN/MAPI/Admin)
+- Konfigurácia v `main.ts` cez `DocumentBuilder` + `SwaggerModule`
+- Auth schémy: Bearer (MAPI/Admin), API Key query param `token` (CDN)
+
+## Auth guard konvencie (apps/api)
+
+- Používame **unified `@Auth()` dekorátor** namiesto `@UseGuards()` s individuálnymi guardmi
+- `@Auth('session')` — admin endpointy (cookie/bearer session)
+- `@Auth('token')` — CDN endpointy (query param `?token=`)
+- `@Auth('session-or-token')` — MAPI endpointy (akceptuje oboje)
+- Implementácia v `apps/api/src/auth/unified-auth.guard.ts`
+- Staré guardy (SessionGuard, TokenGuard, etc.) existujú pre backwards compat ale nepoužívaj ich v novom kóde
+
+## Webhook konvencie
+
+- **HMAC-SHA256 signing** — payload podpísaný cez `X-Webhook-Signature: sha256={hex}` + `X-Webhook-Timestamp` header
+- Signature sa počíta ako `HMAC-SHA256(secret, "{timestamp}.{body}")`
+- **Job idempotencia** — webhook joby majú deterministic `jobId` (`wh-{endpointId}-{action}-{spaceId}-{resourceId}-{timestamp}`)
+- `Webhook-Secret` header (plaintext) je deprecated — zachovaný pre backwards compat
+
+## DB transakcie
+
+- Multi-table operácie MUSIA používať `this.db.transaction(async (tx) => { ... })`
+- Vzor: DB writes v transakcii, side effects (webhooky, job queue, logging) PO transakcii
+- Príklady: `publishRelease()`, `publishStory()`, `unpublishStory()`, `createStory()`
+- Single-table operácie transakciu nepotrebujú
+
+## Monitoring a telemetria
+
+- **OpenTelemetry** — opt-in cez `OTEL_ENABLED=true` env var
+- Auto-instrumentácia pre HTTP, Express, PostgreSQL
+- **Prometheus metrics** na `GET /metrics` (prom-client) + OTel exporter na port 9464 (`METRICS_PORT`)
+- Implementácia v `apps/api/src/telemetry/`
+
+## CI/CD
+
+- GitHub Actions pipeline v `.github/workflows/ci.yml`
+- Joby: lint + typecheck → test API (s Postgres + Redis services) → test CDN → build all
+- Trigger: push/PR na `main`
+- Shared packages (`@sbx/types`, `@sbx/jobs`) sa buildujú pred každým jobom

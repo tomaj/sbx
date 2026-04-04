@@ -1,22 +1,46 @@
-import { Controller, Get, Param, Query, Req, UseGuards } from '@nestjs/common';
-import { SessionOrTokenGuard } from '../auth/session-or-token.guard';
-import { SessionGuard } from '../auth/session.guard';
+import { Controller, Get, Param, ParseIntPipe, Query, Req } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
+import { Auth } from '../auth/auth.decorator';
+import { StatisticsService } from './statistics.service';
+import { AiLogsService } from '../ai/ai-logs.service';
 
 /**
  * Per-space statistics:
  *   GET /v1/spaces/:spaceId/statistics/:date
  */
+@ApiTags('Statistics - MAPI')
 @Controller('v1/spaces/:spaceId/statistics')
-@UseGuards(SessionOrTokenGuard)
+@Auth('session-or-token')
 export class SpaceStatisticsController {
+  constructor(
+    private readonly statisticsService: StatisticsService,
+    private readonly aiLogsService: AiLogsService,
+  ) {}
+
+  // Specific routes MUST be before the :date wildcard
+  @Get('traffic')
+  async getTraffic(
+    @Param('spaceId', ParseIntPipe) spaceId: number,
+    @Query('period') period = 'this_month',
+  ) {
+    return this.statisticsService.findSpaceTraffic(spaceId, period);
+  }
+
+  @Get('ai')
+  async getAiStats(
+    @Param('spaceId', ParseIntPipe) spaceId: number,
+    @Query('period') period = 'last_14_days',
+  ) {
+    return this.aiLogsService.getStats(spaceId, period);
+  }
+
   @Get(':date')
   async getByDate(
     @Req() req: any,
     @Param('date') date: string,
   ) {
-    // Return empty statistics array in correct MAPI shape.
-    // We don't track per-request metrics yet — this is a stub for API compatibility.
-    return { statistics: [] };
+    const rows = await this.statisticsService.findBySpaceAndMonth(req.space.id, date);
+    return { statistics: rows };
   }
 }
 
@@ -25,28 +49,23 @@ export class SpaceStatisticsController {
  *   GET /v1/orgs/me/statistics/all_traffic
  *   GET /v1/orgs/me/statistics/assets_traffic
  */
+@ApiTags('Statistics - MAPI')
 @Controller('v1/orgs/me/statistics')
-@UseGuards(SessionGuard)
+@Auth('session')
 export class OrgStatisticsController {
+  constructor(private readonly statisticsService: StatisticsService) {}
+
   @Get('all_traffic')
   async allTraffic(
     @Query('start_date') startDate?: string,
     @Query('end_date') endDate?: string,
     @Query('group_by') groupBy?: string,
   ) {
-    return {
-      montly_traffic_limit: 0,
-      yearly_traffic_limit: 0,
-      traffic_used_this_year: 0,
-      cumulated_traffic: {
-        requests_used_last_days: 0,
-        total_requests_per_time_period: 0,
-        total_traffic_per_time_period: 0,
-        traffic: [],
-      },
-      traffic_top_spaces: {},
-      traffic: [],
-    };
+    const today = new Date().toISOString().slice(0, 10);
+    const from = startDate ?? new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
+    const to = endDate ?? today;
+    const gb = (groupBy === 'day' || groupBy === 'year') ? groupBy : 'month';
+    return this.statisticsService.orgAllTraffic(from, to, gb);
   }
 
   @Get('assets_traffic')
@@ -54,6 +73,9 @@ export class OrgStatisticsController {
     @Query('start_date') startDate?: string,
     @Query('end_date') endDate?: string,
   ) {
-    return { assets: [] };
+    const today = new Date().toISOString().slice(0, 10);
+    const from = startDate ?? new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
+    const to = endDate ?? today;
+    return this.statisticsService.orgAssetsTraffic(from, to);
   }
 }

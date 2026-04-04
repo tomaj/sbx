@@ -532,7 +532,9 @@ async function seedStories() {
           updatedAt: sql`excluded.updated_at`,
           publishedAt: sql`excluded.published_at`,
           tagList: sql`excluded.tag_list`,
-          content: sql`excluded.content`,
+          // Only overwrite content if incoming has actual data — MAPI list endpoint
+          // sometimes omits content even with with_content=1, so we preserve existing.
+          content: sql`CASE WHEN excluded.content::text = '{}' THEN stories.content ELSE excluded.content END`,
           position: sql`excluded.position`,
           defaultFullSlug: sql`excluded.default_full_slug`,
           translatedSlugs: sql`excluded.translated_slugs`,

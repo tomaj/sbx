@@ -2,13 +2,13 @@ import { Module } from '@nestjs/common';
 import { AssetsAdminController } from './assets-admin.controller';
 import { AssetsController } from './assets.controller';
 import { AssetsService } from './assets.service';
-import { SessionGuard } from '../auth/session.guard';
-import { SessionOrTokenGuard } from '../auth/session-or-token.guard';
 import { WebhooksModule } from '../webhooks/webhooks.module';
+import { AiModule } from '../ai/ai.module';
+import { AiConfigurationsModule } from '../ai-configurations/ai-configurations.module';
 
 @Module({
-  imports: [WebhooksModule],
+  imports: [WebhooksModule, AiModule, AiConfigurationsModule],
   controllers: [AssetsAdminController, AssetsController],
-  providers: [AssetsService, SessionGuard, SessionOrTokenGuard],
+  providers: [AssetsService],
 })
 export class AssetsModule {}

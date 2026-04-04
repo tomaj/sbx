@@ -9,13 +9,15 @@ import {
   Post,
   Put,
   Query,
-  UseGuards,
 } from '@nestjs/common';
-import { SessionOrTokenGuard } from '../auth/session-or-token.guard';
+import { ApiTags } from '@nestjs/swagger';
+import { Auth } from '../auth/auth.decorator';
 import { DatasourcesService } from './datasources.service';
+import { QueryParserUtil } from '../shared/query-parser.util';
 
+@ApiTags('Datasource Entries - MAPI')
 @Controller('v1/spaces/:spaceId/datasource_entries')
-@UseGuards(SessionOrTokenGuard)
+@Auth('session-or-token')
 export class DatasourceEntriesMapiController {
   constructor(private readonly datasourcesService: DatasourcesService) {}
 
@@ -29,8 +31,9 @@ export class DatasourceEntriesMapiController {
     @Query('per_page') perPage = '25',
     @Query('search') search?: string,
   ) {
-    const pageNum = Math.max(1, parseInt(page) || 1);
-    const perPageNum = Math.min(1000, parseInt(perPage) || 25);
+    const { page: parsedPage, perPage: parsedPerPage } = QueryParserUtil.parsePagination(page, perPage);
+    const pageNum = parsedPage;
+    const perPageNum = Math.min(1000, parsedPerPage);
 
     // Resolve dimension entry_value from numeric dimension ID
     let dimensionEntryValue: string | undefined;

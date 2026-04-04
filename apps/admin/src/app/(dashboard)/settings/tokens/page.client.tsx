@@ -5,14 +5,10 @@ import { Pencil, Trash2, TriangleAlert } from 'lucide-react'
 import { SelectDropdown } from '@/components/ui/select-dropdown'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
 import { RightSidebar } from '@/components/ui/right-sidebar'
-
-interface Token {
-  id: number
-  name: string
-  lastFour: string
-  expiresAt: string | null
-  createdAt: string
-}
+import { UnsavedChangesModal } from '@/components/ui/unsaved-changes-modal'
+import { useUnsavedChanges } from '@/hooks/use-unsaved-changes'
+import type { PersonalAccessToken } from '@sbx/types'
+import { formatDateTime as formatDate, formatDate as formatDateOnly } from '@/lib/date'
 
 const EXPIRY_OPTIONS = [
   { label: '30 days', days: 30 },
@@ -22,15 +18,8 @@ const EXPIRY_OPTIONS = [
   { label: 'No expiration', days: 0 },
 ]
 
-function formatDate(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString('en-GB', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  })
-}
-
 export default function TokensPage() {
-  const [tokens, setTokens] = useState<Token[]>([])
+  const [tokens, setTokens] = useState<PersonalAccessToken[]>([])
   const [showForm, setShowForm] = useState(false)
   const [tokenName, setTokenName] = useState('')
   const [expiryDays, setExpiryDays] = useState(90)
@@ -39,8 +28,10 @@ export default function TokensPage() {
   const [copied, setCopied] = useState(false)
 
   const [deleteId, setDeleteId] = useState<number | null>(null)
-  const [editToken, setEditToken] = useState<Token | null>(null)
+  const [editToken, setEditToken] = useState<PersonalAccessToken | null>(null)
   const [editName, setEditName] = useState('')
+  const [editIsDirty, setEditIsDirty] = useState(false)
+  const { showModal: showUnsavedModal, handleConfirm: confirmUnsaved, handleCancel: cancelUnsaved } = useUnsavedChanges(editIsDirty)
   const [saving, setSaving] = useState(false)
 
   const fetchTokens = useCallback(async () => {
@@ -86,13 +77,15 @@ export default function TokensPage() {
       body: JSON.stringify({ name: editName }),
     })
     setSaving(false)
+    setEditIsDirty(false)
     setEditToken(null)
     fetchTokens()
   }
 
-  function openEdit(token: Token) {
+  function openEdit(token: PersonalAccessToken) {
     setEditToken(token)
     setEditName(token.name)
+    setEditIsDirty(false)
   }
 
   function handleCopy() {
@@ -104,7 +97,7 @@ export default function TokensPage() {
   }
 
   const expiryDate = expiryDays
-    ? new Date(Date.now() + expiryDays * 86400000).toLocaleDateString('en-GB')
+    ? formatDateOnly(new Date(Date.now() + expiryDays * 86400000))
     : null
 
   return (
@@ -134,7 +127,7 @@ export default function TokensPage() {
               </p>
               {token.expiresAt && (
                 <p className="text-xs text-gray-400">
-                  The token will expire on {new Date(token.expiresAt).toLocaleDateString('en-GB')}
+                  The token will expire on {formatDateOnly(token.expiresAt)}
                 </p>
               )}
             </div>
@@ -286,11 +279,13 @@ export default function TokensPage() {
           <input
             type="text"
             value={editName}
-            onChange={(e) => setEditName(e.target.value)}
+            onChange={(e) => { setEditName(e.target.value); setEditIsDirty(true) }}
             className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
           />
         </div>
       </RightSidebar>
+
+      <UnsavedChangesModal open={showUnsavedModal} onConfirm={confirmUnsaved} onCancel={cancelUnsaved} />
     </div>
   )
 }

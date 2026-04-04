@@ -1,54 +1,58 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useMemo, useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
 import { useRouter } from 'next/navigation'
 import { Search, Plus, Code2 } from 'lucide-react'
+import { PageLayout } from '@/components/ui/page-layout'
+import { useApi } from '@/lib/swr'
+import type { FieldType } from '@sbx/types'
 
-interface FieldType {
-  id: number
-  name: string
-  approved_version: number | null
-}
+const fieldTypeSchema = z.object({
+  name: z.string().min(1, 'Name is required'),
+})
+type FieldTypeFormValues = z.infer<typeof fieldTypeSchema>
 
 export default function OrgFieldTypesPage() {
   const router = useRouter()
-  const [fieldTypes, setFieldTypes] = useState<FieldType[]>([])
-  const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [creating, setCreating] = useState(false)
-  const [newName, setNewName] = useState('')
-  const [createError, setCreateError] = useState('')
 
-  useEffect(() => {
-    fetch('/api/admin/field-types')
-      .then((r) => r.json())
-      .then((d) => { setFieldTypes(d.field_types ?? []); setLoading(false) })
-      .catch(() => setLoading(false))
-  }, [])
+  const { data, isLoading: loading, mutate } = useApi<{ field_types: FieldType[] }>('/api/admin/field-types')
+  const fieldTypes = data?.field_types ?? []
 
   const filtered = useMemo(() => {
     if (!search.trim()) return fieldTypes
     return fieldTypes.filter((ft) => ft.name.toLowerCase().includes(search.toLowerCase()))
   }, [fieldTypes, search])
 
-  async function handleCreate(e: React.FormEvent) {
-    e.preventDefault()
-    if (!newName.trim()) return
-    setCreateError('')
+  const { register, handleSubmit, reset, formState: { errors, isSubmitting }, setError } = useForm<FieldTypeFormValues>({
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-expect-error — zod v4 minor version literal mismatch with @hookform/resolvers types
+    resolver: zodResolver(fieldTypeSchema),
+    defaultValues: { name: '' },
+  })
+
+  async function onCreateSubmit(values: FieldTypeFormValues) {
     const res = await fetch('/api/admin/field-types', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ field_type: { name: newName.trim() } }),
+      body: JSON.stringify({ field_type: { name: values.name.trim() } }),
     })
     const data = await res.json()
-    if (!res.ok) { setCreateError(data.message ?? 'Error'); return }
+    if (!res.ok) {
+      setError('root', { message: data.message ?? 'Error' })
+      return
+    }
     router.push(`/organization/field-types/${data.field_type.id}`)
   }
 
   return (
-    <div className="p-8 max-w-4xl">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Field-types</h1>
+    <PageLayout
+      title="Field-types"
+      action={
         <button
           type="button"
           onClick={() => setCreating(true)}
@@ -57,30 +61,30 @@ export default function OrgFieldTypesPage() {
           <Plus className="w-4 h-4" />
           New Field-type
         </button>
-      </div>
-
+      }
+    >
       {/* Create form */}
       {creating && (
         <div className="mb-6 p-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800">
           <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-3">New field-type name</p>
-          <form onSubmit={handleCreate} className="flex gap-2">
+          <form onSubmit={handleSubmit(onCreateSubmit)} className="flex gap-2">
             <input
               autoFocus
               type="text"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
+              {...register('name')}
               placeholder="e.g. my-custom-picker"
               className="flex-1 px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
             />
-            <button type="submit" className="px-4 py-2 text-sm font-medium bg-teal-600 hover:bg-teal-700 text-white rounded-lg transition-colors">
-              Create
+            <button type="submit" disabled={isSubmitting} className="px-4 py-2 text-sm font-medium bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white rounded-lg transition-colors">
+              {isSubmitting ? 'Creating...' : 'Create'}
             </button>
-            <button type="button" onClick={() => { setCreating(false); setNewName(''); setCreateError('') }}
+            <button type="button" onClick={() => { setCreating(false); reset() }}
               className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors">
               Cancel
             </button>
           </form>
-          {createError && <p className="text-xs text-red-500 mt-2">{createError}</p>}
+          {errors.name && <p className="text-xs text-red-500 mt-2">{errors.name.message}</p>}
+          {errors.root && <p className="text-xs text-red-500 mt-2">{errors.root.message}</p>}
         </div>
       )}
 
@@ -135,6 +139,6 @@ export default function OrgFieldTypesPage() {
           ))}
         </div>
       )}
-    </div>
+    </PageLayout>
   )
 }

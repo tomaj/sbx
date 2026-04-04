@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, PayloadTooLargeException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   S3Client,
@@ -48,10 +48,21 @@ export class StorageService {
   }
 }
 
+const MAX_ASSET_SIZE = 100 * 1024 * 1024; // 100 MB
+
 function streamToBuffer(stream: Readable): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
-    stream.on('data', (chunk: Buffer) => chunks.push(chunk));
+    let totalSize = 0;
+    stream.on('data', (chunk: Buffer) => {
+      totalSize += chunk.length;
+      if (totalSize > MAX_ASSET_SIZE) {
+        stream.destroy();
+        reject(new PayloadTooLargeException(`Asset too large: exceeds ${MAX_ASSET_SIZE} bytes`));
+        return;
+      }
+      chunks.push(chunk);
+    });
     stream.on('end', () => resolve(Buffer.concat(chunks)));
     stream.on('error', reject);
   });

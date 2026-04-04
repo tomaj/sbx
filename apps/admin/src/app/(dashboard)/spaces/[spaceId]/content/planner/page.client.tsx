@@ -3,6 +3,7 @@
 import { useState, useEffect, use } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Plus, ChevronLeft, ChevronRight, Search } from 'lucide-react'
+import { formatDateTime, formatDate } from '@/lib/date'
 
 type Release = {
   id: number
@@ -289,7 +290,7 @@ export default function ContentPlannerClient({ params }: { params: Promise<{ spa
           ) : filteredReleases.length === 0 ? (
             <div className="text-sm text-gray-400 dark:text-gray-500 py-4">
               {selectedDay
-                ? `No releases scheduled for ${selectedDay.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}`
+                ? `No releases scheduled for ${formatDate(selectedDay)}`
                 : filterType === 'scheduled'
                 ? 'No scheduled releases'
                 : filterType === 'unscheduled'
@@ -316,7 +317,7 @@ export default function ContentPlannerClient({ params }: { params: Promise<{ spa
                   </div>
                   <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0 ml-4">
                     {release.release_at
-                      ? `Scheduled: ${new Date(release.release_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`
+                      ? `Scheduled: ${formatDateTime(release.release_at)}`
                       : `Edited: ${formatRelativeDate(release.updated_at)}`}
                   </span>
                 </button>

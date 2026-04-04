@@ -1,10 +1,13 @@
-import { Controller, Get, Post, Put, Delete, Param, Body, Query, UseGuards, ParseIntPipe, Res, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Param, Body, Query, ParseIntPipe, Res, HttpCode, HttpStatus } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
+import { Auth } from '../auth/auth.decorator';
 import type { Response } from 'express';
-import { SessionGuard } from '../auth/session.guard';
 import { FieldTypesService } from './field-types.service';
+import { QueryParserUtil } from '../shared/query-parser.util';
 
+@ApiTags('Field Types - Admin')
 @Controller('v1/field_types')
-@UseGuards(SessionGuard)
+@Auth('session')
 export class FieldTypesAdminController {
   constructor(private readonly service: FieldTypesService) {}
 
@@ -15,11 +18,12 @@ export class FieldTypesAdminController {
     @Query('page') page?: string,
     @Query('per_page') perPage?: string,
   ) {
+    const { page: parsedPage, perPage: parsedPerPage } = QueryParserUtil.parsePagination(page, perPage);
     return this.service.list({
       search,
-      onlyMine: onlyMine === '1',
-      page: page ? parseInt(page) : 1,
-      perPage: perPage ? parseInt(perPage) : 25,
+      onlyMine: QueryParserUtil.parseBoolean(onlyMine) ?? false,
+      page: parsedPage,
+      perPage: parsedPerPage,
     });
   }
 

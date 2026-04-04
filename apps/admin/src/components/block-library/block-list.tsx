@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react'
 import { LayoutTemplate } from 'lucide-react'
 import type { ComponentGroup } from './group-tree'
+import { formatDate } from '@/lib/date'
 
 export interface Block {
   id: number
@@ -21,11 +22,6 @@ export interface Block {
   preview_field: string | null
   preview_tmpl: string | null
   internal_tags_list: { id: string | number; name: string }[]
-}
-
-function formatDate(iso: string): string {
-  const d = new Date(iso)
-  return d.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })
 }
 
 function BlockType({ is_root, is_nestable }: { is_root: boolean; is_nestable: boolean }) {

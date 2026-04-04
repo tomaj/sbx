@@ -4,21 +4,7 @@ import { useState, useEffect, use } from 'react'
 import Link from 'next/link'
 import { Plus, Settings, Lock } from 'lucide-react'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
-
-interface WorkflowStage {
-  id: number
-  name: string
-  color: string
-  position: number
-}
-
-interface Workflow {
-  id: number
-  name: string
-  content_types: string[]
-  is_default: boolean
-  stages: WorkflowStage[]
-}
+import type { Workflow, WorkflowStage } from '@sbx/types'
 
 function StageBadge({ stage }: { stage: WorkflowStage }) {
   return (

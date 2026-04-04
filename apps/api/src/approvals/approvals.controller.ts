@@ -4,18 +4,19 @@ import {
   Delete,
   Get,
   HttpCode,
-  NotFoundException,
   Param,
   Post,
   Query,
   Req,
-  UseGuards,
 } from '@nestjs/common';
-import { SessionOrTokenGuard } from '../auth/session-or-token.guard';
+import { ApiTags } from '@nestjs/swagger';
+import { Auth } from '../auth/auth.decorator';
 import { ApprovalsService } from './approvals.service';
+import { ResultGuard } from '../shared/result-guard.util';
 
+@ApiTags('Approvals - MAPI')
 @Controller('v1/spaces/:spaceId/approvals')
-@UseGuards(SessionOrTokenGuard)
+@Auth('session-or-token')
 export class ApprovalsController {
   constructor(private readonly approvalsService: ApprovalsService) {}
 
@@ -31,9 +32,7 @@ export class ApprovalsController {
 
   @Get(':id')
   async getApproval(@Req() req: any, @Param('id') id: string) {
-    const result = await this.approvalsService.findOne(req.space.id, parseInt(id));
-    if (!result) throw new NotFoundException();
-    return result;
+    return ResultGuard.throwIfNotFound(await this.approvalsService.findOne(req.space.id, parseInt(id)));
   }
 
   @Post()

@@ -1,9 +1,12 @@
-import { Controller, Get, Param, Query, Req, UseGuards } from '@nestjs/common';
-import { TokenGuard } from '../auth/token.guard';
+import { Controller, Get, Param, Query, Req } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
+import { Auth } from '../auth/auth.decorator';
 import { StoriesCdnService } from './stories-cdn.service';
+import { QueryParserUtil } from '../shared/query-parser.util';
 
+@ApiTags('Stories - CDN')
 @Controller('v2/cdn/stories')
-@UseGuards(TokenGuard)
+@Auth('token')
 export class StoriesCdnController {
   constructor(private readonly storiesCdnService: StoriesCdnService) {}
 
@@ -40,17 +43,18 @@ export class StoriesCdnController {
     // so filter_query[field][op]=value arrives as flat keys. Parse them manually.
     const filterQuery = this.parseFilterQuery(req.query);
 
+    const { page: parsedPage, perPage: parsedPerPage } = QueryParserUtil.parsePagination(page, perPage);
     return this.storiesCdnService.listStories(req.space.id, {
       version: resolvedVersion,
       fromRelease: fromRelease ? parseInt(fromRelease) : undefined,
-      page: Math.max(1, parseInt(page ?? '1') || 1),
-      perPage: Math.min(100, parseInt(perPage ?? '25') || 25),
+      page: parsedPage,
+      perPage: parsedPerPage,
       startsWith,
-      bySlugs: bySlugs ? bySlugs.split(',').filter(Boolean) : undefined,
-      byUuids: byUuids ? byUuids.split(',').filter(Boolean) : undefined,
-      byUuidsOrdered: byUuidsOrdered ? byUuidsOrdered.split(',').filter(Boolean) : undefined,
-      excludingSlugs: excludingSlugs ? excludingSlugs.split(',').filter(Boolean) : undefined,
-      excludingIds: excludingIds ? excludingIds.split(',').map(Number).filter(Boolean) : undefined,
+      bySlugs: QueryParserUtil.parseCsvToStrings(bySlugs),
+      byUuids: QueryParserUtil.parseCsvToStrings(byUuids),
+      byUuidsOrdered: QueryParserUtil.parseCsvToStrings(byUuidsOrdered),
+      excludingSlugs: QueryParserUtil.parseCsvToStrings(excludingSlugs),
+      excludingIds: QueryParserUtil.parseCsvToInts(excludingIds),
       contentType,
       level: level !== undefined ? parseInt(level) : undefined,
       withTag,
@@ -64,7 +68,7 @@ export class StoriesCdnController {
       publishedAtLt,
       updatedAtGt,
       updatedAtLt,
-      excludingFields: excludingFields ? excludingFields.split(',').filter(Boolean) : undefined,
+      excludingFields: QueryParserUtil.parseCsvToStrings(excludingFields),
     });
   }
 

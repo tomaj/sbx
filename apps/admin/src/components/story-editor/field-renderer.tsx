@@ -1,11 +1,11 @@
 'use client'
 
+import dynamic from 'next/dynamic'
 import { MessageSquare } from 'lucide-react'
 import type { AnyFieldDef } from '@/components/block-library/edit-block-modal/types'
 import type { ComponentMeta, ComponentGroup } from './types'
 import { TextField } from './fields/text-field'
 import { TextareaField } from './fields/textarea-field'
-import { RichtextField } from './fields/richtext-field'
 import { MarkdownField } from './fields/markdown-field'
 import { NumberField } from './fields/number-field'
 import { BooleanField } from './fields/boolean-field'
@@ -20,6 +20,20 @@ import { BloksField } from './fields/bloks-field'
 import { CustomPluginField } from './fields/custom-plugin-field'
 import { fieldLabel } from './field-label'
 import { FieldLabel } from './FieldLabel'
+
+const RichtextField = dynamic(
+  () => import('./fields/richtext-field').then((mod) => mod.RichtextField),
+  {
+    loading: () => (
+      <div>
+        <div className="h-4 w-24 animate-pulse bg-muted rounded mb-1" />
+        <div className="h-10 animate-pulse bg-muted rounded mb-1" />
+        <div className="h-32 animate-pulse bg-muted rounded" />
+      </div>
+    ),
+    ssr: false,
+  },
+)
 
 interface Props {
   fieldKey: string

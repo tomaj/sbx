@@ -1,10 +1,15 @@
-import { Body, Controller, Delete, Get, HttpCode, NotFoundException, Param, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
-import { SessionOrTokenGuard } from '../auth/session-or-token.guard';
+import { Body, Controller, Delete, Get, HttpCode, Param, Post, Put, Query, Req } from '@nestjs/common';
+import { Auth } from '../auth/auth.decorator';
 import { StoriesService } from './stories.service';
 import { StoryVersionsService } from './story-versions.service';
+import { CreateStoryDto } from './dto/create-story.dto';
+import { UpdateStoryDto } from './dto/update-story.dto';
+import { PartialUpdateStoryDto } from './dto/partial-update-story.dto';
+import { QueryParserUtil } from '../shared/query-parser.util';
+import { ResultGuard } from '../shared/result-guard.util';
 
 @Controller('v1/spaces/:spaceId/stories')
-@UseGuards(SessionOrTokenGuard)
+@Auth('session-or-token')
 export class StoriesController {
   constructor(
     private readonly storiesService: StoriesService,
@@ -17,16 +22,7 @@ export class StoriesController {
    */
   private parseSortBy(sortBy?: string, sortField?: string, sortDir?: string, sortOrder?: string): { field: string; dir: 'asc' | 'desc' } {
     if (sortBy) {
-      const lastColon = sortBy.lastIndexOf(':');
-      if (lastColon > 0) {
-        const field = sortBy.slice(0, lastColon);
-        const dir = sortBy.slice(lastColon + 1);
-        if (dir === 'asc' || dir === 'desc') {
-          return { field, dir };
-        }
-      }
-      // sort_by without direction defaults to asc
-      return { field: sortBy, dir: 'asc' };
+      return QueryParserUtil.parseSortBy(sortBy, 'position', 'asc');
     }
     // Legacy params
     return {
@@ -102,9 +98,10 @@ export class StoriesController {
       favouriteOf = req.adminUser.sbxUserId;
     }
 
+    const { page: parsedPage, perPage: parsedPerPage } = QueryParserUtil.parsePagination(page, perPage);
     const { stories, total } = await this.storiesService.listStoriesAdmin(parseInt(spaceId), {
-      page: Math.max(1, parseInt(page) || 1),
-      perPage: Math.min(100, parseInt(perPage) || 25),
+      page: parsedPage,
+      perPage: parsedPerPage,
       search: textSearch ?? search,
       sortField: resolvedSortField,
       sortDir: resolvedSortDir,
@@ -116,23 +113,23 @@ export class StoriesController {
       uuid,
       inRelease: inRelease ? parseInt(inRelease) : undefined,
       byIds: byIdsParam?.trim() ? byIdsParam.split(',').map((s) => BigInt(s.trim())).filter(Boolean) : undefined,
-      byUuids: byUuidsParam?.trim() ? byUuidsParam.split(',').map((s) => s.trim()).filter(Boolean) : undefined,
-      byUuidsOrdered: byUuidsOrderedParam?.trim() ? byUuidsOrderedParam.split(',').map((s) => s.trim()).filter(Boolean) : undefined,
+      byUuids: QueryParserUtil.parseCsvToStrings(byUuidsParam),
+      byUuidsOrdered: QueryParserUtil.parseCsvToStrings(byUuidsOrderedParam),
       excludingIds: excludingIdsParam?.trim() ? excludingIdsParam.split(',').map((s) => BigInt(s.trim())).filter(Boolean) : undefined,
       favouriteOf,
       mine: mine === 'true' ? req.adminUser?.sbxUserId : undefined,
-      folderOnly: folderOnly === 'true' || folderOnly === '1',
-      storyOnly: storyOnly === 'true' || storyOnly === '1',
+      folderOnly: QueryParserUtil.parseBoolean(folderOnly) ?? false,
+      storyOnly: QueryParserUtil.parseBoolean(storyOnly) ?? false,
       startsWith,
-      inTrash: inTrash === 'true' || inTrash === '1',
+      inTrash: QueryParserUtil.parseBoolean(inTrash) ?? false,
       withSlug,
-      bySlugs: bySlugsParam?.trim() ? bySlugsParam.split(',').map((s) => s.trim()).filter(Boolean) : undefined,
-      excludingSlugs: excludingSlugsParam?.trim() ? excludingSlugsParam.split(',').map((s) => s.trim()).filter(Boolean) : undefined,
-      inWorkflowStages: inWorkflowStagesParam?.trim() ? inWorkflowStagesParam.split(',').map((s) => parseInt(s.trim())).filter((n) => !isNaN(n)) : undefined,
+      bySlugs: QueryParserUtil.parseCsvToStrings(bySlugsParam),
+      excludingSlugs: QueryParserUtil.parseCsvToStrings(excludingSlugsParam),
+      inWorkflowStages: QueryParserUtil.parseCsvToInts(inWorkflowStagesParam),
       scheduledAtGt: scheduledAtGt ? new Date(scheduledAtGt) : undefined,
       scheduledAtLt: scheduledAtLt ? new Date(scheduledAtLt) : undefined,
       referenceSearch: referenceSearch ?? referenceSearchBracket ?? undefined,
-      withSummary: withSummary === 'true' || withSummary === '1',
+      withSummary: QueryParserUtil.parseBoolean(withSummary) ?? false,
     });
 
     return { stories, total };
@@ -196,19 +193,16 @@ export class StoriesController {
     @Query('release_id') releaseIdParam?: string,
   ) {
     const releaseId = releaseIdParam ? parseInt(releaseIdParam) : undefined;
-    const result = await this.storiesService.getStoryAdmin(parseInt(spaceId), parseInt(id), releaseId);
-    if (!result) throw new NotFoundException('Story not found');
-    return result;
+    return ResultGuard.throwIfNotFound(
+      await this.storiesService.getStoryAdmin(parseInt(spaceId), parseInt(id), releaseId),
+      'Story not found',
+    );
   }
 
   @Post()
   async createStory(
     @Param('spaceId') spaceId: string,
-    @Body() body: {
-      story: { name: string; slug: string; content?: Record<string, any>; parent_id?: number | null; tag_list?: string[]; path?: string | null; is_folder?: boolean; is_startpage?: boolean; first_published_at?: string | null; publish_at?: string | null; expire_at?: string | null };
-      publish?: boolean;
-      release_id?: number;
-    },
+    @Body() body: CreateStoryDto,
     @Req() req: any,
   ) {
     const result = await this.storiesService.createStory(parseInt(spaceId), body.story, req.adminUser?.sbxUserId, body.release_id);
@@ -225,14 +219,7 @@ export class StoriesController {
   async updateStory(
     @Param('spaceId') spaceId: string,
     @Param('id') id: string,
-    @Body() body: {
-      story: { name?: string; slug?: string; content?: Record<string, any>; tag_list?: string[]; path?: string | null; sort_by_date?: string | null; first_published_at?: string | null; publish_at?: string | null; expire_at?: string | null; is_startpage?: boolean; disable_fe_editor?: boolean };
-      publish?: boolean;
-      force_update?: string;
-      release_id?: number;
-      group_id?: string;
-      lang?: string;
-    },
+    @Body() body: UpdateStoryDto,
     @Req() req: any,
   ) {
     // Merge release_id from body root into data for the service
@@ -270,7 +257,7 @@ export class StoriesController {
   partialUpdate(
     @Param('spaceId') spaceId: string,
     @Param('id') id: string,
-    @Body() body: { story: { favourite_for_user_ids?: number[] } },
+    @Body() body: PartialUpdateStoryDto,
   ) {
     return this.storiesService.partialUpdateStory(parseInt(spaceId), parseInt(id), body.story ?? {});
   }

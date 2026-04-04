@@ -1,5 +1,5 @@
 import { Inject, Injectable, ConflictException } from '@nestjs/common';
-import { and, asc, eq, ilike, notInArray, or, sql, count } from 'drizzle-orm';
+import { and, asc, desc, eq, ilike, inArray, notInArray, or, sql, count } from 'drizzle-orm';
 import { randomBytes } from 'crypto';
 import { DB } from '../db/db.module';
 import type { DbType } from '../db/db.module';
@@ -53,17 +53,23 @@ export class UsersService {
       .from(users)
       .where(where);
 
-    const dir = sortDir === 'desc' ? 'DESC' : 'ASC';
+    const isDesc = sortDir === 'desc';
     const roleOrder = sql`(EXISTS (SELECT 1 FROM space_members sm WHERE sm.user_id = users.id AND sm.role = 'admin'))`;
 
     const orderExpr =
       sortBy === 'role'
-        ? sql`${roleOrder} ${sql.raw(dir === 'ASC' ? 'DESC' : 'ASC')}, ${users.firstname} ASC`
+        ? (isDesc
+            ? sql`${roleOrder} ASC, ${users.firstname} ASC`
+            : sql`${roleOrder} DESC, ${users.firstname} ASC`)
         : sortBy === 'email'
-          ? sql`${users.email} ${sql.raw(dir)}`
+          ? (isDesc ? desc(users.email) : asc(users.email))
           : sortBy === 'lastname'
-            ? sql`${users.lastname} ${sql.raw(dir)}, ${users.firstname} ASC`
-            : sql`${users.firstname} ${sql.raw(dir)}, ${users.lastname} ASC`;
+            ? (isDesc
+                ? sql`${users.lastname} DESC, ${users.firstname} ASC`
+                : sql`${users.lastname} ASC, ${users.firstname} ASC`)
+            : (isDesc
+                ? sql`${users.firstname} DESC, ${users.lastname} ASC`
+                : sql`${users.firstname} ASC, ${users.lastname} ASC`);
 
     const rows = await this.db
       .select()
@@ -85,7 +91,7 @@ export class UsersService {
           })
           .from(spaceMembers)
           .leftJoin(spaces, eq(spaceMembers.spaceId, spaces.id))
-          .where(sql`${spaceMembers.userId} = ANY(${sql.raw(`ARRAY[${userIds.join(',')}]`)})`)
+          .where(inArray(spaceMembers.userId, userIds))
       : [];
 
     const membershipsByUser = new Map<number, typeof memberships>();

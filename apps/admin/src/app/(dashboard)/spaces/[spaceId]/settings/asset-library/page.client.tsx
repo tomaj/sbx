@@ -2,6 +2,8 @@
 
 import { useState, useEffect, use } from 'react'
 import { Check, Plus, Trash2, Minus } from 'lucide-react'
+import { useUnsavedChanges } from '@/hooks/use-unsaved-changes'
+import { UnsavedChangesModal } from '@/components/ui/unsaved-changes-modal'
 
 interface DefaultMetadataField {
   required: boolean
@@ -80,6 +82,13 @@ export default function AssetLibraryPage({ params }: { params: Promise<{ spaceId
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isDirty, setIsDirty] = useState(false)
+  const { showModal: showUnsavedModal, handleConfirm: confirmUnsaved, handleCancel: cancelUnsaved } = useUnsavedChanges(isDirty)
+
+  function updateSettings(updater: (s: AssetLibrarySettings) => AssetLibrarySettings) {
+    setSettings(updater)
+    setIsDirty(true)
+  }
 
   useEffect(() => {
     fetch(`/api/admin/spaces/${spaceId}/space`)
@@ -116,6 +125,7 @@ export default function AssetLibraryPage({ params }: { params: Promise<{ spaceId
         const data = await res.json().catch(() => ({}))
         throw new Error(data.message ?? 'Failed to save')
       }
+      setIsDirty(false)
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
     } catch (e: any) {
@@ -126,7 +136,7 @@ export default function AssetLibraryPage({ params }: { params: Promise<{ spaceId
   }
 
   function updateDefaultField(field: keyof DefaultMetadataFields, key: 'required' | 'translatable', value: boolean) {
-    setSettings((s) => ({
+    updateSettings((s) => ({
       ...s,
       defaultMetadataFields: {
         ...s.defaultMetadataFields,
@@ -137,7 +147,7 @@ export default function AssetLibraryPage({ params }: { params: Promise<{ spaceId
 
   function addCustomField() {
     if (!newCustomField.name.trim()) return
-    setSettings((s) => ({
+    updateSettings((s) => ({
       ...s,
       customMetadataFields: [...s.customMetadataFields, { ...newCustomField, name: newCustomField.name.trim() }],
     }))
@@ -145,7 +155,7 @@ export default function AssetLibraryPage({ params }: { params: Promise<{ spaceId
   }
 
   function removeCustomField(index: number) {
-    setSettings((s) => ({
+    updateSettings((s) => ({
       ...s,
       customMetadataFields: s.customMetadataFields.filter((_, i) => i !== index),
     }))
@@ -298,7 +308,7 @@ export default function AssetLibraryPage({ params }: { params: Promise<{ spaceId
         <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">Upload limit per file (in MB)</p>
         <div className="flex items-center gap-0 w-40">
           <button
-            onClick={() => setSettings((s) => ({ ...s, uploadLimitMb: Math.max(1, s.uploadLimitMb - 1) }))}
+            onClick={() => updateSettings((s) => ({ ...s, uploadLimitMb: Math.max(1, s.uploadLimitMb - 1) }))}
             className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-l-lg text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
           >
             <Minus className="w-4 h-4" />
@@ -306,11 +316,11 @@ export default function AssetLibraryPage({ params }: { params: Promise<{ spaceId
           <input
             type="number"
             value={settings.uploadLimitMb}
-            onChange={(e) => setSettings((s) => ({ ...s, uploadLimitMb: Math.max(1, parseInt(e.target.value) || 5) }))}
+            onChange={(e) => updateSettings((s) => ({ ...s, uploadLimitMb: Math.max(1, parseInt(e.target.value) || 5) }))}
             className="flex-1 px-3 py-2 border-y border-gray-300 dark:border-gray-600 text-sm text-center text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-teal-500 w-16"
           />
           <button
-            onClick={() => setSettings((s) => ({ ...s, uploadLimitMb: Math.min(5000, s.uploadLimitMb + 1) }))}
+            onClick={() => updateSettings((s) => ({ ...s, uploadLimitMb: Math.min(5000, s.uploadLimitMb + 1) }))}
             className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-r-lg text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
           >
             <Plus className="w-4 h-4" />
@@ -327,12 +337,14 @@ export default function AssetLibraryPage({ params }: { params: Promise<{ spaceId
         <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">List of paths to invalidate</p>
         <textarea
           value={settings.imageServicePathsToInvalidate}
-          onChange={(e) => setSettings((s) => ({ ...s, imageServicePathsToInvalidate: e.target.value }))}
+          onChange={(e) => updateSettings((s) => ({ ...s, imageServicePathsToInvalidate: e.target.value }))}
           placeholder={`/300x300/f/xxx.jpg\n/300x300/f/xxx.jpg\n...`}
           rows={5}
           className="w-full px-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 font-mono resize-y"
         />
       </div>
+
+      <UnsavedChangesModal open={showUnsavedModal} onConfirm={confirmUnsaved} onCancel={cancelUnsaved} />
     </div>
   )
 }

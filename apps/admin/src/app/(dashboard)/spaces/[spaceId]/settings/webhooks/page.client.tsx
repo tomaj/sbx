@@ -4,20 +4,9 @@ import { useState, useEffect, use, useRef } from 'react'
 import { Plus, Trash2, History, Settings, ChevronRight } from 'lucide-react'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
 import { RightSidebar } from '@/components/ui/right-sidebar'
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface Webhook {
-  id: number
-  name: string
-  endpoint: string
-  description: string | null
-  secret: string | null
-  actions: string[]
-  activated: boolean
-  created_at: string
-  updated_at: string
-}
+import { UnsavedChangesModal } from '@/components/ui/unsaved-changes-modal'
+import { useUnsavedChanges } from '@/hooks/use-unsaved-changes'
+import type { Webhook } from '@sbx/types'
 
 // ─── Trigger definitions ──────────────────────────────────────────────────────
 
@@ -183,6 +172,8 @@ function WebhookForm({ spaceId, webhook, open, onClose, onSaved }: WebhookFormPr
   const [error, setError] = useState<string | null>(null)
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [isDirty, setIsDirty] = useState(false)
+  const { showModal: showUnsavedModal, handleConfirm: confirmUnsaved, handleCancel: cancelUnsaved } = useUnsavedChanges(isDirty)
 
   // Reset form when webhook changes
   useEffect(() => {
@@ -194,16 +185,19 @@ function WebhookForm({ spaceId, webhook, open, onClose, onSaved }: WebhookFormPr
     setActivated(webhook?.activated ?? true)
     setError(null)
     setExpandedGroups(new Set())
+    setIsDirty(false)
   }, [webhook, open])
 
   function toggleTrigger(value: string) {
     setActions((prev) => prev.includes(value) ? prev.filter((a) => a !== value) : [...prev, value])
+    setIsDirty(true)
   }
 
   function toggleGroup(group: TriggerGroup) {
     const vals = group.triggers.map((t) => t.value)
     const allSel = vals.every((v) => actions.includes(v))
     setActions((prev) => allSel ? prev.filter((a) => !vals.includes(a)) : [...new Set([...prev, ...vals])])
+    setIsDirty(true)
   }
 
   function toggleExpandGroup(label: string) {
@@ -287,7 +281,7 @@ function WebhookForm({ spaceId, webhook, open, onClose, onSaved }: WebhookFormPr
           <input
             type="text"
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => { setName(e.target.value); setIsDirty(true) }}
             placeholder="My Webhook"
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-teal-500"
           />
@@ -296,7 +290,7 @@ function WebhookForm({ spaceId, webhook, open, onClose, onSaved }: WebhookFormPr
         {/* Active toggle */}
         <div className="flex items-center justify-between">
           <label className="text-sm font-semibold text-gray-900 dark:text-gray-100">Active</label>
-          <Toggle checked={activated} onChange={setActivated} />
+          <Toggle checked={activated} onChange={(v) => { setActivated(v); setIsDirty(true) }} />
         </div>
 
         {/* Description */}
@@ -305,7 +299,7 @@ function WebhookForm({ spaceId, webhook, open, onClose, onSaved }: WebhookFormPr
           <input
             type="text"
             value={description}
-            onChange={(e) => setDescription(e.target.value)}
+            onChange={(e) => { setDescription(e.target.value); setIsDirty(true) }}
             placeholder="Optional"
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-teal-500"
           />
@@ -319,7 +313,7 @@ function WebhookForm({ spaceId, webhook, open, onClose, onSaved }: WebhookFormPr
           <input
             type="url"
             value={endpoint}
-            onChange={(e) => setEndpoint(e.target.value)}
+            onChange={(e) => { setEndpoint(e.target.value); setIsDirty(true) }}
             placeholder="https://example.com/webhook"
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-teal-500"
           />
@@ -331,7 +325,7 @@ function WebhookForm({ spaceId, webhook, open, onClose, onSaved }: WebhookFormPr
           <input
             type="text"
             value={secret}
-            onChange={(e) => setSecret(e.target.value)}
+            onChange={(e) => { setSecret(e.target.value); setIsDirty(true) }}
             placeholder="Sent as Webhook-Secret header"
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-teal-500"
           />
@@ -429,6 +423,12 @@ function WebhookForm({ spaceId, webhook, open, onClose, onSaved }: WebhookFormPr
         dangerous
         onConfirm={handleDelete}
         onCancel={() => setConfirmDelete(false)}
+      />
+
+      <UnsavedChangesModal
+        open={showUnsavedModal}
+        onConfirm={confirmUnsaved}
+        onCancel={cancelUnsaved}
       />
     </>
   )

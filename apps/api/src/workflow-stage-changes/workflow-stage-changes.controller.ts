@@ -7,13 +7,14 @@ import {
   Post,
   Query,
   Req,
-  UseGuards,
 } from '@nestjs/common';
-import { SessionOrTokenGuard } from '../auth/session-or-token.guard';
+import { ApiTags } from '@nestjs/swagger';
+import { Auth } from '../auth/auth.decorator';
 import { WorkflowStageChangesService } from './workflow-stage-changes.service';
 
+@ApiTags('Workflow Stage Changes - MAPI')
 @Controller('v1/spaces/:spaceId/workflow_stage_changes')
-@UseGuards(SessionOrTokenGuard)
+@Auth('session-or-token')
 export class WorkflowStageChangesController {
   constructor(private readonly workflowStageChangesService: WorkflowStageChangesService) {}
 

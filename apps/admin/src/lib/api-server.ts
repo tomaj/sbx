@@ -36,7 +36,7 @@ export async function apiFetch(path: string, init: RequestInit = {}): Promise<Re
     Authorization: `Bearer ${token}`,
     ...(init.headers as Record<string, string>),
   }
-  if (init.body !== undefined && init.body !== null) {
+  if (init.body !== undefined && init.body !== null && !(init.body instanceof FormData)) {
     headers['Content-Type'] = 'application/json'
   }
   return fetch(`${API_URL}${path}`, { ...init, headers })

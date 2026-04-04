@@ -1,6 +1,7 @@
 'use client'
 
 import { use, useState, useEffect, useRef, useCallback } from 'react'
+import { formatDateTime } from '@/lib/date'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -15,6 +16,8 @@ import {
   formatActivityKey,
   resolveItemName,
 } from '@/components/activities/activity-utils'
+import { ContentActivitiesChart } from '@/components/dashboard/content-activities-chart'
+import { ApiRequestsChart } from '@/components/dashboard/api-requests-chart'
 
 interface SpaceInfo {
   id: number
@@ -101,12 +104,6 @@ function timeAgo(dateStr: string): string {
   const days = Math.floor(hours / 24)
   if (days === 1) return 'yesterday'
   return `${days} days ago`
-}
-
-function formatDateTime(dateStr: string): string {
-  const d = new Date(dateStr)
-  return d.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }) +
-    ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true })
 }
 
 function ActivityIcon({ activityKey }: { activityKey: string }) {
@@ -396,6 +393,12 @@ export default function SpaceDashboardPage({ params }: { params: Promise<{ space
             )}
           </Link>
         ))}
+      </div>
+
+      {/* Charts */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <ApiRequestsChart spaceId={spaceId} />
+        <ContentActivitiesChart spaceId={spaceId} />
       </div>
 
       {/* Activity */}

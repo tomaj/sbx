@@ -1,11 +1,23 @@
-import { Controller, Get, Param, Query, Req, UseGuards } from '@nestjs/common';
-import { TokenGuard } from '../auth/token.guard';
+import { Controller, Get, Param, ParseIntPipe, Query, Req } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
+import { Auth } from '../auth/auth.decorator';
 import { ActivitiesService } from './activities.service';
+import { QueryParserUtil } from '../shared/query-parser.util';
 
+@ApiTags('Activities - MAPI')
 @Controller('v1/spaces/:spaceId/activities')
-@UseGuards(TokenGuard)
+@Auth('session-or-token')
 export class ActivitiesController {
   constructor(private readonly activitiesService: ActivitiesService) {}
+
+  // Must be before :activityId wildcard
+  @Get('stats')
+  async getStats(
+    @Param('spaceId', ParseIntPipe) spaceId: number,
+    @Query('period') period?: string,
+  ) {
+    return this.activitiesService.getStats(spaceId, period || 'last_14_days');
+  }
 
   @Get()
   async getActivities(
@@ -17,22 +29,16 @@ export class ActivitiesController {
     @Query('by_owner_ids') byOwnerIds?: string,
     @Query('types') types?: string,
   ) {
+    const { page: parsedPage, perPage: parsedPerPage } = QueryParserUtil.parsePagination(page, perPage);
     return this.activitiesService.findAll(
       req.space.id,
-      Math.max(1, parseInt(page) || 1),
-      Math.min(100, parseInt(perPage) || 25),
+      parsedPage,
+      parsedPerPage,
       {
         createdAtGte: createdAtGte || undefined,
         createdAtLte: createdAtLte || undefined,
-        byOwnerIds: byOwnerIds
-          ? byOwnerIds
-              .split(',')
-              .map(Number)
-              .filter(Boolean)
-          : undefined,
-        types: types
-          ? types.split(',').filter(Boolean)
-          : undefined,
+        byOwnerIds: QueryParserUtil.parseCsvToInts(byOwnerIds),
+        types: QueryParserUtil.parseCsvToStrings(types),
       },
     );
   }

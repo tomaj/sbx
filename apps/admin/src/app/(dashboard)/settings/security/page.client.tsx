@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import { Check } from 'lucide-react'
+import { useUnsavedChanges } from '@/hooks/use-unsaved-changes'
+import { UnsavedChangesModal } from '@/components/ui/unsaved-changes-modal'
 
 export default function SecurityPage() {
   const [showPasswordForm, setShowPasswordForm] = useState(false)
@@ -9,6 +11,9 @@ export default function SecurityPage() {
   const [newPassword, setNewPassword] = useState('')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+
+  const isDirty = showPasswordForm && (currentPassword.length > 0 || newPassword.length > 0)
+  const { showModal: showUnsavedModal, handleConfirm: confirmUnsaved, handleCancel: cancelUnsaved } = useUnsavedChanges(isDirty)
 
   async function handleSavePassword() {
     if (!newPassword) return
@@ -84,6 +89,8 @@ export default function SecurityPage() {
       {saved && (
         <p className="mt-4 text-sm text-teal-600 dark:text-teal-400">Password updated successfully.</p>
       )}
+
+      <UnsavedChangesModal open={showUnsavedModal} onConfirm={confirmUnsaved} onCancel={cancelUnsaved} />
     </div>
   )
 }

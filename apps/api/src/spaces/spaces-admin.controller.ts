@@ -1,11 +1,14 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
-import { SessionGuard } from '../auth/session.guard';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
+import { Auth } from '../auth/auth.decorator';
 import { SpacesService } from './spaces.service';
 import { UsersService } from '../users/users.service';
 import { SpaceRolesService } from '../space-roles/space-roles.service';
+import { QueryParserUtil } from '../shared/query-parser.util';
 
+@ApiTags('Spaces - Admin')
 @Controller('v1/admin')
-@UseGuards(SessionGuard)
+@Auth('session')
 export class SpacesAdminController {
   constructor(
     private readonly spacesService: SpacesService,
@@ -60,9 +63,10 @@ export class SpacesAdminController {
     @Query('sort_by') sortBy?: string,
     @Query('sort_dir') sortDir?: string,
   ) {
+    const { page: parsedPage, perPage: parsedPerPage } = QueryParserUtil.parsePagination(page, perPage);
     return this.usersService.getAllUsers({
-      page: Math.max(1, parseInt(page) || 1),
-      perPage: Math.min(100, parseInt(perPage) || 10),
+      page: parsedPage,
+      perPage: parsedPerPage,
       search: search || undefined,
       filter: (filter as 'all' | 'internal' | 'disabled') || 'all',
       sortBy: sortBy || 'firstname',

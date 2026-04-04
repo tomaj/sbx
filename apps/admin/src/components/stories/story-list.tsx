@@ -4,6 +4,8 @@ import { useEffect } from 'react'
 import { Folder, Star, Home } from 'lucide-react'
 import { UserAvatar } from '@/components/ui/user-avatar'
 import { StoryStatusIcon } from './story-status-icon'
+import { formatDateTime as formatDate } from '@/lib/date'
+
 
 export type StoryUser = {
   name: string
@@ -38,12 +40,6 @@ function StatusIcon({ story }: { story: Story }) {
     return <Folder className="w-4 h-4 text-gray-400" />
   }
   return <StoryStatusIcon published={story.published} unpublishedChanges={story.unpublished_changes} />
-}
-
-function formatDate(iso: string) {
-  const d = new Date(iso)
-  return d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) +
-    ' ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
 }
 
 

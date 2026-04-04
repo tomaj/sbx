@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Trash2 } from 'lucide-react'
 import { UserAvatar } from './user-avatar'
 import { ConfirmModal } from './confirm-modal'
+import { formatDate } from '@/lib/date'
 
 export interface CommentData {
   id: number
@@ -34,7 +35,7 @@ function formatRelativeTime(date: string | Date): string {
   if (diffH < 24) return `${diffH}h ago`
   const diffD = Math.floor(diffH / 24)
   if (diffD < 30) return `${diffD}d ago`
-  return d.toLocaleDateString()
+  return formatDate(d)
 }
 
 export function CommentItem({ comment, onDelete, canDelete }: CommentItemProps) {

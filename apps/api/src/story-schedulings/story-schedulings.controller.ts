@@ -10,13 +10,14 @@ import {
   Put,
   Query,
   Req,
-  UseGuards,
 } from '@nestjs/common';
-import { SessionOrTokenGuard } from '../auth/session-or-token.guard';
+import { ApiTags } from '@nestjs/swagger';
+import { Auth } from '../auth/auth.decorator';
 import { StorySchedulingsService } from './story-schedulings.service';
 
+@ApiTags('Story Schedulings - MAPI')
 @Controller('v1/spaces/:spaceId/story_schedulings')
-@UseGuards(SessionOrTokenGuard)
+@Auth('session-or-token')
 export class StorySchedulingsController {
   constructor(private readonly service: StorySchedulingsService) {}
 

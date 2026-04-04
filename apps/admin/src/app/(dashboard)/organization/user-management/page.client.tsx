@@ -1,35 +1,33 @@
 'use client'
 
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
 import { usePerPage } from '@/hooks/use-per-page'
 import { MoreHorizontal, EyeOff, Plus } from 'lucide-react'
 import { Tabs } from '@/components/ui/tabs'
 import { SearchBar } from '@/components/ui/search-bar'
 import { DataTable, type Column, type SortState } from '@/components/ui/data-table'
 import { RightSidebar } from '@/components/ui/right-sidebar'
+import { UnsavedChangesModal } from '@/components/ui/unsaved-changes-modal'
+import { useUnsavedChanges } from '@/hooks/use-unsaved-changes'
 import { UserAvatar } from '@/components/ui/user-avatar'
-import { SelectDropdown } from '@/components/ui/select-dropdown'
 import { cn } from '@/lib/utils'
+import { useCrudSidebar } from '@/hooks/use-crud-sidebar'
+import { PageLayout } from '@/components/ui/page-layout'
+import type { User, UserSpace } from '@sbx/types'
 
-interface Space {
-  id: number
-  name: string
-  role: string
-}
+const createUserSchema = z.object({
+  email: z.string().email('Valid email is required'),
+})
+type CreateUserFormValues = z.infer<typeof createUserSchema>
 
-interface User {
-  id: number
-  name: string
-  firstname: string
-  lastname: string
-  email: string
-  avatar: string | null
-  role: 'admin' | 'member'
-  spaces: Space[]
-  disabled: boolean
-  createdAt: string
-  updatedAt: string
-}
+const editUserSchema = z.object({
+  firstname: z.string().optional(),
+  lastname: z.string().optional(),
+})
+type EditUserFormValues = z.infer<typeof editUserSchema>
 
 interface ApiResponse {
   users: User[]
@@ -46,7 +44,7 @@ const FILTER_MAP: Record<string, string> = {
 
 // ---- Spaces tooltip ----
 
-function SpacesTooltip({ spaces }: { spaces: Space[] }) {
+function SpacesTooltip({ spaces }: { spaces: UserSpace[] }) {
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState({ top: 0, left: 0 })
   const btnRef = useRef<HTMLButtonElement>(null)
@@ -93,15 +91,12 @@ function SpacesTooltip({ spaces }: { spaces: Space[] }) {
 
 function RowMenu({ onEdit, onDisable, disabled }: { onEdit: () => void; onDisable: () => void; disabled: boolean }) {
   const [open, setOpen] = useState(false)
-  const [pos, setPos] = useState({ top: 0, right: 0 })
-  const btnRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!open) return
     function onClickOutside(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node) &&
-          btnRef.current && !btnRef.current.contains(e.target as Node)) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setOpen(false)
       }
     }
@@ -109,28 +104,16 @@ function RowMenu({ onEdit, onDisable, disabled }: { onEdit: () => void; onDisabl
     return () => document.removeEventListener('mousedown', onClickOutside)
   }, [open])
 
-  function handleOpen() {
-    if (!btnRef.current) return
-    const rect = btnRef.current.getBoundingClientRect()
-    setPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right })
-    setOpen((v) => !v)
-  }
-
   return (
-    <>
+    <div ref={menuRef} className="relative">
       <button
-        ref={btnRef}
-        onClick={handleOpen}
+        onClick={() => setOpen((v) => !v)}
         className="p-1 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
       >
         <MoreHorizontal className="size-4" />
       </button>
       {open && (
-        <div
-          ref={menuRef}
-          style={{ top: pos.top, right: pos.right }}
-          className="fixed z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 min-w-[150px]"
-        >
+        <div className="absolute right-0 top-full mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 min-w-[150px]">
           <button
             onClick={() => { onEdit(); setOpen(false) }}
             className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
@@ -145,7 +128,7 @@ function RowMenu({ onEdit, onDisable, disabled }: { onEdit: () => void; onDisabl
           </button>
         </div>
       )}
-    </>
+    </div>
   )
 }
 
@@ -162,15 +145,44 @@ export default function UserManagementPage() {
   const [data, setData] = useState<ApiResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
-  const [editUser, setEditUser] = useState<User | null>(null)
-  const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [sidebarMode, setSidebarMode] = useState<'edit' | 'create'>('edit')
-  const [editRole, setEditRole] = useState<'admin' | 'member'>('member')
-  const [editFirstname, setEditFirstname] = useState('')
-  const [editLastname, setEditLastname] = useState('')
-  const [editEmail, setEditEmail] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [saveError, setSaveError] = useState<string | null>(null)
+  const { open: sidebarOpen, mode: sidebarMode, selected: selectedUser, openCreate: openCreateRaw, openEdit: openEditRaw, close: closeSidebar } = useCrudSidebar<User>()
+
+  // Create form
+  const {
+    register: registerCreate,
+    handleSubmit: handleSubmitCreate,
+    reset: resetCreate,
+    formState: { errors: createErrors, isSubmitting: isCreating, isDirty: isCreateDirty },
+    setError: setCreateError,
+  } = useForm<CreateUserFormValues>({
+    // @ts-expect-error — zod v4 minor version literal mismatch with @hookform/resolvers types
+    resolver: zodResolver(createUserSchema),
+    defaultValues: { email: '' },
+  })
+
+  // Edit form
+  const {
+    register: registerEdit,
+    handleSubmit: handleSubmitEdit,
+    reset: resetEdit,
+    formState: { errors: editErrors, isSubmitting: isSaving, isDirty: isEditDirty },
+    setError: setEditError,
+  } = useForm<EditUserFormValues>({
+    // @ts-expect-error — zod v4 minor version literal mismatch with @hookform/resolvers types
+    resolver: zodResolver(editUserSchema),
+    defaultValues: { firstname: '', lastname: '' },
+  })
+
+  const { showModal: showUnsavedModal, handleConfirm: confirmUnsaved, handleCancel: cancelUnsaved } = useUnsavedChanges(sidebarOpen && (isCreateDirty || isEditDirty))
+
+  // Reset forms when sidebar opens
+  useEffect(() => {
+    if (sidebarMode === 'edit' && selectedUser) {
+      resetEdit({ firstname: selectedUser.firstname, lastname: selectedUser.lastname })
+    } else {
+      resetCreate({ email: '' })
+    }
+  }, [sidebarOpen, selectedUser, sidebarMode, resetEdit, resetCreate])
 
   const fetchUsers = useCallback(async () => {
     setIsLoading(true)
@@ -212,48 +224,25 @@ export default function UserManagementPage() {
   }, [])
 
   function openEdit(user: User) {
-    setEditUser(user)
-    setSidebarMode('edit')
-    setEditRole(user.role)
-    setEditFirstname(user.firstname)
-    setEditLastname(user.lastname)
-    setEditEmail(user.email)
-    setSaveError(null)
-    setSidebarOpen(true)
+    openEditRaw(user)
   }
 
   function openCreate() {
-    setEditUser(null)
-    setSidebarMode('create')
-    setEditRole('member')
-    setEditFirstname('')
-    setEditLastname('')
-    setEditEmail('')
-    setSaveError(null)
-    setSidebarOpen(true)
+    openCreateRaw()
   }
 
-  async function handleCreate() {
-    if (!editEmail.trim()) return
-    setSaving(true)
-    setSaveError(null)
-    try {
-      const res = await fetch('/api/admin/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ firstname: editFirstname, lastname: editLastname, email: editEmail }),
-      })
-      const data = await res.json()
-      if (res.ok) {
-        setSidebarOpen(false)
-        fetchUsers()
-      } else {
-        setSaveError(data.message ?? 'Failed to create user')
-      }
-    } catch {
-      setSaveError('Network error')
-    } finally {
-      setSaving(false)
+  async function onCreateSubmit(values: CreateUserFormValues) {
+    const res = await fetch('/api/admin/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: values.email }),
+    })
+    const json = await res.json()
+    if (res.ok) {
+      closeSidebar()
+      fetchUsers()
+    } else {
+      setCreateError('root', { message: json.message ?? 'Failed to create user' })
     }
   }
 
@@ -266,27 +255,19 @@ export default function UserManagementPage() {
     fetchUsers()
   }
 
-  async function handleSave() {
-    if (!editUser) return
-    setSaving(true)
-    setSaveError(null)
-    try {
-      const res = await fetch(`/api/admin/users/${editUser.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ firstname: editFirstname, lastname: editLastname }),
-      })
-      const data = await res.json()
-      if (res.ok) {
-        setSidebarOpen(false)
-        fetchUsers()
-      } else {
-        setSaveError(data.message ?? 'Failed to update user')
-      }
-    } catch {
-      setSaveError('Network error')
-    } finally {
-      setSaving(false)
+  async function onEditSubmit(values: EditUserFormValues) {
+    if (!selectedUser) return
+    const res = await fetch(`/api/admin/users/${selectedUser.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ firstname: values.firstname, lastname: values.lastname }),
+    })
+    const json = await res.json()
+    if (res.ok) {
+      closeSidebar()
+      fetchUsers()
+    } else {
+      setEditError('root', { message: json.message ?? 'Failed to update user' })
     }
   }
 
@@ -360,99 +341,98 @@ export default function UserManagementPage() {
     },
   ]
 
-  return (
-    <>
-      <div className="flex flex-col min-h-full">
-        <div className="px-8 pt-8 pb-0">
-          <div className="flex items-center justify-between mb-6">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">User management</h1>
-            <button
-              onClick={openCreate}
-              className="flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium rounded-md transition-colors"
-            >
-              <Plus className="size-4" />
-              Add user
-            </button>
-          </div>
-          <Tabs
-            tabs={tabs}
-            activeTab={activeTab}
-            onChange={(id) => { setActiveTab(id); setPage(1); setSelectedIds([]) }}
-          />
-          <div className="py-4">
-            <SearchBar
-              value={search}
-              onChange={(v) => { setSearch(v); setPage(1) }}
-              placeholder="Search..."
-              className="max-w-xs"
-            />
-          </div>
-        </div>
+  const isSubmitting = sidebarMode === 'create' ? isCreating : isSaving
 
-        <DataTable
-          columns={columns as unknown as Column<Record<string, unknown>>[]}
-          data={(data?.users ?? []) as unknown as Record<string, unknown>[]}
-          keyField="id"
-          sort={sort}
-          onSort={(field, direction) => { setSort({ field, direction }); setPage(1) }}
-          selectedIds={selectedIds}
-          onSelectChange={(ids) => setSelectedIds(ids as number[])}
-          isLoading={isLoading}
-          selectionActions={
-            <div className="flex items-center gap-2">
-              <button
-                onClick={async () => {
-                  await Promise.all(selectedIds.map((id) =>
-                    fetch(`/api/admin/users/${id}`, {
-                      method: 'PATCH',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ disabled: true }),
-                    })
-                  ))
-                  setSelectedIds([])
-                  fetchUsers()
-                }}
-                className="px-3 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
-              >
-                Disable selected
-              </button>
-              <button
-                onClick={async () => {
-                  if (!confirm(`Delete ${selectedIds.length} user(s)? This cannot be undone.`)) return
-                  await Promise.all(selectedIds.map((id) =>
-                    fetch(`/api/admin/users/${id}`, { method: 'DELETE' })
-                  ))
-                  setSelectedIds([])
-                  fetchUsers()
-                }}
-                className="px-3 py-1.5 text-xs border border-red-300 rounded hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500 transition-colors"
-              >
-                Remove selected
-              </button>
-            </div>
-          }
-          pagination={{
-            total: data?.total ?? 0,
-            page,
-            perPage,
-            onPageChange: setPage,
-            onPerPageChange: (n) => { setPerPage(n); setPage(1) },
-            storageKey: 'perPage:users',
-          }}
+  return (
+    <PageLayout
+      title="User management"
+      action={
+        <button
+          onClick={openCreate}
+          className="flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium rounded-md transition-colors"
+        >
+          <Plus className="size-4" />
+          Add user
+        </button>
+      }
+    >
+      <Tabs
+        tabs={tabs}
+        activeTab={activeTab}
+        onChange={(id) => { setActiveTab(id); setPage(1); setSelectedIds([]) }}
+      />
+      <div className="py-4">
+        <SearchBar
+          value={search}
+          onChange={(v) => { setSearch(v); setPage(1) }}
+          placeholder="Search..."
+          className="max-w-xs"
         />
       </div>
 
+      <DataTable
+        columns={columns as unknown as Column<Record<string, unknown>>[]}
+        data={(data?.users ?? []) as unknown as Record<string, unknown>[]}
+        keyField="id"
+        sort={sort}
+        onSort={(field, direction) => { setSort({ field, direction }); setPage(1) }}
+        selectedIds={selectedIds}
+        onSelectChange={(ids) => setSelectedIds(ids as number[])}
+        isLoading={isLoading}
+        selectionActions={
+          <div className="flex items-center gap-2">
+            <button
+              onClick={async () => {
+                await Promise.all(selectedIds.map((id) =>
+                  fetch(`/api/admin/users/${id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ disabled: true }),
+                  })
+                ))
+                setSelectedIds([])
+                fetchUsers()
+              }}
+              className="px-3 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
+            >
+              Disable selected
+            </button>
+            <button
+              onClick={async () => {
+                if (!confirm(`Delete ${selectedIds.length} user(s)? This cannot be undone.`)) return
+                await Promise.all(selectedIds.map((id) =>
+                  fetch(`/api/admin/users/${id}`, { method: 'DELETE' })
+                ))
+                setSelectedIds([])
+                fetchUsers()
+              }}
+              className="px-3 py-1.5 text-xs border border-red-300 rounded hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500 transition-colors"
+            >
+              Remove selected
+            </button>
+          </div>
+        }
+        pagination={{
+          total: data?.total ?? 0,
+          page,
+          perPage,
+          onPageChange: setPage,
+          onPerPageChange: (n) => { setPerPage(n); setPage(1) },
+          storageKey: 'perPage:users',
+        }}
+      />
+
       <RightSidebar
         open={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
+        onClose={closeSidebar}
         header={
           sidebarMode === 'create' ? (
             <span className="font-semibold text-gray-900 dark:text-gray-100">Add user</span>
-          ) : editUser ? (
+          ) : selectedUser ? (
             <>
-              <UserAvatar name={`${editUser.firstname} ${editUser.lastname}`} src={editUser.avatar} size="lg" />
+              <UserAvatar name={`${selectedUser.firstname} ${selectedUser.lastname}`} src={selectedUser.avatar} size="lg" />
               <span className="font-semibold text-gray-900 dark:text-gray-100 truncate">
-                {editUser.firstname} {editUser.lastname}
+                {selectedUser.firstname} {selectedUser.lastname}
               </span>
             </>
           ) : null
@@ -466,77 +446,78 @@ export default function UserManagementPage() {
             )}
             <div className="ml-auto flex items-center gap-2">
               <button
-                onClick={() => setSidebarOpen(false)}
+                type="button"
+                onClick={closeSidebar}
                 className="px-4 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
               >
                 Cancel
               </button>
               <button
-                onClick={sidebarMode === 'create' ? handleCreate : handleSave}
-                disabled={saving}
+                type="submit"
+                form={sidebarMode === 'create' ? 'create-user-form' : 'edit-user-form'}
+                disabled={isSubmitting}
                 className="px-4 py-2 text-sm bg-teal-200 hover:bg-teal-300 disabled:opacity-60 text-teal-800 rounded-md font-medium transition-colors"
               >
-                {saving ? 'Saving...' : 'Save'}
+                {isSubmitting ? 'Saving...' : 'Save'}
               </button>
             </div>
           </div>
         }
       >
-        {saveError && (
-          <p className="text-sm text-red-500 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-md">{saveError}</p>
+        {sidebarMode === 'create' ? (
+          <form id="create-user-form" onSubmit={handleSubmitCreate(onCreateSubmit)}>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                  Email <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="email"
+                  {...registerCreate('email')}
+                  placeholder="user@telekom.sk"
+                  className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-md text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                />
+                {createErrors.email && (
+                  <p className="mt-1 text-xs text-red-500">{createErrors.email.message}</p>
+                )}
+              </div>
+              {createErrors.root && (
+                <p className="text-sm text-red-500 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-md">
+                  {createErrors.root.message}
+                </p>
+              )}
+            </div>
+          </form>
+        ) : (
+          <form id="edit-user-form" onSubmit={handleSubmitEdit(onEditSubmit)}>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">First name</label>
+                <input
+                  type="text"
+                  {...registerEdit('firstname')}
+                  className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-md text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Last name</label>
+                <input
+                  type="text"
+                  {...registerEdit('lastname')}
+                  className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-md text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                />
+              </div>
+              {editErrors.root && (
+                <p className="text-sm text-red-500 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-md">
+                  {editErrors.root.message}
+                </p>
+              )}
+            </div>
+          </form>
         )}
-
-        {sidebarMode === 'create' && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-              Email <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="email"
-              value={editEmail}
-              onChange={(e) => setEditEmail(e.target.value)}
-              placeholder="user@telekom.sk"
-              className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-md text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
-            />
-          </div>
-        )}
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Role</label>
-          <SelectDropdown
-            value={editRole}
-            onChange={(v) => v && setEditRole(v as 'admin' | 'member')}
-            options={[
-              { value: 'member', label: 'Member' },
-              { value: 'admin', label: 'Admin' },
-            ]}
-          />
-          <div className="text-xs text-gray-500 dark:text-gray-400 mt-1.5 space-y-0.5">
-            <p><strong>Member</strong> - Can be added to organization spaces</p>
-            <p><strong>Admin</strong> - Can manage organization users and spaces</p>
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">First name</label>
-          <input
-            type="text"
-            value={editFirstname}
-            onChange={(e) => setEditFirstname(e.target.value)}
-            className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-md text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Last name</label>
-          <input
-            type="text"
-            value={editLastname}
-            onChange={(e) => setEditLastname(e.target.value)}
-            className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-md text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
-          />
-        </div>
       </RightSidebar>
-    </>
+
+      <UnsavedChangesModal open={showUnsavedModal} onConfirm={confirmUnsaved} onCancel={cancelUnsaved} />
+    </PageLayout>
   )
 }

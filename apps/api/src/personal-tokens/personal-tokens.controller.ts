@@ -1,9 +1,11 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
-import { SessionGuard } from '../auth/session.guard';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Req } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
+import { Auth } from '../auth/auth.decorator';
 import { PersonalTokensService } from './personal-tokens.service';
 
+@ApiTags('Personal Tokens - Admin')
 @Controller('v1/admin/me/tokens')
-@UseGuards(SessionGuard)
+@Auth('session')
 export class PersonalTokensController {
   constructor(private readonly service: PersonalTokensService) {}
 

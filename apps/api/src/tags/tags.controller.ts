@@ -1,9 +1,11 @@
-import { Controller, Get, Query, Req, UseGuards } from '@nestjs/common';
-import { TokenGuard } from '../auth/token.guard';
+import { Controller, Get, Query, Req } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
+import { Auth } from '../auth/auth.decorator';
 import { TagsService } from './tags.service';
 
+@ApiTags('Tags - CDN')
 @Controller('v2/cdn/tags')
-@UseGuards(TokenGuard)
+@Auth('token')
 export class TagsController {
   constructor(private readonly tagsService: TagsService) {}
 

@@ -4,18 +4,20 @@ import {
   Delete,
   Get,
   HttpCode,
-  NotFoundException,
   Param,
   Post,
   Put,
   Query,
-  UseGuards,
 } from '@nestjs/common';
-import { SessionOrTokenGuard } from '../auth/session-or-token.guard';
+import { ApiTags } from '@nestjs/swagger';
+import { Auth } from '../auth/auth.decorator';
 import { DatasourcesService } from './datasources.service';
+import { QueryParserUtil } from '../shared/query-parser.util';
+import { ResultGuard } from '../shared/result-guard.util';
 
+@ApiTags('Datasources - MAPI')
 @Controller('v1/spaces/:spaceId/datasources')
-@UseGuards(SessionOrTokenGuard)
+@Auth('session-or-token')
 export class DatasourcesMapiController {
   constructor(private readonly datasourcesService: DatasourcesService) {}
 
@@ -28,15 +30,15 @@ export class DatasourcesMapiController {
     @Query('search') search?: string,
     @Query('by_ids') byIds?: string,
   ) {
-    // Parse sort_by="name:asc" format
-    const [sortField, sortDir] = (sortBy ?? 'name:asc').split(':');
-    const byIdsArr = byIds ? byIds.split(',').map(Number).filter(Boolean) : undefined;
+    const { field: sortField, dir: sortDirParsed } = QueryParserUtil.parseSortBy(sortBy, 'name', 'asc');
+    const byIdsArr = QueryParserUtil.parseCsvToInts(byIds);
 
+    const { page: parsedPage, perPage: parsedPerPage } = QueryParserUtil.parsePagination(page, perPage);
     return this.datasourcesService.listDatasourcesAdmin(parseInt(spaceId), {
-      page: Math.max(1, parseInt(page) || 1),
-      perPage: Math.min(200, parseInt(perPage) || 25),
+      page: parsedPage,
+      perPage: Math.min(200, parsedPerPage),
       sortField,
-      sortDir: sortDir === 'desc' ? 'desc' : 'asc',
+      sortDir: sortDirParsed,
       search,
       byIds: byIdsArr,
     });
@@ -44,12 +46,10 @@ export class DatasourcesMapiController {
 
   @Get(':id')
   async getOne(@Param('spaceId') spaceId: string, @Param('id') id: string) {
-    const result = await this.datasourcesService.findOne(
-      parseInt(spaceId),
-      parseInt(id),
+    return ResultGuard.throwIfNotFound(
+      await this.datasourcesService.findOne(parseInt(spaceId), parseInt(id)),
+      'Datasource not found',
     );
-    if (!result) throw new NotFoundException('Datasource not found');
-    return result;
   }
 
   @Post()

@@ -4,18 +4,19 @@ import {
   Delete,
   Get,
   HttpCode,
-  NotFoundException,
   Param,
   Post,
   Put,
   Req,
-  UseGuards,
 } from '@nestjs/common';
-import { SessionOrTokenGuard } from '../auth/session-or-token.guard';
+import { ApiTags } from '@nestjs/swagger';
+import { Auth } from '../auth/auth.decorator';
 import { AccessTokensService } from './access-tokens.service';
+import { ResultGuard } from '../shared/result-guard.util';
 
+@ApiTags('Access Tokens - MAPI')
 @Controller('v1/spaces/:spaceId/api_keys')
-@UseGuards(SessionOrTokenGuard)
+@Auth('session-or-token')
 export class AccessTokensController {
   constructor(private readonly accessTokensService: AccessTokensService) {}
 
@@ -26,12 +27,9 @@ export class AccessTokensController {
 
   @Get(':id')
   async getApiKey(@Req() req: any, @Param('id') id: string) {
-    const result = await this.accessTokensService.findOne(
-      req.space.id,
-      parseInt(id),
+    return ResultGuard.throwIfNotFound(
+      await this.accessTokensService.findOne(req.space.id, parseInt(id)),
     );
-    if (!result) throw new NotFoundException();
-    return result;
   }
 
   @Post()
@@ -69,28 +67,25 @@ export class AccessTokensController {
       };
     },
   ) {
-    const result = await this.accessTokensService.adminUpdate(
-      req.space.id,
-      parseInt(id),
-      {
-        name: body.api_key?.name,
-        access: body.api_key?.access as 'public' | 'private' | undefined,
-        branchId: body.api_key?.branch_id,
-        minCache: body.api_key?.min_cache ?? undefined,
-      },
+    return ResultGuard.throwIfNotFound(
+      await this.accessTokensService.adminUpdate(
+        req.space.id,
+        parseInt(id),
+        {
+          name: body.api_key?.name,
+          access: body.api_key?.access as 'public' | 'private' | undefined,
+          branchId: body.api_key?.branch_id,
+          minCache: body.api_key?.min_cache ?? undefined,
+        },
+      ),
     );
-    if (!result) throw new NotFoundException();
-    return result;
   }
 
   @Delete(':id')
   @HttpCode(200)
   async deleteApiKey(@Req() req: any, @Param('id') id: string) {
-    const result = await this.accessTokensService.adminDelete(
-      req.space.id,
-      parseInt(id),
+    return ResultGuard.throwIfNotFound(
+      await this.accessTokensService.adminDelete(req.space.id, parseInt(id)),
     );
-    if (!result) throw new NotFoundException();
-    return result;
   }
 }

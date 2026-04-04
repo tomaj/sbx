@@ -9,13 +9,12 @@ import {
   Post,
   Put,
   Req,
-  UseGuards,
 } from '@nestjs/common';
-import { SessionOrTokenGuard } from '../auth/session-or-token.guard';
+import { Auth } from '../auth/auth.decorator';
 import { TasksService } from './tasks.service';
 
 @Controller('v1/spaces/:spaceId/tasks')
-@UseGuards(SessionOrTokenGuard)
+@Auth('session-or-token')
 export class TasksController {
   constructor(private readonly tasksService: TasksService) {}
 
@@ -75,7 +74,7 @@ export class TasksController {
 
   @Post(':id/execute')
   async executeTask(@Req() req: any, @Param('id') id: string, @Body() body: any) {
-    const user = req.user;
+    const user = req.adminUser;
     return this.tasksService.execute(req.space.id, parseInt(id), body?.dialog_values ?? body ?? {}, user);
   }
 }

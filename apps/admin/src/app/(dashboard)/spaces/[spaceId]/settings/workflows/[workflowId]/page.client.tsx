@@ -7,29 +7,9 @@ import Link from 'next/link'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
 import { ContentTypeSelector } from '@/components/ui/content-type-selector'
 import { RightSidebar } from '@/components/ui/right-sidebar'
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface WorkflowStage {
-  id: number
-  name: string
-  color: string
-  position: number
-  is_default: boolean
-  allow_publish: boolean
-  allow_all_stages: boolean
-  allow_all_users: boolean
-  story_editing_locked: boolean
-  auto_remove_assignee: boolean
-}
-
-interface Workflow {
-  id: number
-  name: string
-  content_types: string[]
-  is_default: boolean
-  stages: WorkflowStage[]
-}
+import type { WorkflowDetail, WorkflowStageDetail } from '@sbx/types'
+import { useUnsavedChanges } from '@/hooks/use-unsaved-changes'
+import { UnsavedChangesModal } from '@/components/ui/unsaved-changes-modal'
 
 // ─── Stage color presets ──────────────────────────────────────────────────────
 
@@ -48,11 +28,11 @@ function EditStagePanel({
   onSaved,
   onDeleted,
 }: {
-  stage: WorkflowStage | null
+  stage: WorkflowStageDetail | null
   spaceId: string
   workflowId: string
   onClose: () => void
-  onSaved: (updated: WorkflowStage) => void
+  onSaved: (updated: WorkflowStageDetail) => void
   onDeleted: () => void
 }) {
   const [color, setColor] = useState(stage?.color ?? '#07B2AF')
@@ -276,13 +256,15 @@ export default function WorkflowEditorPage({
 
   const [name, setName] = useState('')
   const [contentTypes, setContentTypes] = useState<string[]>([])
-  const [stages, setStages] = useState<WorkflowStage[]>([])
+  const [stages, setStages] = useState<WorkflowStageDetail[]>([])
   const [newColor, setNewColor] = useState('#07B2AF')
   const [newStageName, setNewStageName] = useState('')
-  const [editingStage, setEditingStage] = useState<WorkflowStage | null>(null)
+  const [editingStage, setEditingStage] = useState<WorkflowStageDetail | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(!isNew)
+  const [isDirty, setIsDirty] = useState(false)
+  const { showModal: showUnsavedModal, handleConfirm: confirmUnsaved, handleCancel: cancelUnsaved } = useUnsavedChanges(isDirty)
 
   useEffect(() => {
     if (isNew) return
@@ -311,6 +293,7 @@ export default function WorkflowEditorPage({
         })
         const data = await res.json()
         if (!res.ok) throw new Error(data.message ?? 'Failed')
+        setIsDirty(false)
         router.push(`/spaces/${spaceId}/settings/workflows/${data.workflow.id}`)
       } else {
         const res = await fetch(`/api/admin/spaces/${spaceId}/workflows/${workflowId}`, {
@@ -319,6 +302,7 @@ export default function WorkflowEditorPage({
           body: JSON.stringify({ name: name.trim(), contentTypes }),
         })
         if (!res.ok) { const d = await res.json(); throw new Error(d.message ?? 'Failed') }
+        setIsDirty(false)
       }
     } catch (e: any) {
       setError(e.message)
@@ -341,7 +325,7 @@ export default function WorkflowEditorPage({
     }
   }
 
-  function handleStageUpdated(updated: WorkflowStage) {
+  function handleStageUpdated(updated: WorkflowStageDetail) {
     setStages((prev) => prev.map((s) => (s.id === updated.id ? updated : s)))
     setEditingStage(null)
   }
@@ -405,7 +389,7 @@ export default function WorkflowEditorPage({
         <input
           type="text"
           value={name}
-          onChange={(e) => setName(e.target.value)}
+          onChange={(e) => { setName(e.target.value); setIsDirty(true) }}
           placeholder="Workflow name"
           className="w-full px-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-teal-500"
         />
@@ -419,7 +403,7 @@ export default function WorkflowEditorPage({
         <ContentTypeSelector
           spaceId={spaceId}
           value={contentTypes}
-          onChange={setContentTypes}
+          onChange={(v) => { setContentTypes(v); setIsDirty(true) }}
         />
       </div>
 
@@ -514,6 +498,12 @@ export default function WorkflowEditorPage({
         onClose={() => setEditingStage(null)}
         onSaved={handleStageUpdated}
         onDeleted={handleStageDeleted}
+      />
+
+      <UnsavedChangesModal
+        open={showUnsavedModal}
+        onConfirm={confirmUnsaved}
+        onCancel={cancelUnsaved}
       />
     </div>
   )

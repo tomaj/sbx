@@ -4,19 +4,20 @@ import {
   Delete,
   Get,
   HttpCode,
-  NotFoundException,
   Param,
   Post,
   Put,
   Query,
   Req,
-  UseGuards,
 } from '@nestjs/common';
-import { SessionOrTokenGuard } from '../auth/session-or-token.guard';
+import { ApiTags } from '@nestjs/swagger';
+import { Auth } from '../auth/auth.decorator';
 import { ReleasesService } from './releases.service';
+import { ResultGuard } from '../shared/result-guard.util';
 
+@ApiTags('Releases - MAPI')
 @Controller('v1/spaces/:spaceId/releases')
-@UseGuards(SessionOrTokenGuard)
+@Auth('session-or-token')
 export class ReleasesController {
   constructor(private readonly releasesService: ReleasesService) {}
 
@@ -27,9 +28,7 @@ export class ReleasesController {
 
   @Get(':id')
   async getRelease(@Req() req: any, @Param('id') id: string) {
-    const result = await this.releasesService.findOne(req.space.id, parseInt(id));
-    if (!result) throw new NotFoundException();
-    return result;
+    return ResultGuard.throwIfNotFound(await this.releasesService.findOne(req.space.id, parseInt(id)));
   }
 
   @Post()
@@ -43,8 +42,7 @@ export class ReleasesController {
 
   @Get(':id/conflict_check')
   async conflictCheck(@Req() req: any, @Param('id') id: string) {
-    const release = await this.releasesService.findOne(req.space.id, parseInt(id));
-    if (!release) throw new NotFoundException();
+    ResultGuard.throwIfNotFound(await this.releasesService.findOne(req.space.id, parseInt(id)));
     return this.releasesService.conflictCheck(req.space.id, parseInt(id));
   }
 
@@ -54,12 +52,12 @@ export class ReleasesController {
     @Param('id') id: string,
     @Body() body: { release: { name?: string; release_at?: string | null; timezone?: string; branches_to_deploy?: number[] }; do_release?: boolean },
   ) {
-    const result = await this.releasesService.update(req.space.id, parseInt(id), {
-      ...body.release,
-      do_release: body.do_release,
-    });
-    if (!result) throw new NotFoundException();
-    return result;
+    return ResultGuard.throwIfNotFound(
+      await this.releasesService.update(req.space.id, parseInt(id), {
+        ...body.release,
+        do_release: body.do_release,
+      }),
+    );
   }
 
   @Delete(':id')

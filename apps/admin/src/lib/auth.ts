@@ -8,4 +8,19 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
   },
+  session: {
+    cookieCache: {
+      enabled: true,
+      maxAge: 5 * 60, // 5 min
+    },
+  },
+  advanced: {
+    cookiePrefix: 'better-auth',
+    defaultCookieAttributes: {
+      sameSite: 'lax',
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      path: '/',
+    },
+  },
 })

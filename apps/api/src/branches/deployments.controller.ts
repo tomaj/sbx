@@ -5,13 +5,14 @@ import {
   HttpStatus,
   Post,
   Req,
-  UseGuards,
 } from '@nestjs/common';
-import { SessionOrTokenGuard } from '../auth/session-or-token.guard';
+import { ApiTags } from '@nestjs/swagger';
+import { Auth } from '../auth/auth.decorator';
 import { BranchesService } from './branches.service';
 
+@ApiTags('Deployments - MAPI')
 @Controller('v1/spaces/:spaceId/deployments')
-@UseGuards(SessionOrTokenGuard)
+@Auth('session-or-token')
 export class DeploymentsController {
   constructor(private readonly branchesService: BranchesService) {}
 

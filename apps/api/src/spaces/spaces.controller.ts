@@ -2,16 +2,17 @@ import {
   Body,
   Controller,
   Get,
-  NotFoundException,
   Param,
   Put,
-  UseGuards,
 } from '@nestjs/common';
-import { SessionOrTokenGuard } from '../auth/session-or-token.guard';
+import { ApiTags } from '@nestjs/swagger';
+import { Auth } from '../auth/auth.decorator';
 import { SpacesService } from './spaces.service';
+import { ResultGuard } from '../shared/result-guard.util';
 
+@ApiTags('Spaces - MAPI')
 @Controller('v1/spaces')
-@UseGuards(SessionOrTokenGuard)
+@Auth('session-or-token')
 export class SpacesController {
   constructor(private readonly spacesService: SpacesService) {}
 
@@ -22,9 +23,7 @@ export class SpacesController {
 
   @Get(':id')
   async get(@Param('id') id: string) {
-    const result = await this.spacesService.getSpaceById(parseInt(id));
-    if (!result) throw new NotFoundException();
-    return result;
+    return ResultGuard.throwIfNotFound(await this.spacesService.getSpaceById(parseInt(id)));
   }
 
   @Put(':id')
@@ -48,20 +47,20 @@ export class SpacesController {
     },
   ) {
     const s = body.space;
-    const result = await this.spacesService.updateSpace(parseInt(id), {
-      name: s.name,
-      domain: s.domain,
-      defaultLang: s.default_lang,
-      defaultRoot: s.default_root,
-      previewUrls: s.preview_urls,
-      encodeUrl: s.encode_url,
-      mobileWidth: s.mobile_width,
-      visualEditorDisabled: s.visual_editor_disabled,
-      assetLibrarySettings: s.asset_library_settings,
-      storyPublishedHook: s.story_published_hook,
-      environments: s.environments,
-    });
-    if (!result) throw new NotFoundException();
-    return result;
+    return ResultGuard.throwIfNotFound(
+      await this.spacesService.updateSpace(parseInt(id), {
+        name: s.name,
+        domain: s.domain,
+        defaultLang: s.default_lang,
+        defaultRoot: s.default_root,
+        previewUrls: s.preview_urls,
+        encodeUrl: s.encode_url,
+        mobileWidth: s.mobile_width,
+        visualEditorDisabled: s.visual_editor_disabled,
+        assetLibrarySettings: s.asset_library_settings,
+        storyPublishedHook: s.story_published_hook,
+        environments: s.environments,
+      }),
+    );
   }
 }

@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { X, CheckCircle, RotateCcw } from 'lucide-react'
 import { UserAvatar } from '@/components/ui/user-avatar'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
+import { formatDate } from '@/lib/date'
 
 interface CommentData {
   id: number
@@ -51,7 +52,7 @@ function formatRelativeTime(date: string): string {
   if (diffH < 24) return `${diffH}h ago`
   const diffD = Math.floor(diffH / 24)
   if (diffD < 30) return `${diffD}d ago`
-  return d.toLocaleDateString()
+  return formatDate(d)
 }
 
 function renderMessageWithMentions(message: string) {

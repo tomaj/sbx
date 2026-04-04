@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, asc, desc, eq, ilike, inArray, isNotNull, isNull, or, sql, SQL } from 'drizzle-orm';
 import { DB } from '../db/db.module';
 import type { DbType } from '../db/db.module';
@@ -155,9 +155,16 @@ export class StoriesCdnService {
     return conditions;
   }
 
-  // Build a SQL fragment for JSONB text extraction (field already validated: /^[\w.]+$/)
+  // Build a SQL fragment for JSONB text extraction
+  // SAFETY: field is pre-validated against /^[\w.]+$/ (alphanumeric, underscores, dots only)
   private jsonbText(field: string): SQL {
     const parts = field.split('.');
+    // Double-check: each part must be a simple identifier (no quotes, no special chars)
+    for (const p of parts) {
+      if (!/^\w+$/.test(p)) {
+        throw new BadRequestException(`Invalid field name: ${field}`);
+      }
+    }
     if (parts.length === 1) {
       return sql`content->>${sql.raw(`'${parts[0]}'`)}`;
     }
@@ -170,6 +177,11 @@ export class StoriesCdnService {
 
   private jsonbJson(field: string): SQL {
     const parts = field.split('.');
+    for (const p of parts) {
+      if (!/^\w+$/.test(p)) {
+        throw new BadRequestException(`Invalid field name: ${field}`);
+      }
+    }
     let acc: SQL = sql`content`;
     for (const p of parts) {
       acc = sql`${acc}->${sql.raw(`'${p}'`)}`;

@@ -4,24 +4,25 @@ import {
   Delete,
   Get,
   HttpCode,
-  NotFoundException,
   Param,
   Post,
   Put,
   Query,
   Req,
-  UseGuards,
 } from '@nestjs/common';
-import { SessionOrTokenGuard } from '../auth/session-or-token.guard';
+import { ApiTags } from '@nestjs/swagger';
+import { Auth } from '../auth/auth.decorator';
 import { DiscussionsService } from './discussions.service';
+import { ResultGuard } from '../shared/result-guard.util';
 
 /**
  * Story-scoped discussion routes:
  *   GET  /v1/spaces/:spaceId/stories/:storyId/discussions
  *   POST /v1/spaces/:spaceId/stories/:storyId/discussions
  */
+@ApiTags('Discussions - MAPI')
 @Controller('v1/spaces/:spaceId/stories/:storyId/discussions')
-@UseGuards(SessionOrTokenGuard)
+@Auth('session-or-token')
 export class StoryDiscussionsController {
   constructor(private readonly discussionsService: DiscussionsService) {}
 
@@ -74,8 +75,9 @@ export class StoryDiscussionsController {
  *   PUT    /v1/spaces/:spaceId/discussions/:discussionId
  *   DELETE /v1/spaces/:spaceId/discussions/:discussionId
  */
+@ApiTags('Discussions - MAPI')
 @Controller('v1/spaces/:spaceId/discussions')
-@UseGuards(SessionOrTokenGuard)
+@Auth('session-or-token')
 export class DiscussionsController {
   constructor(private readonly discussionsService: DiscussionsService) {}
 
@@ -84,12 +86,9 @@ export class DiscussionsController {
     @Req() req: any,
     @Param('discussionId') discussionId: string,
   ) {
-    const result = await this.discussionsService.getDiscussion(
-      req.space.id,
-      parseInt(discussionId),
-    );
-    if (!result) throw new NotFoundException();
-    return { discussion: result };
+    return { discussion: ResultGuard.throwIfNotFound(
+      await this.discussionsService.getDiscussion(req.space.id, parseInt(discussionId)),
+    ) };
   }
 
   @Put(':discussionId')
@@ -98,13 +97,13 @@ export class DiscussionsController {
     @Param('discussionId') discussionId: string,
     @Body() body: { discussion?: { solved_at?: string | null } },
   ) {
-    const result = await this.discussionsService.updateDiscussion(
-      req.space.id,
-      parseInt(discussionId),
-      body.discussion ?? {},
-    );
-    if (!result) throw new NotFoundException();
-    return { discussion: result };
+    return { discussion: ResultGuard.throwIfNotFound(
+      await this.discussionsService.updateDiscussion(
+        req.space.id,
+        parseInt(discussionId),
+        body.discussion ?? {},
+      ),
+    ) };
   }
 
   @Delete(':discussionId')
@@ -162,14 +161,14 @@ export class DiscussionsController {
     @Param('commentId') commentId: string,
     @Body() body: { comment?: { message?: string; message_json?: any[] } },
   ) {
-    const result = await this.discussionsService.updateComment(
-      req.space.id,
-      parseInt(discussionId),
-      parseInt(commentId),
-      body.comment ?? {},
+    return ResultGuard.throwIfNotFound(
+      await this.discussionsService.updateComment(
+        req.space.id,
+        parseInt(discussionId),
+        parseInt(commentId),
+        body.comment ?? {},
+      ),
     );
-    if (!result) throw new NotFoundException();
-    return result;
   }
 
   @Delete(':discussionId/comments/:commentId')
@@ -191,8 +190,9 @@ export class DiscussionsController {
  * Mentioned discussions:
  *   GET /v1/spaces/:spaceId/mentioned_discussions/me
  */
+@ApiTags('Discussions - MAPI')
 @Controller('v1/spaces/:spaceId/mentioned_discussions')
-@UseGuards(SessionOrTokenGuard)
+@Auth('session-or-token')
 export class MentionedDiscussionsController {
   constructor(private readonly discussionsService: DiscussionsService) {}
 

@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useRef, use } from 'react'
 import { usePerPage } from '@/hooks/use-per-page'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { formatDateTime } from '@/lib/date'
 import Link from 'next/link'
 import { Plus, ChevronRight, Settings, Move, Files, Eye, EyeOff, Trash2, Star, ChevronDown, AlertTriangle, GitBranch, Rocket, SlidersHorizontal, Search, SquarePen, CalendarDays } from 'lucide-react'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
@@ -658,7 +659,7 @@ export default function ContentPage({ params }: { params: Promise<{ spaceId: str
                     .filter((r) => !releaseSearch || r.name.toLowerCase().includes(releaseSearch.toLowerCase()))
                     .map((release) => {
                       const scheduleLabel = release.release_at
-                        ? new Date(release.release_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                        ? formatDateTime(release.release_at)
                         : 'Not scheduled'
                       return (
                         <button
@@ -725,7 +726,7 @@ export default function ContentPage({ params }: { params: Promise<{ spaceId: str
                 >
                   <CalendarDays className="w-4 h-4" />
                   {activeRelease.release_at
-                    ? new Date(activeRelease.release_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                    ? formatDateTime(activeRelease.release_at)
                     : 'Set scheduled date'}
                 </button>
                 {scheduleDateOpen && (

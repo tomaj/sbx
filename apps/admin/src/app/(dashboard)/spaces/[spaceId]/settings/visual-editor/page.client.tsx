@@ -2,6 +2,8 @@
 
 import { useState, useEffect, use } from 'react'
 import { Check, Trash2, Plus, Minus } from 'lucide-react'
+import { useUnsavedChanges } from '@/hooks/use-unsaved-changes'
+import { UnsavedChangesModal } from '@/components/ui/unsaved-changes-modal'
 
 interface PreviewUrl {
   name: string
@@ -48,6 +50,13 @@ export default function VisualEditorPage({ params }: { params: Promise<{ spaceId
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isDirty, setIsDirty] = useState(false)
+  const { showModal: showUnsavedModal, handleConfirm: confirmUnsaved, handleCancel: cancelUnsaved } = useUnsavedChanges(isDirty)
+
+  function updateSettings(updater: (s: VisualEditorSettings) => VisualEditorSettings) {
+    setSettings(updater)
+    setIsDirty(true)
+  }
 
   useEffect(() => {
     fetch(`/api/admin/spaces/${spaceId}/space`)
@@ -97,6 +106,7 @@ export default function VisualEditorPage({ params }: { params: Promise<{ spaceId
           visualEditorDisabled: s.visual_editor_disabled ?? false,
         })
       }
+      setIsDirty(false)
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
     } catch (e: any) {
@@ -108,16 +118,16 @@ export default function VisualEditorPage({ params }: { params: Promise<{ spaceId
 
   function addPreviewUrl() {
     if (!newPreview.name.trim() || !newPreview.location.trim()) return
-    setSettings((s) => ({ ...s, previewUrls: [...s.previewUrls, { name: newPreview.name.trim(), location: newPreview.location.trim() }] }))
+    updateSettings((s) => ({ ...s, previewUrls: [...s.previewUrls, { name: newPreview.name.trim(), location: newPreview.location.trim() }] }))
     setNewPreview({ name: '', location: '' })
   }
 
   function removePreviewUrl(index: number) {
-    setSettings((s) => ({ ...s, previewUrls: s.previewUrls.filter((_, i) => i !== index) }))
+    updateSettings((s) => ({ ...s, previewUrls: s.previewUrls.filter((_, i) => i !== index) }))
   }
 
   function updatePreviewUrl(index: number, field: 'name' | 'location', value: string) {
-    setSettings((s) => ({
+    updateSettings((s) => ({
       ...s,
       previewUrls: s.previewUrls.map((p, i) => i === index ? { ...p, [field]: value } : p),
     }))
@@ -151,7 +161,7 @@ export default function VisualEditorPage({ params }: { params: Promise<{ spaceId
           <input
             type="url"
             value={settings.domain}
-            onChange={(e) => setSettings((s) => ({ ...s, domain: e.target.value }))}
+            onChange={(e) => updateSettings((s) => ({ ...s, domain: e.target.value }))}
             placeholder="https://example.com"
             className="w-full px-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-teal-500"
           />
@@ -176,7 +186,7 @@ export default function VisualEditorPage({ params }: { params: Promise<{ spaceId
             <input
               type="checkbox"
               checked={settings.encodeUrl}
-              onChange={(e) => setSettings((s) => ({ ...s, encodeUrl: e.target.checked }))}
+              onChange={(e) => updateSettings((s) => ({ ...s, encodeUrl: e.target.checked }))}
               className="w-4 h-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500 cursor-pointer"
             />
             <span className="text-sm text-gray-700 dark:text-gray-300">Encode URL</span>
@@ -243,7 +253,7 @@ export default function VisualEditorPage({ params }: { params: Promise<{ spaceId
           <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">Mobile width in px</p>
           <div className="flex items-center gap-0 w-40">
             <button
-              onClick={() => setSettings((s) => ({ ...s, mobileWidth: Math.max(240, s.mobileWidth - 10) }))}
+              onClick={() => updateSettings((s) => ({ ...s, mobileWidth: Math.max(240, s.mobileWidth - 10) }))}
               className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-l-lg text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
             >
               <Minus className="w-4 h-4" />
@@ -251,11 +261,11 @@ export default function VisualEditorPage({ params }: { params: Promise<{ spaceId
             <input
               type="number"
               value={settings.mobileWidth}
-              onChange={(e) => setSettings((s) => ({ ...s, mobileWidth: Math.max(240, parseInt(e.target.value) || 360) }))}
+              onChange={(e) => updateSettings((s) => ({ ...s, mobileWidth: Math.max(240, parseInt(e.target.value) || 360) }))}
               className="flex-1 px-3 py-2 border-y border-gray-300 dark:border-gray-600 text-sm text-center text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-teal-500 w-16"
             />
             <button
-              onClick={() => setSettings((s) => ({ ...s, mobileWidth: Math.min(1920, s.mobileWidth + 10) }))}
+              onClick={() => updateSettings((s) => ({ ...s, mobileWidth: Math.min(1920, s.mobileWidth + 10) }))}
               className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-r-lg text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
             >
               <Plus className="w-4 h-4" />
@@ -274,12 +284,14 @@ export default function VisualEditorPage({ params }: { params: Promise<{ spaceId
           <input
             type="checkbox"
             checked={settings.visualEditorDisabled}
-            onChange={(e) => setSettings((s) => ({ ...s, visualEditorDisabled: e.target.checked }))}
+            onChange={(e) => updateSettings((s) => ({ ...s, visualEditorDisabled: e.target.checked }))}
             className="w-4 h-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500 cursor-pointer"
           />
           <span className="text-sm text-gray-700 dark:text-gray-300">Disable Visual Editor</span>
         </label>
       </div>
+
+      <UnsavedChangesModal open={showUnsavedModal} onConfirm={confirmUnsaved} onCancel={cancelUnsaved} />
     </div>
   )
 }

@@ -7,7 +7,6 @@ import {
   Body,
   Req,
   Res,
-  UseGuards,
   UseInterceptors,
   UploadedFile,
   NotFoundException,
@@ -17,9 +16,10 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
 import { randomBytes } from 'crypto';
 import { extname } from 'path';
-import { SessionGuard } from '../auth/session.guard';
+import { Auth } from '../auth/auth.decorator';
 import { UsersService } from './users.service';
 import { StorageService } from '../storage/storage.service';
+import { UpdateMeDto } from './dto/update-me.dto';
 
 const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 const MAX_SIZE = 5 * 1024 * 1024; // 5 MB
@@ -52,7 +52,7 @@ export class UsersController {
   // ─── Authenticated: get current user profile ────────────────────────────────
 
   @Get('v1/user/me')
-  @UseGuards(SessionGuard)
+  @Auth('session')
   async getMe(@Req() req: any) {
     const user = await this.usersService.getMe(req.adminUser.email);
     if (!user) throw new NotFoundException('User not found');
@@ -62,8 +62,8 @@ export class UsersController {
   // ─── Authenticated: update name ──────────────────────────────────────────────
 
   @Patch('v1/user/me')
-  @UseGuards(SessionGuard)
-  async updateMe(@Req() req: any, @Body() body: { firstname?: string; lastname?: string; favourite_spaces?: number[] }) {
+  @Auth('session')
+  async updateMe(@Req() req: any, @Body() body: UpdateMeDto) {
     const me = await this.usersService.getMe(req.adminUser.email);
     if (!me) throw new NotFoundException('User not found');
     const updated = await this.usersService.updateUser(me.id, {
@@ -77,7 +77,7 @@ export class UsersController {
   // ─── Authenticated: upload avatar ────────────────────────────────────────────
 
   @Post('v1/user/me/avatar')
-  @UseGuards(SessionGuard)
+  @Auth('session')
   @UseInterceptors(FileInterceptor('file'))
   async uploadAvatar(@Req() req: any, @UploadedFile() file: Express.Multer.File) {
     if (!file) throw new BadRequestException('No file provided');

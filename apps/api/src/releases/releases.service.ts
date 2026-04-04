@@ -120,58 +120,63 @@ export class ReleasesService {
 
     const now = new Date();
 
-    for (const snapshot of snapshots) {
-      const storyIdBig = BigInt(snapshot.storyId);
-      const d = snapshot.content as {
-        name?: string; slug?: string; full_slug?: string;
-        content?: Record<string, any>; tag_list?: any;
-        path?: string | null; is_startpage?: boolean;
-      };
+    // Wrap all DB writes in a transaction (story updates + storyReleases delete + release update)
+    const result = await this.db.transaction(async (tx) => {
+      for (const snapshot of snapshots) {
+        const storyIdBig = BigInt(snapshot.storyId);
+        const d = snapshot.content as {
+          name?: string; slug?: string; full_slug?: string;
+          content?: Record<string, any>; tag_list?: any;
+          path?: string | null; is_startpage?: boolean;
+        };
 
-      const [current] = await this.db
-        .select({ firstPublishedAt: stories.firstPublishedAt, releaseIds: stories.releaseIds })
-        .from(stories)
-        .where(and(eq(stories.id, storyIdBig), eq(stories.spaceId, spaceId)))
-        .limit(1);
+        const [current] = await tx
+          .select({ firstPublishedAt: stories.firstPublishedAt, releaseIds: stories.releaseIds })
+          .from(stories)
+          .where(and(eq(stories.id, storyIdBig), eq(stories.spaceId, spaceId)))
+          .limit(1);
 
-      if (!current) continue;
+        if (!current) continue;
 
-      const updatedReleaseIds = ((current.releaseIds as number[]) ?? []).filter((id) => id !== releaseId);
+        const updatedReleaseIds = ((current.releaseIds as number[]) ?? []).filter((id) => id !== releaseId);
 
-      await this.db
-        .update(stories)
-        .set({
-          // Apply all snapshot fields to draft + published state
-          ...(d.name !== undefined && { name: d.name }),
-          ...(d.slug !== undefined && { slug: d.slug }),
-          ...(d.full_slug !== undefined && { fullSlug: d.full_slug }),
-          ...(d.content !== undefined && { content: d.content }),
-          ...(d.tag_list !== undefined && { tagList: d.tag_list }),
-          ...('path' in d && { path: d.path }),
-          ...(d.is_startpage !== undefined && { isStartpage: d.is_startpage }),
-          publishedData: snapshot.content as Record<string, any>,
-          published: true,
-          unpublishedChanges: false,
-          publishedAt: now,
-          firstPublishedAt: current.firstPublishedAt ?? now,
-          updatedAt: now,
-          releaseIds: updatedReleaseIds,
-        })
-        .where(and(eq(stories.id, storyIdBig), eq(stories.spaceId, spaceId)));
-    }
+        await tx
+          .update(stories)
+          .set({
+            // Apply all snapshot fields to draft + published state
+            ...(d.name !== undefined && { name: d.name }),
+            ...(d.slug !== undefined && { slug: d.slug }),
+            ...(d.full_slug !== undefined && { fullSlug: d.full_slug }),
+            ...(d.content !== undefined && { content: d.content }),
+            ...(d.tag_list !== undefined && { tagList: d.tag_list }),
+            ...('path' in d && { path: d.path }),
+            ...(d.is_startpage !== undefined && { isStartpage: d.is_startpage }),
+            publishedData: snapshot.content as Record<string, any>,
+            published: true,
+            unpublishedChanges: false,
+            publishedAt: now,
+            firstPublishedAt: current.firstPublishedAt ?? now,
+            updatedAt: now,
+            releaseIds: updatedReleaseIds,
+          })
+          .where(and(eq(stories.id, storyIdBig), eq(stories.spaceId, spaceId)));
+      }
 
-    // Delete all story_releases entries for this release
-    await this.db.delete(storyReleases).where(eq(storyReleases.releaseId, releaseId));
+      // Delete all story_releases entries for this release
+      await tx.delete(storyReleases).where(eq(storyReleases.releaseId, releaseId));
 
-    // Mark release as released
-    const [updated] = await this.db
-      .update(releases)
-      .set({ released: true, updatedAt: now })
-      .where(and(eq(releases.id, releaseId), eq(releases.spaceId, spaceId)))
-      .returning();
+      // Mark release as released
+      const [updated] = await tx
+        .update(releases)
+        .set({ released: true, updatedAt: now })
+        .where(and(eq(releases.id, releaseId), eq(releases.spaceId, spaceId)))
+        .returning();
 
-    if (!updated) return null;
-    return { release: this.format(updated) };
+      return updated;
+    });
+
+    if (!result) return null;
+    return { release: this.format(result) };
   }
 
   private format(r: typeof releases.$inferSelect) {

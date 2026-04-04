@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { X, RotateCcw, LayoutGrid } from 'lucide-react'
+import { UnsavedChangesModal } from '@/components/ui/unsaved-changes-modal'
 import type { ComponentGroup } from '../group-tree'
 import type { Block } from '../block-list'
 import { FieldsTab } from './fields-tab'
@@ -287,6 +288,9 @@ export function EditBlockModal({ open, block, spaceId, groups, onClose, onSaved 
   // ─── Save state ────────────────────────────────────────────────────────────
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isDirty, setIsDirty] = useState(false)
+  const [showUnsavedModal, setShowUnsavedModal] = useState(false)
+  const canMarkDirtyRef = useRef(false)
 
   // ─── Version preview state ─────────────────────────────────────────────────
   const [previewVersion, setPreviewVersion] = useState<ComponentVersionDetail | null>(null)
@@ -311,6 +315,10 @@ export function EditBlockModal({ open, block, spaceId, groups, onClose, onSaved 
     setEditingFieldKey(null)
     setError(null)
     setPreviewVersion(null)
+    setIsDirty(false)
+    canMarkDirtyRef.current = false
+    const t = setTimeout(() => { canMarkDirtyRef.current = true }, 300)
+    return () => clearTimeout(t)
   }, [open, block])
 
   // Keyboard close
@@ -322,7 +330,7 @@ export function EditBlockModal({ open, block, spaceId, groups, onClose, onSaved 
         if (view === 'edit-field' || view === 'manage-tabs') {
           setView('fields'); setMainTab('fields'); setEditingFieldKey(null)
         } else {
-          onClose()
+          if (isDirty) { setShowUnsavedModal(true) } else { onClose() }
         }
       }
       if ((e.metaKey || e.ctrlKey) && e.key === 's') {
@@ -332,9 +340,14 @@ export function EditBlockModal({ open, block, spaceId, groups, onClose, onSaved 
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [open, view, tabs, fields, displayName, description, blockType, groupUuid, previewVersion])
+  }, [open, view, tabs, fields, displayName, description, blockType, groupUuid, previewVersion, isDirty])
 
   if (!open) return null
+
+  function tryClose() {
+    if (isDirty) { setShowUnsavedModal(true) }
+    else { onClose() }
+  }
 
   function navigateToMainTab(tab: MainTab) {
     setMainTab(tab)
@@ -355,6 +368,7 @@ export function EditBlockModal({ open, block, spaceId, groups, onClose, onSaved 
         f.key === oldKey ? { ...f, key, def: updatedDef } : f
       )
     )
+    setIsDirty(true)
     setView('fields')
     setMainTab('fields')
     setEditingFieldKey(null)
@@ -398,6 +412,7 @@ export function EditBlockModal({ open, block, spaceId, groups, onClose, onSaved 
       }
 
       const data = await res.json()
+      setIsDirty(false)
       onSaved(data.component)
     } catch (e: any) {
       setError(e.message ?? 'Failed to save')
@@ -420,7 +435,7 @@ export function EditBlockModal({ open, block, spaceId, groups, onClose, onSaved 
           if (view === 'edit-field' || view === 'manage-tabs') {
             setView('fields'); setMainTab('fields'); setEditingFieldKey(null)
           } else {
-            onClose()
+            tryClose()
           }
         }}
       />
@@ -453,7 +468,7 @@ export function EditBlockModal({ open, block, spaceId, groups, onClose, onSaved 
               Edit &lsquo;{block.display_name || block.name}&rsquo;
             </h2>
             <button
-              onClick={onClose}
+              onClick={tryClose}
               className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors flex-shrink-0"
             >
               <X className="w-5 h-5" />
@@ -489,8 +504,8 @@ export function EditBlockModal({ open, block, spaceId, groups, onClose, onSaved 
             <FieldsTab
               tabs={tabs}
               fields={fields}
-              onTabsChange={setTabs}
-              onFieldsChange={setFields}
+              onTabsChange={(v) => { setTabs(v); if (canMarkDirtyRef.current) setIsDirty(true) }}
+              onFieldsChange={(v) => { setFields(v); if (canMarkDirtyRef.current) setIsDirty(true) }}
               onEditField={handleEditField}
               onManageTabs={() => { setView('manage-tabs'); setMainTab('fields') }}
             />
@@ -525,14 +540,14 @@ export function EditBlockModal({ open, block, spaceId, groups, onClose, onSaved 
               previewTmpl={previewTmpl}
               internalTags={internalTags}
               color={color}
-              onDisplayNameChange={setDisplayName}
-              onDescriptionChange={setDescription}
-              onBlockTypeChange={setBlockType}
-              onGroupUuidChange={setGroupUuid}
-              onPreviewFieldChange={setPreviewField}
-              onPreviewTmplChange={setPreviewTmpl}
-              onInternalTagsChange={setInternalTags}
-              onColorChange={setColor}
+              onDisplayNameChange={(v) => { setDisplayName(v); if (canMarkDirtyRef.current) setIsDirty(true) }}
+              onDescriptionChange={(v) => { setDescription(v); if (canMarkDirtyRef.current) setIsDirty(true) }}
+              onBlockTypeChange={(v) => { setBlockType(v); if (canMarkDirtyRef.current) setIsDirty(true) }}
+              onGroupUuidChange={(v) => { setGroupUuid(v); if (canMarkDirtyRef.current) setIsDirty(true) }}
+              onPreviewFieldChange={(v) => { setPreviewField(v); if (canMarkDirtyRef.current) setIsDirty(true) }}
+              onPreviewTmplChange={(v) => { setPreviewTmpl(v); if (canMarkDirtyRef.current) setIsDirty(true) }}
+              onInternalTagsChange={(v) => { setInternalTags(v); if (canMarkDirtyRef.current) setIsDirty(true) }}
+              onColorChange={(v) => { setColor(v); if (canMarkDirtyRef.current) setIsDirty(true) }}
             />
           )}
           {view === 'presets' && (
@@ -575,6 +590,12 @@ export function EditBlockModal({ open, block, spaceId, groups, onClose, onSaved 
           </div>
         )}
       </div>
+
+      <UnsavedChangesModal
+        open={showUnsavedModal}
+        onConfirm={() => { setShowUnsavedModal(false); onClose() }}
+        onCancel={() => setShowUnsavedModal(false)}
+      />
     </div>
   )
 }

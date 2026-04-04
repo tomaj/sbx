@@ -1,3 +1,5 @@
+import { formatDate, formatTime } from '@/lib/date'
+
 export const ACTIVITY_TYPES = [
   { value: 'Story', label: 'Story' },
   { value: 'Component', label: 'Component' },
@@ -69,10 +71,7 @@ export function resolveItemName(
 }
 
 export function formatActivityTime(dateStr: string | Date): { date: string; time: string } {
-  const d = new Date(dateStr)
-  const date = d.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })
-  const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
-  return { date, time }
+  return { date: formatDate(dateStr), time: formatTime(dateStr) }
 }
 
 export function formatTrackableType(type: string | null): string {

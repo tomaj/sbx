@@ -5,8 +5,6 @@ import {
   MentionedDiscussionsController,
 } from './discussions.controller';
 import { DiscussionsService } from './discussions.service';
-import { TokenGuard } from '../auth/token.guard';
-import { SessionOrTokenGuard } from '../auth/session-or-token.guard';
 
 @Module({
   controllers: [
@@ -14,6 +12,6 @@ import { SessionOrTokenGuard } from '../auth/session-or-token.guard';
     MentionedDiscussionsController,
     DiscussionsController,
   ],
-  providers: [DiscussionsService, TokenGuard, SessionOrTokenGuard],
+  providers: [DiscussionsService],
 })
 export class DiscussionsModule {}

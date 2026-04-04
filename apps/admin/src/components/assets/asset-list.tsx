@@ -3,18 +3,13 @@
 import { RotateCcw } from 'lucide-react'
 import { AssetThumb } from './asset-thumb'
 import type { Asset } from './asset-grid'
+import { formatDateTime } from '@/lib/date'
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B'
   const units = ['B', 'KB', 'MB', 'GB']
   const i = Math.floor(Math.log(bytes) / Math.log(1024))
   return `${(bytes / Math.pow(1024, i)).toFixed(2)} ${units[i]}`
-}
-
-function formatDate(iso: string): string {
-  const d = new Date(iso)
-  return d.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }) +
-    ' ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
 }
 
 function formatExt(contentType: string): string {
@@ -102,7 +97,7 @@ export function AssetList({ assets, spaceId, isLoading, showRestore, onRestore, 
 
           {/* Date */}
           <span className="text-sm text-gray-500 dark:text-gray-400 w-40 shrink-0 hidden lg:block">
-            {formatDate(asset.updated_at)}
+            {formatDateTime(asset.updated_at)}
           </span>
 
           {/* Restore button (deleted view) */}

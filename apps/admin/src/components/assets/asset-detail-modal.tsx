@@ -15,6 +15,7 @@ import { AssetThumb } from './asset-thumb'
 import { TagsMultiselect } from '@/components/ui/tags-multiselect'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
 import { DateField } from '@/components/ui/date-field'
+import { formatDate } from '@/lib/date'
 import type { Asset } from './asset-grid'
 
 const CDN_URL = process.env.NEXT_PUBLIC_CDN_URL ?? 'http://localhost:3002'
@@ -95,7 +96,7 @@ export function AssetDetailModal({ asset: initialAsset, spaceId, onClose, onDele
   const [errors, setErrors] = useState<{ title?: string; alt?: string }>({})
   const [copied, setCopied] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const [showAltTextTodo, setShowAltTextTodo] = useState(false)
+  const [generatingAlt, setGeneratingAlt] = useState(false)
   const [showEditorTodo, setShowEditorTodo] = useState(false)
   const [showMoveTodo, setShowMoveTodo] = useState(false)
   const replaceInputRef = useRef<HTMLInputElement>(null)
@@ -134,6 +135,27 @@ export function AssetDetailModal({ asset: initialAsset, spaceId, onClose, onDele
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
   }, [onClose])
+
+  async function handleGenerateAltText() {
+    setGeneratingAlt(true)
+    setErrors((prev) => ({ ...prev, alt: undefined }))
+    try {
+      const res = await fetch(`/api/admin/spaces/${spaceId}/assets/${asset.id}/ai/alt-text`, {
+        method: 'POST',
+      })
+      if (res.ok) {
+        const data = await res.json()
+        if (data.alt_text) setAlt(data.alt_text)
+      } else {
+        const data = await res.json().catch(() => ({}))
+        setErrors((prev) => ({ ...prev, alt: data.message ?? 'Failed to generate alt text' }))
+      }
+    } catch {
+      setErrors((prev) => ({ ...prev, alt: 'Failed to generate alt text' }))
+    } finally {
+      setGeneratingAlt(false)
+    }
+  }
 
   async function handleSave() {
     const newErrors: { title?: string; alt?: string } = {}
@@ -361,19 +383,23 @@ export function AssetDetailModal({ asset: initialAsset, spaceId, onClose, onDele
                       <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                         Alt text <span className="text-red-500">*</span>
                       </label>
-                      <button
-                        onClick={() => setShowAltTextTodo(true)}
-                        className="flex items-center gap-1 text-xs text-teal-600 dark:text-teal-400 hover:text-teal-700"
-                      >
-                        <Wand2 className="w-3 h-3" />
-                        Generate Alt Text
-                      </button>
+                      {isImage && (
+                        <button
+                          onClick={handleGenerateAltText}
+                          disabled={generatingAlt}
+                          className="flex items-center gap-1 text-xs text-teal-600 dark:text-teal-400 hover:text-teal-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <Wand2 className="w-3 h-3" />
+                          {generatingAlt ? 'Generating...' : 'Generate Alt Text'}
+                        </button>
+                      )}
                     </div>
                     <input
                       type="text"
                       value={alt}
+                      disabled={generatingAlt}
                       onChange={e => { setAlt(e.target.value); setErrors(prev => ({ ...prev, alt: undefined })) }}
-                      className={`w-full px-3 py-2 border rounded-lg text-sm text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 focus:outline-none focus:ring-1 ${errors.alt ? 'border-red-400 focus:ring-red-400' : 'border-gray-200 dark:border-gray-700 focus:ring-teal-500 focus:border-teal-500'}`}
+                      className={`w-full px-3 py-2 border rounded-lg text-sm text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 focus:outline-none focus:ring-1 disabled:opacity-50 disabled:cursor-not-allowed ${errors.alt ? 'border-red-400 focus:ring-red-400' : 'border-gray-200 dark:border-gray-700 focus:ring-teal-500 focus:border-teal-500'}`}
                     />
                     {errors.alt ? (
                       <p className="mt-1 text-xs text-red-500">{errors.alt}</p>
@@ -479,7 +505,7 @@ export function AssetDetailModal({ asset: initialAsset, spaceId, onClose, onDele
                               </div>
                               <div className="shrink-0 text-right">
                                 <p className="text-xs text-gray-400">
-                                  {story.updated_at ? new Date(story.updated_at).toLocaleDateString() : ''}
+                                  {story.updated_at ? formatDate(story.updated_at) : ''}
                                 </p>
                               </div>
                               <a
@@ -530,19 +556,6 @@ export function AssetDetailModal({ asset: initialAsset, spaceId, onClose, onDele
         onConfirm={handleDelete}
         onCancel={() => setShowDeleteConfirm(false)}
       />
-
-      {/* AI alt text — coming soon */}
-      {showAltTextTodo && (
-        <div className="fixed inset-0 z-[60] bg-black/50 flex items-center justify-center" onClick={() => setShowAltTextTodo(false)}>
-          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-sm mx-4 p-6" onClick={e => e.stopPropagation()}>
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">AI Alt Text Generation</h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">AI-powered alt text generation is not available yet. This feature is planned for a future release.</p>
-            <div className="flex justify-end">
-              <button onClick={() => setShowAltTextTodo(false)} className="px-4 py-2 text-sm bg-teal-600 text-white rounded-lg hover:bg-teal-700">OK</button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Image editor — coming soon */}
       {showEditorTodo && (

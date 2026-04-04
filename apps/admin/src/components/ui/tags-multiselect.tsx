@@ -3,11 +3,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { ChevronDown, X, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
-
-interface Tag {
-  id: number
-  name: string
-}
+import type { Tag } from '@sbx/types'
 
 interface TagsMultiselectProps {
   spaceId: string

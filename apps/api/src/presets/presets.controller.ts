@@ -4,19 +4,20 @@ import {
   Delete,
   Get,
   HttpCode,
-  NotFoundException,
   Param,
   Post,
   Put,
   Query,
   Req,
-  UseGuards,
 } from '@nestjs/common';
-import { SessionOrTokenGuard } from '../auth/session-or-token.guard';
+import { ApiTags } from '@nestjs/swagger';
+import { Auth } from '../auth/auth.decorator';
 import { PresetsService } from './presets.service';
+import { ResultGuard } from '../shared/result-guard.util';
 
+@ApiTags('Presets - MAPI')
 @Controller('v1/spaces/:spaceId/presets')
-@UseGuards(SessionOrTokenGuard)
+@Auth('session-or-token')
 export class PresetsController {
   constructor(private readonly presetsService: PresetsService) {}
 
@@ -30,9 +31,7 @@ export class PresetsController {
 
   @Get(':id')
   async getPreset(@Req() req: any, @Param('id') id: string) {
-    const result = await this.presetsService.findOne(req.space.id, parseInt(id));
-    if (!result) throw new NotFoundException();
-    return result;
+    return ResultGuard.throwIfNotFound(await this.presetsService.findOne(req.space.id, parseInt(id)));
   }
 
   @Post()
@@ -72,16 +71,14 @@ export class PresetsController {
       };
     },
   ) {
-    const result = await this.presetsService.update(req.space.id, parseInt(id), body.preset);
-    if (!result) throw new NotFoundException();
-    return result;
+    return ResultGuard.throwIfNotFound(
+      await this.presetsService.update(req.space.id, parseInt(id), body.preset),
+    );
   }
 
   @Delete(':id')
   @HttpCode(200)
   async deletePreset(@Req() req: any, @Param('id') id: string) {
-    const result = await this.presetsService.remove(req.space.id, parseInt(id));
-    if (!result) throw new NotFoundException();
-    return result;
+    return ResultGuard.throwIfNotFound(await this.presetsService.remove(req.space.id, parseInt(id)));
   }
 }

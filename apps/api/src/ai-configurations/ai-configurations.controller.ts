@@ -1,0 +1,93 @@
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  Post,
+  Put,
+  Query,
+} from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
+import { Auth } from '../auth/auth.decorator';
+import { AiConfigurationsService } from './ai-configurations.service';
+
+@ApiTags('AI Configurations - MAPI')
+@Controller('v1/ai_configurations')
+@Auth('session-or-token')
+export class AiConfigurationsController {
+  constructor(private readonly service: AiConfigurationsService) {}
+
+  @Get('providers')
+  getProviders() {
+    return this.service.getProviders();
+  }
+
+  @Get()
+  list(@Query('space_id') spaceId: string) {
+    return this.service.listConfigurations(parseInt(spaceId));
+  }
+
+  @Get(':id')
+  getOne(
+    @Param('id') id: string,
+    @Query('space_id') spaceId: string,
+  ) {
+    return this.service.getConfiguration(parseInt(id), parseInt(spaceId));
+  }
+
+  @Post()
+  create(
+    @Query('space_id') spaceIdQuery: string,
+    @Body() body: {
+      ai_configuration: {
+        name: string;
+        description?: string | null;
+        provider_name: string;
+        model_identifier: string;
+        api_key?: string | null;
+        settings?: Record<string, unknown>;
+      };
+      space_id?: number;
+    },
+  ) {
+    const spaceId = body.space_id ?? parseInt(spaceIdQuery);
+    return this.service.createConfiguration(spaceId, body.ai_configuration);
+  }
+
+  @Put(':id')
+  update(
+    @Param('id') id: string,
+    @Query('space_id') spaceId: string,
+    @Body() body: {
+      ai_configuration: {
+        name?: string;
+        description?: string | null;
+        provider_name?: string;
+        model_identifier?: string;
+        api_key?: string | null;
+        settings?: Record<string, unknown>;
+      };
+    },
+  ) {
+    return this.service.updateConfiguration(parseInt(id), parseInt(spaceId), body.ai_configuration);
+  }
+
+  @Delete(':id')
+  @HttpCode(204)
+  async delete(
+    @Param('id') id: string,
+    @Query('space_id') spaceId: string,
+  ) {
+    await this.service.deleteConfiguration(parseInt(id), parseInt(spaceId));
+  }
+
+  @Put(':id/set_as_default')
+  setDefault(
+    @Param('id') id: string,
+    @Query('space_id') spaceId: string,
+  ) {
+    return this.service.setDefault(parseInt(id), parseInt(spaceId));
+  }
+}

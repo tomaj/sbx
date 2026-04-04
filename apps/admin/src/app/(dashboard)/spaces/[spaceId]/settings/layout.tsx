@@ -20,6 +20,7 @@ const NAV_SECTIONS = [
       { label: 'Access Tokens', href: 'access-tokens' },
       { label: 'Workflows', href: 'workflows' },
       { label: 'Asset Library', href: 'asset-library' },
+      { label: 'AI Settings', href: 'ai-settings' },
     ],
   },
   {

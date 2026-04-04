@@ -3,14 +3,9 @@
 import { useState, useEffect, use } from 'react'
 import { Copy, Check } from 'lucide-react'
 import { SelectDropdown } from '@/components/ui/select-dropdown'
-
-interface Space {
-  id: number
-  uuid: string
-  name: string
-  domain: string
-  default_root: string | null
-}
+import type { SpaceDetail } from '@sbx/types'
+import { useUnsavedChanges } from '@/hooks/use-unsaved-changes'
+import { UnsavedChangesModal } from '@/components/ui/unsaved-changes-modal'
 
 interface ContentType {
   name: string
@@ -31,7 +26,7 @@ function SettingsSection({ title, children }: { title?: string; children: React.
 export default function SpaceSettingsPage({ params }: { params: Promise<{ spaceId: string }> }) {
   const { spaceId } = use(params)
 
-  const [space, setSpace] = useState<Space | null>(null)
+  const [space, setSpace] = useState<SpaceDetail | null>(null)
   const [name, setName] = useState('')
   const [defaultRoot, setDefaultRoot] = useState<string | null>(null)
   const [contentTypes, setContentTypes] = useState<ContentType[]>([])
@@ -40,6 +35,8 @@ export default function SpaceSettingsPage({ params }: { params: Promise<{ spaceI
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [isDirty, setIsDirty] = useState(false)
+  const { showModal: showUnsavedModal, handleConfirm: confirmUnsaved, handleCancel: cancelUnsaved } = useUnsavedChanges(isDirty)
 
   useEffect(() => {
     fetch(`/api/admin/spaces/${spaceId}/space`)
@@ -85,6 +82,7 @@ export default function SpaceSettingsPage({ params }: { params: Promise<{ spaceI
         setName(data.space.name)
         setDefaultRoot(data.space.default_root ?? null)
       }
+      setIsDirty(false)
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
     } catch (e: any) {
@@ -134,7 +132,7 @@ export default function SpaceSettingsPage({ params }: { params: Promise<{ spaceI
           <input
             type="text"
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => { setName(e.target.value); setIsDirty(true) }}
             maxLength={100}
             className="w-full px-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-teal-500"
           />
@@ -183,13 +181,19 @@ export default function SpaceSettingsPage({ params }: { params: Promise<{ spaceI
           </label>
           <SelectDropdown
             value={defaultRoot}
-            onChange={setDefaultRoot}
+            onChange={(v) => { setDefaultRoot(v); setIsDirty(true) }}
             options={contentTypeOptions}
             placeholder="Select a content type..."
             loading={loadingTypes}
           />
         </div>
       </SettingsSection>
+
+      <UnsavedChangesModal
+        open={showUnsavedModal}
+        onConfirm={confirmUnsaved}
+        onCancel={cancelUnsaved}
+      />
     </div>
   )
 }

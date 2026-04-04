@@ -5,23 +5,9 @@ import { Plus, Copy, Settings, Trash2, Check } from 'lucide-react'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
 import { RightSidebar } from '@/components/ui/right-sidebar'
 import { SelectDropdown } from '@/components/ui/select-dropdown'
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface ApiToken {
-  id: number
-  name: string | null
-  token: string
-  access: 'public' | 'private' | 'management'
-  branch_id: number | null
-  min_cache: number
-  space_id: number
-}
-
-interface Branch {
-  id: number
-  name: string
-}
+import { UnsavedChangesModal } from '@/components/ui/unsaved-changes-modal'
+import { useUnsavedChanges } from '@/hooks/use-unsaved-changes'
+import type { ApiToken, Branch } from '@sbx/types'
 
 // ─── Access level badge ───────────────────────────────────────────────────────
 
@@ -79,6 +65,8 @@ function TokenForm({ spaceId, token, branches, open, onClose, onSaved }: TokenFo
   const [error, setError] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [copiedKey, setCopiedKey] = useState(false)
+  const [isDirty, setIsDirty] = useState(false)
+  const { showModal: showUnsavedModal, handleConfirm: confirmUnsaved, handleCancel: cancelUnsaved } = useUnsavedChanges(isDirty)
 
   useEffect(() => {
     setAccess((token?.access === 'private' ? 'private' : 'public') as 'public' | 'private')
@@ -86,6 +74,7 @@ function TokenForm({ spaceId, token, branches, open, onClose, onSaved }: TokenFo
     setBranchId(token?.branch_id != null ? String(token.branch_id) : null)
     setMinCache(token?.min_cache ?? 0)
     setError(null)
+    setIsDirty(false)
   }, [token, open])
 
   async function handleSave() {
@@ -205,7 +194,7 @@ function TokenForm({ spaceId, token, branches, open, onClose, onSaved }: TokenFo
           </label>
           <SelectDropdown
             value={access}
-            onChange={(v) => setAccess((v ?? 'public') as 'public' | 'private')}
+            onChange={(v) => { setAccess((v ?? 'public') as 'public' | 'private'); setIsDirty(true) }}
             options={[
               { value: 'public', label: 'Public' },
               { value: 'private', label: 'Preview' },
@@ -219,7 +208,7 @@ function TokenForm({ spaceId, token, branches, open, onClose, onSaved }: TokenFo
           <input
             type="text"
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => { setName(e.target.value); setIsDirty(true) }}
             placeholder="Access token name"
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-teal-500"
           />
@@ -230,7 +219,7 @@ function TokenForm({ spaceId, token, branches, open, onClose, onSaved }: TokenFo
           <label className="block text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">Pipeline</label>
           <SelectDropdown
             value={branchId}
-            onChange={setBranchId}
+            onChange={(v) => { setBranchId(v); setIsDirty(true) }}
             options={branchOptions}
             placeholder="Select..."
           />
@@ -245,7 +234,7 @@ function TokenForm({ spaceId, token, branches, open, onClose, onSaved }: TokenFo
             type="number"
             min={0}
             value={minCache}
-            onChange={(e) => setMinCache(Math.max(0, parseInt(e.target.value) || 0))}
+            onChange={(e) => { setMinCache(Math.max(0, parseInt(e.target.value) || 0)); setIsDirty(true) }}
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-teal-500"
           />
           <p className="mt-1 text-xs text-gray-400">
@@ -262,6 +251,12 @@ function TokenForm({ spaceId, token, branches, open, onClose, onSaved }: TokenFo
         dangerous
         onConfirm={handleDelete}
         onCancel={() => setConfirmDelete(false)}
+      />
+
+      <UnsavedChangesModal
+        open={showUnsavedModal}
+        onConfirm={confirmUnsaved}
+        onCancel={cancelUnsaved}
       />
     </>
   )

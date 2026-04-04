@@ -627,21 +627,25 @@ export class StoriesService {
       is_startpage: effectiveIsStartpage,
     };
 
-    await this.db
-      .insert(storyReleases)
-      .values({ storyId, releaseId, content: snapshot, createdAt: now, updatedAt: now })
-      .onConflictDoUpdate({
-        target: [storyReleases.storyId, storyReleases.releaseId],
-        set: { content: snapshot, updatedAt: now },
-      });
+    // Wrap all DB writes in a transaction (release snapshot upsert + story releaseIds update)
+    await this.db.transaction(async (tx) => {
+      await tx
+        .insert(storyReleases)
+        .values({ storyId, releaseId, content: snapshot, createdAt: now, updatedAt: now })
+        .onConflictDoUpdate({
+          target: [storyReleases.storyId, storyReleases.releaseId],
+          set: { content: snapshot, updatedAt: now },
+        });
 
-    if (!existingIds.includes(releaseId)) {
-      await this.db
-        .update(stories)
-        .set({ releaseIds: [...existingIds, releaseId], updatedAt: now })
-        .where(eq(stories.id, BigInt(storyId)));
-    }
+      if (!existingIds.includes(releaseId)) {
+        await tx
+          .update(stories)
+          .set({ releaseIds: [...existingIds, releaseId], updatedAt: now })
+          .where(eq(stories.id, BigInt(storyId)));
+      }
+    });
 
+    // Side effects AFTER transaction (version logging)
     this.logVersion({
       storyId, spaceId, releaseId, action: 'save', status: 'draft',
       name: snapshot.name, slug: snapshot.slug, fullSlug: snapshot.full_slug,
@@ -776,51 +780,55 @@ export class StoriesService {
     const now = new Date();
     const lastAuthorId = authorId ?? null;
 
-    await this.db.insert(stories).values({
-      id,
-      spaceId,
-      uuid,
-      name: data.name,
-      slug: data.slug,
-      fullSlug,
-      path: data.path ?? null,
-      parentId: data.parent_id ? BigInt(data.parent_id) : null,
-      contentType,
-      isFolder: data.is_folder ?? false,
-      isStartpage: data.is_startpage ?? false,
-      published: false,
-      unpublishedChanges: true,
-      position: 0,
-      tagList: data.tag_list ?? [],
-      content: data.content ?? {},
-      firstPublishedAt: data.first_published_at ? new Date(data.first_published_at) : null,
-      publishAt: data.publish_at ? new Date(data.publish_at) : null,
-      expireAt: data.expire_at ? new Date(data.expire_at) : null,
-      lastAuthorId,
-      createdAt: now,
-      updatedAt: now,
-    });
-
-    // Associate with release if release_id provided
-    if (releaseId != null) {
-      const snapshot = {
+    // Wrap all DB writes in a transaction (story insert + optional release snapshot)
+    await this.db.transaction(async (tx) => {
+      await tx.insert(stories).values({
+        id,
+        spaceId,
+        uuid,
         name: data.name,
         slug: data.slug,
-        full_slug: fullSlug,
-        content: data.content ?? {},
-        tag_list: data.tag_list ?? [],
+        fullSlug,
         path: data.path ?? null,
-        is_startpage: data.is_startpage ?? false,
-      };
-      await this.db
-        .insert(storyReleases)
-        .values({ storyId: Number(id), releaseId, content: snapshot, createdAt: now, updatedAt: now });
-      await this.db
-        .update(stories)
-        .set({ releaseIds: [releaseId] })
-        .where(eq(stories.id, id));
-    }
+        parentId: data.parent_id ? BigInt(data.parent_id) : null,
+        contentType,
+        isFolder: data.is_folder ?? false,
+        isStartpage: data.is_startpage ?? false,
+        published: false,
+        unpublishedChanges: true,
+        position: 0,
+        tagList: data.tag_list ?? [],
+        content: data.content ?? {},
+        firstPublishedAt: data.first_published_at ? new Date(data.first_published_at) : null,
+        publishAt: data.publish_at ? new Date(data.publish_at) : null,
+        expireAt: data.expire_at ? new Date(data.expire_at) : null,
+        lastAuthorId,
+        createdAt: now,
+        updatedAt: now,
+      });
 
+      // Associate with release if release_id provided
+      if (releaseId != null) {
+        const snapshot = {
+          name: data.name,
+          slug: data.slug,
+          full_slug: fullSlug,
+          content: data.content ?? {},
+          tag_list: data.tag_list ?? [],
+          path: data.path ?? null,
+          is_startpage: data.is_startpage ?? false,
+        };
+        await tx
+          .insert(storyReleases)
+          .values({ storyId: Number(id), releaseId, content: snapshot, createdAt: now, updatedAt: now });
+        await tx
+          .update(stories)
+          .set({ releaseIds: [releaseId] })
+          .where(eq(stories.id, id));
+      }
+    });
+
+    // Side effects AFTER transaction (webhooks, job queue, version logging)
     void this.webhooks.dispatch(spaceId, 'story.created', {
       action: 'created',
       space_id: spaceId,

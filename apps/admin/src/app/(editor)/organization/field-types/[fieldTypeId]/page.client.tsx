@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { ChevronDown, ChevronRight, ArrowLeft, Trash2, ExternalLink } from 'lucide-react'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
+import { UnsavedChangesModal } from '@/components/ui/unsaved-changes-modal'
+import { useUnsavedChanges } from '@/hooks/use-unsaved-changes'
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false })
 
@@ -50,6 +52,7 @@ export default function FieldTypeEditPage({ params }: { params: Promise<{ fieldT
   const [spaces, setSpaces] = useState<Space[]>([])
   const [body, setBody] = useState('')
   const [isDirty, setIsDirty] = useState(false)
+  const { showModal: showUnsavedModal, handleConfirm: confirmUnsaved, handleCancel: cancelUnsaved, guardNavigate } = useUnsavedChanges(isDirty)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showDelete, setShowDelete] = useState(false)
@@ -143,7 +146,7 @@ export default function FieldTypeEditPage({ params }: { params: Promise<{ fieldT
       <div className="flex items-center gap-3 px-4 py-2.5 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 flex-shrink-0">
         <button
           type="button"
-          onClick={() => router.push('/organization/field-types')}
+          onClick={() => guardNavigate('/organization/field-types')}
           className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
         >
           <ArrowLeft className="w-4 h-4 text-gray-500 dark:text-gray-400" />
@@ -309,6 +312,8 @@ export default function FieldTypeEditPage({ params }: { params: Promise<{ fieldT
         onConfirm={handleDelete}
         onCancel={() => setShowDelete(false)}
       />
+
+      <UnsavedChangesModal open={showUnsavedModal} onConfirm={confirmUnsaved} onCancel={cancelUnsaved} />
     </div>
   )
 }

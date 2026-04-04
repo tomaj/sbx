@@ -1,10 +1,20 @@
 import { Module } from '@nestjs/common';
+import { APP_INTERCEPTOR } from '@nestjs/core';
 import { SpaceStatisticsController, OrgStatisticsController } from './statistics.controller';
-import { SessionOrTokenGuard } from '../auth/session-or-token.guard';
-import { SessionGuard } from '../auth/session.guard';
+import { StatisticsService } from './statistics.service';
+import { StatisticsInterceptor } from './statistics.interceptor';
+import { AiModule } from '../ai/ai.module';
 
 @Module({
+  imports: [AiModule],
   controllers: [SpaceStatisticsController, OrgStatisticsController],
-  providers: [SessionOrTokenGuard, SessionGuard],
+  providers: [
+    StatisticsService,
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: StatisticsInterceptor,
+    },
+  ],
+  exports: [StatisticsService],
 })
 export class StatisticsModule {}
