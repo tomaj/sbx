@@ -1,5 +1,5 @@
 import { Controller, Get, Headers, Req, Res } from '@nestjs/common';
-import { Request, Response } from 'express';
+import type { Request, Response } from 'express';
 import { createHash } from 'crypto';
 import { AssetService } from './asset.service';
 
