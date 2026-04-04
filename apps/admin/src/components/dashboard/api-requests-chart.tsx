@@ -44,6 +44,7 @@ const AI_PERIODS: { value: Period; label: string }[] = [
   { value: 'last_12_months', label: 'Last 12 months' },
 ]
 
+
 function formatLabel(date: string, groupBy: 'day' | 'month'): { line1: string; line2: string } {
   if (groupBy === 'month') {
     const [year, month] = date.split('-')

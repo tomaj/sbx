@@ -34,6 +34,14 @@ export class SpaceStatisticsController {
     return this.aiLogsService.getStats(spaceId, period);
   }
 
+  @Get('assets_growth')
+  async getAssetsGrowth(
+    @Param('spaceId', ParseIntPipe) spaceId: number,
+    @Query('period') period = 'this_month',
+  ) {
+    return this.statisticsService.findSpaceAssetsGrowth(spaceId, period);
+  }
+
   @Get(':date')
   async getByDate(
     @Req() req: any,

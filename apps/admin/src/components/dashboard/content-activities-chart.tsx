@@ -6,6 +6,8 @@ import { useApi } from '@/lib/swr'
 import { Calendar, ChevronDown } from 'lucide-react'
 import { formatWeekdayShort, formatMonthShort } from '@/lib/date'
 
+type Tab = 'activities' | 'assets'
+
 interface DataEntry {
   date: string
   count: number
@@ -54,14 +56,17 @@ interface CustomTooltipProps {
   active?: boolean
   payload?: { value: number }[]
   label?: string
+  tab: Tab
 }
 
-function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
+function CustomTooltip({ active, payload, label, tab }: CustomTooltipProps) {
   if (!active || !payload?.length) return null
   return (
     <div className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white shadow-lg">
       <p className="font-medium">{label}</p>
-      <p className="text-teal-400">{payload[0].value.toLocaleString()} activities</p>
+      <p className="text-teal-400">
+        {payload[0].value.toLocaleString()} {tab === 'assets' ? 'assets' : 'activities'}
+      </p>
     </div>
   )
 }
@@ -114,7 +119,9 @@ function PeriodDropdown({ value, onChange }: { value: Period; onChange: (p: Peri
 }
 
 export function ContentActivitiesChart({ spaceId }: { spaceId: string }) {
-  const [period, setPeriod] = useState<Period>('last_14_days')
+  const [tab, setTab] = useState<Tab>('activities')
+  const [activitiesPeriod, setActivitiesPeriod] = useState<Period>('last_14_days')
+  const [assetsPeriod, setAssetsPeriod] = useState<Period>('last_14_days')
   const [showTable, setShowTable] = useState(false)
   const [isDark, setIsDark] = useState(false)
 
@@ -127,9 +134,12 @@ export function ContentActivitiesChart({ spaceId }: { spaceId: string }) {
     return () => obs.disconnect()
   }, [])
 
-  const { data, isLoading } = useApi<StatsResponse>(
-    `/api/admin/spaces/${spaceId}/activities/stats?period=${period}`,
-  )
+  const period = tab === 'activities' ? activitiesPeriod : assetsPeriod
+  const apiUrl = tab === 'activities'
+    ? `/api/admin/spaces/${spaceId}/activities/stats?period=${activitiesPeriod}`
+    : `/api/admin/spaces/${spaceId}/statistics/assets_growth?period=${assetsPeriod}`
+
+  const { data, isLoading } = useApi<StatsResponse>(apiUrl)
 
   const chartData = (data?.data ?? []).map((d) => {
     const lbl = formatLabel(d.date, data?.group_by ?? 'day')
@@ -143,37 +153,59 @@ export function ContentActivitiesChart({ spaceId }: { spaceId: string }) {
   if (isLoading) {
     return (
       <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-6">
-        <div className="flex items-start justify-between">
-          <div className="space-y-2">
-            <div className="h-5 w-40 rounded bg-gray-200 dark:bg-gray-700 animate-pulse" />
-            <div className="h-8 w-48 rounded bg-gray-200 dark:bg-gray-700 animate-pulse" />
-            <div className="h-4 w-44 rounded bg-gray-200 dark:bg-gray-700 animate-pulse" />
-          </div>
+        <div className="flex items-start justify-between mb-4">
+          <div className="h-8 w-64 rounded bg-gray-200 dark:bg-gray-700 animate-pulse" />
           <div className="h-10 w-40 rounded-lg bg-gray-200 dark:bg-gray-700 animate-pulse" />
         </div>
-        <div className="h-48 w-full rounded bg-gray-100 dark:bg-gray-700/40 animate-pulse mt-6" />
+        <div className="space-y-2 mb-4">
+          <div className="h-8 w-48 rounded bg-gray-200 dark:bg-gray-700 animate-pulse" />
+          <div className="h-4 w-44 rounded bg-gray-200 dark:bg-gray-700 animate-pulse" />
+        </div>
+        <div className="h-48 w-full rounded bg-gray-100 dark:bg-gray-700/40 animate-pulse mt-2" />
       </div>
     )
   }
 
   return (
     <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">Content Activities</h2>
-          <p className="mt-1 text-sm text-gray-700 dark:text-gray-300">
-            <span className="font-bold text-gray-900 dark:text-gray-100 text-2xl">
-              {(data?.total ?? 0).toLocaleString()}
-            </span>{' '}
-            updates in {current.label.toLowerCase()}
-          </p>
-          {data && data.previous_total > 0 && (
-            <p className={`text-xs font-medium mt-0.5 ${prevDiff >= 0 ? 'text-teal-500' : 'text-orange-400'}`}>
-              {prevDiff >= 0 ? '+' : ''}{prevDiff.toLocaleString()} from previous period
-            </p>
-          )}
+      {/* Tab switcher + period dropdown */}
+      <div className="flex items-center justify-between gap-4 mb-5">
+        <div className="flex gap-1 border-b border-gray-200 dark:border-gray-700 w-full pb-0">
+          {(['activities', 'assets'] as Tab[]).map((t) => (
+            <button
+              key={t}
+              onClick={() => { setTab(t); setShowTable(false) }}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px ${
+                tab === t
+                  ? 'border-teal-500 text-teal-600 dark:text-teal-400'
+                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+              }`}
+            >
+              {t === 'activities' ? 'Content Activities' : 'Assets'}
+            </button>
+          ))}
         </div>
-        <PeriodDropdown value={period} onChange={setPeriod} />
+        <div className="shrink-0">
+          <PeriodDropdown
+            value={period}
+            onChange={tab === 'activities' ? setActivitiesPeriod : setAssetsPeriod}
+          />
+        </div>
+      </div>
+
+      {/* Summary */}
+      <div>
+        <p className="text-sm text-gray-700 dark:text-gray-300">
+          <span className="font-bold text-gray-900 dark:text-gray-100 text-2xl">
+            {(data?.total ?? 0).toLocaleString()}
+          </span>{' '}
+          {tab === 'activities' ? 'updates' : 'assets uploaded'} in {current.label.toLowerCase()}
+        </p>
+        {data && data.previous_total > 0 && (
+          <p className={`text-xs font-medium mt-0.5 ${prevDiff >= 0 ? 'text-teal-500' : 'text-orange-400'}`}>
+            {prevDiff >= 0 ? '+' : ''}{prevDiff.toLocaleString()} from previous period
+          </p>
+        )}
       </div>
 
       <div className="mt-4">
@@ -194,7 +226,9 @@ export function ContentActivitiesChart({ spaceId }: { spaceId: string }) {
             <thead>
               <tr className="border-b border-gray-200 dark:border-gray-700">
                 <th className="pb-2 font-medium text-gray-500 dark:text-gray-400">Date</th>
-                <th className="pb-2 font-medium text-gray-500 dark:text-gray-400 text-right">Activities</th>
+                <th className="pb-2 font-medium text-gray-500 dark:text-gray-400 text-right">
+                  {tab === 'activities' ? 'Activities' : 'Assets'}
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -237,7 +271,7 @@ export function ContentActivitiesChart({ spaceId }: { spaceId: string }) {
                 allowDecimals={false}
                 width={32}
               />
-              <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(107,114,128,0.08)' }} />
+              <Tooltip content={<CustomTooltip tab={tab} />} cursor={{ fill: 'rgba(107,114,128,0.08)' }} />
               <Bar dataKey="count" radius={[3, 3, 0, 0]} minPointSize={3}>
                 <LabelList
                   dataKey="count"

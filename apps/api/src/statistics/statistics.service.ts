@@ -301,6 +301,89 @@ export class StatisticsService {
     };
   }
 
+  /** Asset upload growth for a given period — count of new assets grouped by day/month. */
+  async findSpaceAssetsGrowth(spaceId: number, period: string) {
+    const now = new Date();
+    const today = now.toISOString().slice(0, 10);
+    let from: string;
+    let to: string = today;
+    let groupBy: 'day' | 'month' = 'day';
+    let periodLabel: string;
+
+    switch (period) {
+      case 'last_7_days':
+        from = new Date(now.getTime() - 6 * 86400000).toISOString().slice(0, 10);
+        groupBy = 'day';
+        periodLabel = 'last 7 days';
+        break;
+      case 'last_14_days':
+        from = new Date(now.getTime() - 13 * 86400000).toISOString().slice(0, 10);
+        groupBy = 'day';
+        periodLabel = 'last 14 days';
+        break;
+      case 'last_month': {
+        const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        from = lm.toISOString().slice(0, 10);
+        to = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().slice(0, 10);
+        groupBy = 'day';
+        periodLabel = 'last month';
+        break;
+      }
+      case 'last_3_months':
+        from = new Date(now.getFullYear(), now.getMonth() - 2, 1).toISOString().slice(0, 10);
+        groupBy = 'month';
+        periodLabel = 'last 3 months';
+        break;
+      case 'last_6_months':
+        from = new Date(now.getFullYear(), now.getMonth() - 5, 1).toISOString().slice(0, 10);
+        groupBy = 'month';
+        periodLabel = 'last 6 months';
+        break;
+      case 'last_12_months':
+        from = new Date(now.getFullYear(), now.getMonth() - 11, 1).toISOString().slice(0, 10);
+        groupBy = 'month';
+        periodLabel = 'last 12 months';
+        break;
+      case 'this_month':
+      default:
+        from = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+        groupBy = 'day';
+        periodLabel = 'this month';
+        break;
+    }
+
+    const fmt = groupBy === 'day' ? 'YYYY-MM-DD' : 'YYYY-MM';
+
+    const rows = await this.db.execute<{ period: string; count: string }>(sql`
+      SELECT
+        to_char(created_at AT TIME ZONE 'UTC', ${fmt}) AS period,
+        COUNT(*)::bigint AS count
+      FROM assets
+      WHERE space_id = ${spaceId}
+        AND deleted_at IS NULL
+        AND created_at >= ${from}::timestamptz
+        AND created_at < (${to}::date + INTERVAL '1 day')::timestamptz
+      GROUP BY period
+      ORDER BY period
+    `);
+
+    const data = this.fillDateRange(from, to, groupBy, rows.rows);
+    const total = data.reduce((s, d) => s + d.count, 0);
+
+    const prevFrom = this.shiftDate(from, to, groupBy);
+    const prevRows = await this.db.execute<{ cnt: string }>(sql`
+      SELECT COALESCE(COUNT(*), 0)::bigint AS cnt
+      FROM assets
+      WHERE space_id = ${spaceId}
+        AND deleted_at IS NULL
+        AND created_at >= ${prevFrom}::timestamptz
+        AND created_at < ${from}::timestamptz
+    `);
+    const previousTotal = Number(prevRows.rows[0]?.cnt ?? 0);
+
+    return { total, previous_total: previousTotal, period_label: periodLabel, group_by: groupBy, data };
+  }
+
   /** Asset-level bandwidth stats — returns assets with their file size as proxy. */
   async orgAssetsTraffic(startDate: string, endDate: string) {
     // We don't track per-asset CDN bytes yet. Return all assets with content_length

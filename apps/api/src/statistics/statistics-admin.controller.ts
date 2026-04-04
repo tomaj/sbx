@@ -16,4 +16,5 @@ export class StatisticsAdminController {
   ) {
     return this.statisticsService.findSpaceTraffic(spaceId, period);
   }
+
 }
