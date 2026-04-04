@@ -5,6 +5,7 @@ import { STORIES_QUEUE, type StoryPublishJobData, type StoryExpireJobData } from
 import { RELEASES_QUEUE, type ReleaseExecuteJobData } from './queues/releases';
 import { EMAILS_QUEUE, type EmailJobData } from './queues/emails';
 import { WORKFLOW_EVENTS_QUEUE, type WorkflowEventJobData } from './queues/workflow-events';
+import { TASKS_QUEUE, type TaskExecuteJobData } from './queues/tasks';
 
 export class JobsClient {
   private queues = new Map<string, Queue>();
@@ -95,6 +96,19 @@ export class JobsClient {
         attempts: 3,
         backoff: { type: 'exponential', delay: 5000 },
         removeOnComplete: { count: 1000 },
+        removeOnFail: { count: 500 },
+        ...opts,
+      }),
+  };
+
+  // ─── Tasks ────────────────────────────────────────────────────────────────
+
+  readonly tasks = {
+    execute: (data: TaskExecuteJobData, opts?: JobsOptions) =>
+      this.add(TASKS_QUEUE, 'execute', data, {
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 2000 },
+        removeOnComplete: { count: 500 },
         removeOnFail: { count: 500 },
         ...opts,
       }),

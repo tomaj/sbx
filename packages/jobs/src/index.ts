@@ -9,3 +9,5 @@ export { EMAILS_QUEUE } from './queues/emails';
 export type { EmailJobData } from './queues/emails';
 export { WORKFLOW_EVENTS_QUEUE } from './queues/workflow-events';
 export type { WorkflowEventJobData } from './queues/workflow-events';
+export { TASKS_QUEUE } from './queues/tasks';
+export type { TaskExecuteJobData } from './queues/tasks';

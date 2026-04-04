@@ -4,10 +4,15 @@ import { DB } from '../db/db.module';
 import { DbType } from '../db/db.module';
 import { tasks } from '../db/schema';
 import { validateExternalUrl } from '../shared/url-validation.util';
+import { JobsClient } from '@sbx/jobs';
+import { JOBS_CLIENT } from '../jobs/jobs.module';
 
 @Injectable()
 export class TasksService {
-  constructor(@Inject(DB) private db: DbType) {}
+  constructor(
+    @Inject(DB) private db: DbType,
+    @Inject(JOBS_CLIENT) private jobs: JobsClient,
+  ) {}
 
   async findAll(spaceId: number) {
     const rows = await this.db
@@ -101,38 +106,20 @@ export class TasksService {
     // Re-validate at execution time — defense-in-depth against data migrated before validation was added
     validateExternalUrl(row.webhookUrl);
 
-    const userEmail = user?.email ?? 'unknown';
-    const payload = {
-      task: { id: row.id, name: row.name },
-      text: `The user ${userEmail} executed the task "${row.name}"`,
-      action: 'task_execution',
-      space_id: spaceId,
-      dialog_values: dialogValues ?? {},
-    };
-
-    let lastResponse: any = null;
-    try {
-      await this.db
-        .update(tasks)
-        .set({ running: true, updatedAt: new Date() })
-        .where(eq(tasks.id, id));
-
-      const res = await fetch(row.webhookUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(30_000),
-      });
-      lastResponse = { status: res.status, ok: res.ok };
-    } catch (err: any) {
-      lastResponse = { error: err.message };
-    }
-
     const [updated] = await this.db
       .update(tasks)
-      .set({ running: false, lastExecution: new Date(), lastResponse, updatedAt: new Date() })
+      .set({ running: true, updatedAt: new Date() })
       .where(eq(tasks.id, id))
       .returning();
+
+    await this.jobs.tasks.execute({
+      taskId: row.id,
+      spaceId,
+      webhookUrl: row.webhookUrl,
+      taskName: row.name,
+      userEmail: user?.email ?? 'unknown',
+      dialogValues: dialogValues ?? {},
+    });
 
     return { task: this.format(updated) };
   }

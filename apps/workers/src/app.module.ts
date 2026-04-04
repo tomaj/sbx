@@ -10,6 +10,7 @@ import {
   RELEASES_QUEUE,
   EMAILS_QUEUE,
   WORKFLOW_EVENTS_QUEUE,
+  TASKS_QUEUE,
 } from '@sbx/jobs';
 
 import { LoggingModule } from './logging/logging.module.js';
@@ -23,6 +24,7 @@ import { StorySchedulerProcessor } from './processors/story-scheduler.processor.
 import { ReleasesProcessor } from './processors/releases.processor.js';
 import { EmailsProcessor } from './processors/emails.processor.js';
 import { WorkflowEventsProcessor } from './processors/workflow-events.processor.js';
+import { TasksProcessor } from './processors/tasks.processor.js';
 
 const redisConnection = {
   host: process.env.REDIS_HOST ?? 'localhost',
@@ -30,7 +32,14 @@ const redisConnection = {
   password: process.env.REDIS_PASSWORD || undefined,
 };
 
-const queues = [WEBHOOKS_QUEUE, STORIES_QUEUE, RELEASES_QUEUE, EMAILS_QUEUE, WORKFLOW_EVENTS_QUEUE];
+const queues = [
+  WEBHOOKS_QUEUE,
+  STORIES_QUEUE,
+  RELEASES_QUEUE,
+  EMAILS_QUEUE,
+  WORKFLOW_EVENTS_QUEUE,
+  TASKS_QUEUE,
+];
 
 @Module({
   imports: [
@@ -57,6 +66,7 @@ const queues = [WEBHOOKS_QUEUE, STORIES_QUEUE, RELEASES_QUEUE, EMAILS_QUEUE, WOR
     ReleasesProcessor,
     EmailsProcessor,
     WorkflowEventsProcessor,
+    TasksProcessor,
   ],
 })
 export class AppModule {}

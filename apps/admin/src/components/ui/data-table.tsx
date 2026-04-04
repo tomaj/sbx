@@ -41,6 +41,7 @@ interface DataTableProps<T> {
   isLoading?: boolean;
   onRowClick?: (row: T) => void;
   emptyMessage?: string;
+  rowClassName?: string;
 }
 
 export function DataTable<T extends Record<string, unknown>>({
@@ -56,6 +57,7 @@ export function DataTable<T extends Record<string, unknown>>({
   isLoading,
   onRowClick,
   emptyMessage,
+  rowClassName,
 }: DataTableProps<T>) {
   // Map our Column<T> interface to TanStack ColumnDef<T>
   const columnDefs = useMemo<ColumnDef<T>[]>(
@@ -224,6 +226,7 @@ export function DataTable<T extends Record<string, unknown>>({
                     'border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors',
                     row.getIsSelected() && 'bg-teal-50 dark:bg-teal-900/10',
                     onRowClick && 'cursor-pointer',
+                    rowClassName,
                   )}
                 >
                   {onSelectChange && (

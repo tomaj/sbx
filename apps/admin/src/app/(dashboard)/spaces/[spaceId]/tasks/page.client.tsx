@@ -7,7 +7,6 @@ import { formatDateTime } from '@/lib/date';
 import { DataTable, type Column, type SortState } from '@/components/ui/data-table';
 import { SearchBar } from '@/components/ui/search-bar';
 import { CrudSidebarForm } from '@/components/ui/crud-sidebar-form';
-import { SelectDropdown } from '@/components/ui/select-dropdown';
 import { PageLayout } from '@/components/ui/page-layout';
 import { useApi } from '@/lib/swr';
 import { useCrudSidebar } from '@/hooks/use-crud-sidebar';
@@ -36,7 +35,7 @@ interface ExecuteDialogProps {
   task: Task | null;
   spaceId: string;
   onClose: () => void;
-  onExecuted: (task: Task) => void;
+  onExecuted: () => void;
 }
 
 function ExecuteDialog({ open, task, spaceId, onClose, onExecuted }: ExecuteDialogProps) {
@@ -49,7 +48,13 @@ function ExecuteDialog({ open, task, spaceId, onClose, onExecuted }: ExecuteDial
   useEffect(() => {
     if (!open || !task) return;
     const initial: Record<string, string> = {};
-    for (const [key] of fields) initial[key] = '';
+    for (const [key, def] of fields) {
+      if (def.type === 'option' && def.options?.length) {
+        initial[key] = def.options[0].value;
+      } else {
+        initial[key] = '';
+      }
+    }
     setValues(initial);
     setError(null);
     setRunning(false);
@@ -76,7 +81,7 @@ function ExecuteDialog({ open, task, spaceId, onClose, onExecuted }: ExecuteDial
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message ?? 'Execution failed');
-      onExecuted(data.task);
+      onExecuted();
     } catch (e: any) {
       setError(e.message ?? 'Execution failed');
       setRunning(false);
@@ -105,20 +110,26 @@ function ExecuteDialog({ open, task, spaceId, onClose, onExecuted }: ExecuteDial
           )}
           {fields.map(([key, def]) => (
             <div key={key}>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 {def.display_name || key}
                 {def.required && <span className="text-red-500 ml-1">*</span>}
               </label>
               {def.type === 'option' ? (
-                <SelectDropdown
-                  value={values[key] ?? null}
-                  onChange={(v) => setValues((prev) => ({ ...prev, [key]: v ?? '' }))}
-                  options={(def.options ?? []).map((opt: any) => ({
-                    value: opt.value,
-                    label: opt.name,
-                  }))}
-                  placeholder="Select..."
-                />
+                <div className="flex flex-wrap gap-x-4 gap-y-2">
+                  {(def.options ?? []).map((opt: any) => (
+                    <label key={opt.value} className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name={`dialog_${key}`}
+                        value={opt.value}
+                        checked={values[key] === opt.value}
+                        onChange={() => setValues((prev) => ({ ...prev, [key]: opt.value }))}
+                        className="w-4 h-4 accent-teal-600"
+                      />
+                      <span className="text-sm text-gray-700 dark:text-gray-300">{opt.name}</span>
+                    </label>
+                  ))}
+                </div>
               ) : (
                 <input
                   type="text"
@@ -163,6 +174,10 @@ export default function TasksPage({ params }: { params: Promise<{ spaceId: strin
 
   const { data, isLoading, mutate } = useApi<{ tasks: Task[] }>(
     `/api/admin/spaces/${spaceId}/tasks`,
+    {
+      refreshInterval: (latestData: { tasks: Task[] } | undefined) =>
+        latestData?.tasks?.some((t) => t.running) ? 1500 : 0,
+    },
   );
 
   const allTasks = data?.tasks ?? [];
@@ -243,8 +258,8 @@ export default function TasksPage({ params }: { params: Promise<{ spaceId: strin
   const [executingTask, setExecutingTask] = useState<Task | null>(null);
 
   function handleExecuted() {
-    mutate();
     setExecuteOpen(false);
+    mutate();
   }
 
   // ─── Columns ─────────────────────────────────────────────────────────────
@@ -353,18 +368,17 @@ export default function TasksPage({ params }: { params: Promise<{ spaceId: strin
         <SearchBar value={search} onChange={setSearch} placeholder="Search tasks…" />
       </div>
 
-      <div className="[&_tbody_tr]:group/row">
-        <DataTable
-          columns={COLUMNS}
-          data={tasks}
-          keyField="id"
-          sort={sort}
-          onSort={(field, direction) => setSort({ field, direction })}
-          isLoading={isLoading}
-          emptyMessage="No tasks found"
-          onRowClick={openEdit}
-        />
-      </div>
+      <DataTable
+        columns={COLUMNS}
+        data={tasks}
+        keyField="id"
+        sort={sort}
+        onSort={(field, direction) => setSort({ field, direction })}
+        isLoading={isLoading}
+        emptyMessage="No tasks found"
+        onRowClick={openEdit}
+        rowClassName="group/row"
+      />
 
       {!isLoading && total > 0 && (
         <p className="mt-3 text-xs text-gray-400">
