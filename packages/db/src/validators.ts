@@ -53,8 +53,8 @@ import {
 // ── spaces ──────────────────────────────────────────────────────────────────
 export const insertSpaceSchema = createInsertSchema(spaces);
 export const selectSpaceSchema = createSelectSchema(spaces);
-export type InsertSpace = typeof insertSpaceSchema._type;
-export type SelectSpace = typeof selectSpaceSchema._type;
+export type InsertSpace = typeof insertSpaceSchema.type;
+export type SelectSpace = typeof selectSpaceSchema.type;
 
 // ── users ────────────────────────────────────────────────────────────────────
 export const insertUserSchema = createInsertSchema(users).omit({
@@ -63,20 +63,20 @@ export const insertUserSchema = createInsertSchema(users).omit({
   updatedAt: true,
 });
 export const selectUserSchema = createSelectSchema(users).omit({ passwordHash: true });
-export type InsertUser = typeof insertUserSchema._type;
-export type SelectUser = typeof selectUserSchema._type;
+export type InsertUser = typeof insertUserSchema.type;
+export type SelectUser = typeof selectUserSchema.type;
 
 // ── spaceMembers ─────────────────────────────────────────────────────────────
 export const insertSpaceMemberSchema = createInsertSchema(spaceMembers).omit({ id: true });
 export const selectSpaceMemberSchema = createSelectSchema(spaceMembers);
-export type InsertSpaceMember = typeof insertSpaceMemberSchema._type;
-export type SelectSpaceMember = typeof selectSpaceMemberSchema._type;
+export type InsertSpaceMember = typeof insertSpaceMemberSchema.type;
+export type SelectSpaceMember = typeof selectSpaceMemberSchema.type;
 
 // ── apiTokens ────────────────────────────────────────────────────────────────
 export const insertApiTokenSchema = createInsertSchema(apiTokens).omit({ createdAt: true });
 export const selectApiTokenSchema = createSelectSchema(apiTokens);
-export type InsertApiToken = typeof insertApiTokenSchema._type;
-export type SelectApiToken = typeof selectApiTokenSchema._type;
+export type InsertApiToken = typeof insertApiTokenSchema.type;
+export type SelectApiToken = typeof selectApiTokenSchema.type;
 
 // ── personalAccessTokens ─────────────────────────────────────────────────────
 export const insertPersonalAccessTokenSchema = createInsertSchema(personalAccessTokens).omit({
@@ -84,14 +84,14 @@ export const insertPersonalAccessTokenSchema = createInsertSchema(personalAccess
   createdAt: true,
 });
 export const selectPersonalAccessTokenSchema = createSelectSchema(personalAccessTokens);
-export type InsertPersonalAccessToken = typeof insertPersonalAccessTokenSchema._type;
-export type SelectPersonalAccessToken = typeof selectPersonalAccessTokenSchema._type;
+export type InsertPersonalAccessToken = typeof insertPersonalAccessTokenSchema.type;
+export type SelectPersonalAccessToken = typeof selectPersonalAccessTokenSchema.type;
 
 // ── internalTags ─────────────────────────────────────────────────────────────
 export const insertInternalTagSchema = createInsertSchema(internalTags).omit({ id: true });
 export const selectInternalTagSchema = createSelectSchema(internalTags);
-export type InsertInternalTag = typeof insertInternalTagSchema._type;
-export type SelectInternalTag = typeof selectInternalTagSchema._type;
+export type InsertInternalTag = typeof insertInternalTagSchema.type;
+export type SelectInternalTag = typeof selectInternalTagSchema.type;
 
 // ── stories ──────────────────────────────────────────────────────────────────
 export const insertStorySchema = createInsertSchema(stories).omit({
@@ -102,8 +102,8 @@ export const insertStorySchema = createInsertSchema(stories).omit({
   deletedAt: true,
 });
 export const selectStorySchema = createSelectSchema(stories);
-export type InsertStory = typeof insertStorySchema._type;
-export type SelectStory = typeof selectStorySchema._type;
+export type InsertStory = typeof insertStorySchema.type;
+export type SelectStory = typeof selectStorySchema.type;
 
 // ── storyVersions ─────────────────────────────────────────────────────────────
 export const insertStoryVersionSchema = createInsertSchema(storyVersions).omit({
@@ -111,8 +111,8 @@ export const insertStoryVersionSchema = createInsertSchema(storyVersions).omit({
   createdAt: true,
 });
 export const selectStoryVersionSchema = createSelectSchema(storyVersions);
-export type InsertStoryVersion = typeof insertStoryVersionSchema._type;
-export type SelectStoryVersion = typeof selectStoryVersionSchema._type;
+export type InsertStoryVersion = typeof insertStoryVersionSchema.type;
+export type SelectStoryVersion = typeof selectStoryVersionSchema.type;
 
 // ── storyReleases ─────────────────────────────────────────────────────────────
 export const insertStoryReleaseSchema = createInsertSchema(storyReleases).omit({
@@ -121,8 +121,8 @@ export const insertStoryReleaseSchema = createInsertSchema(storyReleases).omit({
   updatedAt: true,
 });
 export const selectStoryReleaseSchema = createSelectSchema(storyReleases);
-export type InsertStoryRelease = typeof insertStoryReleaseSchema._type;
-export type SelectStoryRelease = typeof selectStoryReleaseSchema._type;
+export type InsertStoryRelease = typeof insertStoryReleaseSchema.type;
+export type SelectStoryRelease = typeof selectStoryReleaseSchema.type;
 
 // ── storySchedulings ─────────────────────────────────────────────────────────
 export const insertStorySchedulingSchema = createInsertSchema(storySchedulings).omit({
@@ -132,8 +132,8 @@ export const insertStorySchedulingSchema = createInsertSchema(storySchedulings).
   deletedAt: true,
 });
 export const selectStorySchedulingSchema = createSelectSchema(storySchedulings);
-export type InsertStoryScheduling = typeof insertStorySchedulingSchema._type;
-export type SelectStoryScheduling = typeof selectStorySchedulingSchema._type;
+export type InsertStoryScheduling = typeof insertStorySchedulingSchema.type;
+export type SelectStoryScheduling = typeof selectStorySchedulingSchema.type;
 
 // ── assets ───────────────────────────────────────────────────────────────────
 export const insertAssetSchema = createInsertSchema(assets).omit({
@@ -142,8 +142,8 @@ export const insertAssetSchema = createInsertSchema(assets).omit({
   deletedAt: true,
 });
 export const selectAssetSchema = createSelectSchema(assets);
-export type InsertAsset = typeof insertAssetSchema._type;
-export type SelectAsset = typeof selectAssetSchema._type;
+export type InsertAsset = typeof insertAssetSchema.type;
+export type SelectAsset = typeof selectAssetSchema.type;
 
 // ── assetFolders ─────────────────────────────────────────────────────────────
 export const insertAssetFolderSchema = createInsertSchema(assetFolders).omit({
@@ -151,8 +151,8 @@ export const insertAssetFolderSchema = createInsertSchema(assetFolders).omit({
   updatedAt: true,
 });
 export const selectAssetFolderSchema = createSelectSchema(assetFolders);
-export type InsertAssetFolder = typeof insertAssetFolderSchema._type;
-export type SelectAssetFolder = typeof selectAssetFolderSchema._type;
+export type InsertAssetFolder = typeof insertAssetFolderSchema.type;
+export type SelectAssetFolder = typeof selectAssetFolderSchema.type;
 
 // ── components ───────────────────────────────────────────────────────────────
 export const insertComponentSchema = createInsertSchema(components).omit({
@@ -160,14 +160,14 @@ export const insertComponentSchema = createInsertSchema(components).omit({
   updatedAt: true,
 });
 export const selectComponentSchema = createSelectSchema(components);
-export type InsertComponent = typeof insertComponentSchema._type;
-export type SelectComponent = typeof selectComponentSchema._type;
+export type InsertComponent = typeof insertComponentSchema.type;
+export type SelectComponent = typeof selectComponentSchema.type;
 
 // ── componentGroups ──────────────────────────────────────────────────────────
 export const insertComponentGroupSchema = createInsertSchema(componentGroups);
 export const selectComponentGroupSchema = createSelectSchema(componentGroups);
-export type InsertComponentGroup = typeof insertComponentGroupSchema._type;
-export type SelectComponentGroup = typeof selectComponentGroupSchema._type;
+export type InsertComponentGroup = typeof insertComponentGroupSchema.type;
+export type SelectComponentGroup = typeof selectComponentGroupSchema.type;
 
 // ── componentVersions ─────────────────────────────────────────────────────────
 export const insertComponentVersionSchema = createInsertSchema(componentVersions).omit({
@@ -175,8 +175,8 @@ export const insertComponentVersionSchema = createInsertSchema(componentVersions
   createdAt: true,
 });
 export const selectComponentVersionSchema = createSelectSchema(componentVersions);
-export type InsertComponentVersion = typeof insertComponentVersionSchema._type;
-export type SelectComponentVersion = typeof selectComponentVersionSchema._type;
+export type InsertComponentVersion = typeof insertComponentVersionSchema.type;
+export type SelectComponentVersion = typeof selectComponentVersionSchema.type;
 
 // ── datasources ──────────────────────────────────────────────────────────────
 export const insertDatasourceSchema = createInsertSchema(datasources).omit({
@@ -184,8 +184,8 @@ export const insertDatasourceSchema = createInsertSchema(datasources).omit({
   updatedAt: true,
 });
 export const selectDatasourceSchema = createSelectSchema(datasources);
-export type InsertDatasource = typeof insertDatasourceSchema._type;
-export type SelectDatasource = typeof selectDatasourceSchema._type;
+export type InsertDatasource = typeof insertDatasourceSchema.type;
+export type SelectDatasource = typeof selectDatasourceSchema.type;
 
 // ── datasourceEntries ────────────────────────────────────────────────────────
 export const insertDatasourceEntrySchema = createInsertSchema(datasourceEntries).omit({
@@ -193,8 +193,8 @@ export const insertDatasourceEntrySchema = createInsertSchema(datasourceEntries)
   updatedAt: true,
 });
 export const selectDatasourceEntrySchema = createSelectSchema(datasourceEntries);
-export type InsertDatasourceEntry = typeof insertDatasourceEntrySchema._type;
-export type SelectDatasourceEntry = typeof selectDatasourceEntrySchema._type;
+export type InsertDatasourceEntry = typeof insertDatasourceEntrySchema.type;
+export type SelectDatasourceEntry = typeof selectDatasourceEntrySchema.type;
 
 // ── tags ─────────────────────────────────────────────────────────────────────
 export const insertTagSchema = createInsertSchema(tags).omit({
@@ -202,14 +202,14 @@ export const insertTagSchema = createInsertSchema(tags).omit({
   createdAt: true,
 });
 export const selectTagSchema = createSelectSchema(tags);
-export type InsertTag = typeof insertTagSchema._type;
-export type SelectTag = typeof selectTagSchema._type;
+export type InsertTag = typeof insertTagSchema.type;
+export type SelectTag = typeof selectTagSchema.type;
 
 // ── spaceRoles ───────────────────────────────────────────────────────────────
 export const insertSpaceRoleSchema = createInsertSchema(spaceRoles);
 export const selectSpaceRoleSchema = createSelectSchema(spaceRoles);
-export type InsertSpaceRole = typeof insertSpaceRoleSchema._type;
-export type SelectSpaceRole = typeof selectSpaceRoleSchema._type;
+export type InsertSpaceRole = typeof insertSpaceRoleSchema.type;
+export type SelectSpaceRole = typeof selectSpaceRoleSchema.type;
 
 // ── branches ─────────────────────────────────────────────────────────────────
 export const insertBranchSchema = createInsertSchema(branches).omit({
@@ -220,8 +220,8 @@ export const insertBranchSchema = createInsertSchema(branches).omit({
   deployedAt: true,
 });
 export const selectBranchSchema = createSelectSchema(branches);
-export type InsertBranch = typeof insertBranchSchema._type;
-export type SelectBranch = typeof selectBranchSchema._type;
+export type InsertBranch = typeof insertBranchSchema.type;
+export type SelectBranch = typeof selectBranchSchema.type;
 
 // ── releases ─────────────────────────────────────────────────────────────────
 export const insertReleaseSchema = createInsertSchema(releases).omit({
@@ -229,8 +229,8 @@ export const insertReleaseSchema = createInsertSchema(releases).omit({
   updatedAt: true,
 });
 export const selectReleaseSchema = createSelectSchema(releases);
-export type InsertRelease = typeof insertReleaseSchema._type;
-export type SelectRelease = typeof selectReleaseSchema._type;
+export type InsertRelease = typeof insertReleaseSchema.type;
+export type SelectRelease = typeof selectReleaseSchema.type;
 
 // ── workflows ────────────────────────────────────────────────────────────────
 export const insertWorkflowSchema = createInsertSchema(workflows).omit({
@@ -238,8 +238,8 @@ export const insertWorkflowSchema = createInsertSchema(workflows).omit({
   updatedAt: true,
 });
 export const selectWorkflowSchema = createSelectSchema(workflows);
-export type InsertWorkflow = typeof insertWorkflowSchema._type;
-export type SelectWorkflow = typeof selectWorkflowSchema._type;
+export type InsertWorkflow = typeof insertWorkflowSchema.type;
+export type SelectWorkflow = typeof selectWorkflowSchema.type;
 
 // ── workflowStages ───────────────────────────────────────────────────────────
 export const insertWorkflowStageSchema = createInsertSchema(workflowStages).omit({
@@ -247,8 +247,8 @@ export const insertWorkflowStageSchema = createInsertSchema(workflowStages).omit
   updatedAt: true,
 });
 export const selectWorkflowStageSchema = createSelectSchema(workflowStages);
-export type InsertWorkflowStage = typeof insertWorkflowStageSchema._type;
-export type SelectWorkflowStage = typeof selectWorkflowStageSchema._type;
+export type InsertWorkflowStage = typeof insertWorkflowStageSchema.type;
+export type SelectWorkflowStage = typeof selectWorkflowStageSchema.type;
 
 // ── workflowStageChanges ─────────────────────────────────────────────────────
 export const insertWorkflowStageChangeSchema = createInsertSchema(workflowStageChanges).omit({
@@ -256,8 +256,8 @@ export const insertWorkflowStageChangeSchema = createInsertSchema(workflowStageC
   createdAt: true,
 });
 export const selectWorkflowStageChangeSchema = createSelectSchema(workflowStageChanges);
-export type InsertWorkflowStageChange = typeof insertWorkflowStageChangeSchema._type;
-export type SelectWorkflowStageChange = typeof selectWorkflowStageChangeSchema._type;
+export type InsertWorkflowStageChange = typeof insertWorkflowStageChangeSchema.type;
+export type SelectWorkflowStageChange = typeof selectWorkflowStageChangeSchema.type;
 
 // ── approvals ────────────────────────────────────────────────────────────────
 export const insertApprovalSchema = createInsertSchema(approvals).omit({
@@ -266,8 +266,8 @@ export const insertApprovalSchema = createInsertSchema(approvals).omit({
   updatedAt: true,
 });
 export const selectApprovalSchema = createSelectSchema(approvals);
-export type InsertApproval = typeof insertApprovalSchema._type;
-export type SelectApproval = typeof selectApprovalSchema._type;
+export type InsertApproval = typeof insertApprovalSchema.type;
+export type SelectApproval = typeof selectApprovalSchema.type;
 
 // ── discussions ──────────────────────────────────────────────────────────────
 export const insertDiscussionSchema = createInsertSchema(discussions).omit({
@@ -279,8 +279,8 @@ export const insertDiscussionSchema = createInsertSchema(discussions).omit({
   resolvedAt: true,
 });
 export const selectDiscussionSchema = createSelectSchema(discussions);
-export type InsertDiscussion = typeof insertDiscussionSchema._type;
-export type SelectDiscussion = typeof selectDiscussionSchema._type;
+export type InsertDiscussion = typeof insertDiscussionSchema.type;
+export type SelectDiscussion = typeof selectDiscussionSchema.type;
 
 // ── comments ─────────────────────────────────────────────────────────────────
 export const insertCommentSchema = createInsertSchema(comments).omit({
@@ -289,8 +289,8 @@ export const insertCommentSchema = createInsertSchema(comments).omit({
   updatedAt: true,
 });
 export const selectCommentSchema = createSelectSchema(comments);
-export type InsertComment = typeof insertCommentSchema._type;
-export type SelectComment = typeof selectCommentSchema._type;
+export type InsertComment = typeof insertCommentSchema.type;
+export type SelectComment = typeof selectCommentSchema.type;
 
 // ── webhookEndpoints ─────────────────────────────────────────────────────────
 export const insertWebhookEndpointSchema = createInsertSchema(webhookEndpoints).omit({
@@ -299,8 +299,8 @@ export const insertWebhookEndpointSchema = createInsertSchema(webhookEndpoints).
   deletedAt: true,
 });
 export const selectWebhookEndpointSchema = createSelectSchema(webhookEndpoints);
-export type InsertWebhookEndpoint = typeof insertWebhookEndpointSchema._type;
-export type SelectWebhookEndpoint = typeof selectWebhookEndpointSchema._type;
+export type InsertWebhookEndpoint = typeof insertWebhookEndpointSchema.type;
+export type SelectWebhookEndpoint = typeof selectWebhookEndpointSchema.type;
 
 // ── webhookLogs ──────────────────────────────────────────────────────────────
 export const insertWebhookLogSchema = createInsertSchema(webhookLogs).omit({
@@ -308,8 +308,8 @@ export const insertWebhookLogSchema = createInsertSchema(webhookLogs).omit({
   executedAt: true,
 });
 export const selectWebhookLogSchema = createSelectSchema(webhookLogs);
-export type InsertWebhookLog = typeof insertWebhookLogSchema._type;
-export type SelectWebhookLog = typeof selectWebhookLogSchema._type;
+export type InsertWebhookLog = typeof insertWebhookLogSchema.type;
+export type SelectWebhookLog = typeof selectWebhookLogSchema.type;
 
 // ── presets ──────────────────────────────────────────────────────────────────
 export const insertPresetSchema = createInsertSchema(presets).omit({
@@ -317,14 +317,14 @@ export const insertPresetSchema = createInsertSchema(presets).omit({
   updatedAt: true,
 });
 export const selectPresetSchema = createSelectSchema(presets);
-export type InsertPreset = typeof insertPresetSchema._type;
-export type SelectPreset = typeof selectPresetSchema._type;
+export type InsertPreset = typeof insertPresetSchema.type;
+export type SelectPreset = typeof selectPresetSchema.type;
 
 // ── activities ───────────────────────────────────────────────────────────────
 export const insertActivitySchema = createInsertSchema(activities);
 export const selectActivitySchema = createSelectSchema(activities);
-export type InsertActivity = typeof insertActivitySchema._type;
-export type SelectActivity = typeof selectActivitySchema._type;
+export type InsertActivity = typeof insertActivitySchema.type;
+export type SelectActivity = typeof selectActivitySchema.type;
 
 // ── tasks ────────────────────────────────────────────────────────────────────
 export const insertTaskSchema = createInsertSchema(tasks).omit({
@@ -334,8 +334,8 @@ export const insertTaskSchema = createInsertSchema(tasks).omit({
   lastExecution: true,
 });
 export const selectTaskSchema = createSelectSchema(tasks);
-export type InsertTask = typeof insertTaskSchema._type;
-export type SelectTask = typeof selectTaskSchema._type;
+export type InsertTask = typeof insertTaskSchema.type;
+export type SelectTask = typeof selectTaskSchema.type;
 
 // ── pipelines ────────────────────────────────────────────────────────────────
 export const insertPipelineSchema = createInsertSchema(pipelines).omit({
@@ -344,8 +344,8 @@ export const insertPipelineSchema = createInsertSchema(pipelines).omit({
   updatedAt: true,
 });
 export const selectPipelineSchema = createSelectSchema(pipelines);
-export type InsertPipeline = typeof insertPipelineSchema._type;
-export type SelectPipeline = typeof selectPipelineSchema._type;
+export type InsertPipeline = typeof insertPipelineSchema.type;
+export type SelectPipeline = typeof selectPipelineSchema.type;
 
 // ── fieldTypes ───────────────────────────────────────────────────────────────
 export const insertFieldTypeSchema = createInsertSchema(fieldTypes).omit({
@@ -354,14 +354,14 @@ export const insertFieldTypeSchema = createInsertSchema(fieldTypes).omit({
   updatedAt: true,
 });
 export const selectFieldTypeSchema = createSelectSchema(fieldTypes);
-export type InsertFieldType = typeof insertFieldTypeSchema._type;
-export type SelectFieldType = typeof selectFieldTypeSchema._type;
+export type InsertFieldType = typeof insertFieldTypeSchema.type;
+export type SelectFieldType = typeof selectFieldTypeSchema.type;
 
 // ── statistics ───────────────────────────────────────────────────────────────
 export const insertStatisticsSchema = createInsertSchema(statistics).omit({ id: true });
 export const selectStatisticsSchema = createSelectSchema(statistics);
-export type InsertStatistics = typeof insertStatisticsSchema._type;
-export type SelectStatistics = typeof selectStatisticsSchema._type;
+export type InsertStatistics = typeof insertStatisticsSchema.type;
+export type SelectStatistics = typeof selectStatisticsSchema.type;
 
 // ── apiRequestLogs ───────────────────────────────────────────────────────────
 export const insertApiRequestLogSchema = createInsertSchema(apiRequestLogs).omit({
@@ -369,8 +369,8 @@ export const insertApiRequestLogSchema = createInsertSchema(apiRequestLogs).omit
   createdAt: true,
 });
 export const selectApiRequestLogSchema = createSelectSchema(apiRequestLogs);
-export type InsertApiRequestLog = typeof insertApiRequestLogSchema._type;
-export type SelectApiRequestLog = typeof selectApiRequestLogSchema._type;
+export type InsertApiRequestLog = typeof insertApiRequestLogSchema.type;
+export type SelectApiRequestLog = typeof selectApiRequestLogSchema.type;
 
 // ── aiLogs ───────────────────────────────────────────────────────────────────
 export const insertAiLogSchema = createInsertSchema(aiLogs).omit({
@@ -378,5 +378,5 @@ export const insertAiLogSchema = createInsertSchema(aiLogs).omit({
   createdAt: true,
 });
 export const selectAiLogSchema = createSelectSchema(aiLogs);
-export type InsertAiLog = typeof insertAiLogSchema._type;
-export type SelectAiLog = typeof selectAiLogSchema._type;
+export type InsertAiLog = typeof insertAiLogSchema.type;
+export type SelectAiLog = typeof selectAiLogSchema.type;
