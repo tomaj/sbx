@@ -23,6 +23,8 @@ interface SelectDropdownProps {
   ghost?: boolean;
   /** Open the dropdown upward instead of downward */
   dropUp?: boolean;
+  /** Hide the placeholder/clear option in the dropdown list */
+  noPlaceholder?: boolean;
 }
 
 export function SelectDropdown({
@@ -35,6 +37,7 @@ export function SelectDropdown({
   compact = false,
   ghost = false,
   dropUp = false,
+  noPlaceholder = false,
 }: SelectDropdownProps) {
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState('');
@@ -105,9 +108,9 @@ export function SelectDropdown({
       {open && (
         <div
           className={cn(
-            'absolute z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl max-h-64 overflow-y-auto',
+            'absolute z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl max-h-64 overflow-y-auto overflow-x-hidden',
             dropUp ? 'bottom-full mb-1' : 'top-full mt-1',
-            ghost ? 'left-0' : 'left-0 right-0',
+            ghost ? 'left-0' : compact ? 'left-0 min-w-[3.5rem]' : 'left-0 right-0',
           )}
           style={ghost ? { minWidth: '130px' } : undefined}
         >
@@ -124,7 +127,7 @@ export function SelectDropdown({
             </div>
           )}
 
-          {placeholder !== undefined && (
+          {!noPlaceholder && placeholder !== undefined && (
             <button
               type="button"
               onClick={() => {

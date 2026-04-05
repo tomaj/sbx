@@ -3,9 +3,10 @@
 import { use, useState, useEffect, useCallback, useRef } from 'react';
 import { usePerPage } from '@/hooks/use-per-page';
 import Link from 'next/link';
-import { ArrowLeft, GripVertical, Trash2 } from 'lucide-react';
+import { ArrowLeft, Trash2 } from 'lucide-react';
 import { SearchBar } from '@/components/ui/search-bar';
 import { CrudSidebarForm } from '@/components/ui/crud-sidebar-form';
+import { SortableList, SortableItem, SortableDragHandle } from '@/components/ui/sortable-list';
 import { useDelete } from '@/hooks/use-delete';
 import { useApi } from '@/lib/swr';
 import { Pagination } from '@/components/ui/pagination';
@@ -18,25 +19,9 @@ interface EntryRowProps {
   entry: DatasourceEntry;
   onSave: (id: number, name: string, value: string) => Promise<void>;
   onDelete: (entry: DatasourceEntry) => void;
-  dragging: boolean;
-  isDropTarget: boolean;
-  onDragStart: (e: React.DragEvent) => void;
-  onDragOver: (e: React.DragEvent) => void;
-  onDrop: () => void;
-  onDragEnd: () => void;
 }
 
-function EntryRow({
-  entry,
-  onSave,
-  onDelete,
-  dragging,
-  isDropTarget,
-  onDragStart,
-  onDragOver,
-  onDrop,
-  onDragEnd,
-}: EntryRowProps) {
+function EntryRow({ entry, onSave, onDelete }: EntryRowProps) {
   const [name, setName] = useState(entry.name);
   const [value, setValue] = useState(entry.value);
   const [saving, setSaving] = useState(false);
@@ -58,42 +43,9 @@ function EntryRow({
     setSaving(false);
   }
 
-  const isDraggingViaGrip = useRef(false);
-
   return (
-    <div
-      draggable
-      onDragStart={(e) => {
-        if (!isDraggingViaGrip.current) {
-          e.preventDefault();
-          return;
-        }
-        isDraggingViaGrip.current = false;
-        onDragStart(e);
-      }}
-      onDragOver={(e) => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-        onDragOver(e);
-      }}
-      onDrop={onDrop}
-      onDragEnd={onDragEnd}
-      className={`flex items-center gap-3 px-4 py-2.5 border-b transition-colors ${
-        dragging
-          ? 'opacity-40 bg-teal-50 dark:bg-teal-900/10 border-gray-100 dark:border-gray-800'
-          : isDropTarget
-            ? 'border-t-2 border-t-teal-500 border-b-gray-100 dark:border-b-gray-800 bg-teal-50/50 dark:bg-teal-900/5'
-            : 'border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50'
-      }`}
-    >
-      <div
-        onMouseDown={() => {
-          isDraggingViaGrip.current = true;
-        }}
-        className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-400 shrink-0"
-      >
-        <GripVertical className="size-4" />
-      </div>
+    <div className="flex items-center gap-3 px-4 py-2.5 border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+      <SortableDragHandle />
 
       <input
         type="text"
@@ -160,10 +112,6 @@ export default function DatasourceDetailPage({
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [editIsDirty, setEditIsDirty] = useState(false);
-
-  const dragIndex = useRef<number | null>(null);
-  const [dragSourceIndex, setDragSourceIndex] = useState<number | null>(null);
-  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   // Fetch entries via MAPI /datasource_entries?datasource_id=...
   const fetchEntries = useCallback(async () => {
@@ -264,28 +212,8 @@ export default function DatasourceDetailPage({
     }
   }
 
-  function handleDragStart(index: number, e: React.DragEvent) {
-    dragIndex.current = index;
-    setDragSourceIndex(index);
-    e.dataTransfer.effectAllowed = 'move';
-  }
-
-  function handleDragOver(index: number) {
-    if (dragOverIndex !== index) setDragOverIndex(index);
-  }
-
-  async function handleDrop(dropIndex: number) {
-    const from = dragIndex.current;
-    setDragSourceIndex(null);
-    setDragOverIndex(null);
-    dragIndex.current = null;
-    if (from === null || from === dropIndex) return;
-
-    // Optimistic reorder
-    const original = [...entries];
-    const reordered = [...entries];
-    const [moved] = reordered.splice(from, 1);
-    reordered.splice(dropIndex, 0, moved);
+  async function handleReorder(reordered: DatasourceEntry[]) {
+    const original = entries;
     setEntries(reordered);
 
     // Persist positions via MAPI — update only entries whose position changed
@@ -394,24 +322,20 @@ export default function DatasourceDetailPage({
           ) : entries.length === 0 ? (
             <div className="text-center py-16 text-gray-400 text-sm">No entries found</div>
           ) : (
-            entries.map((entry, index) => (
-              <EntryRow
-                key={entry.id}
-                entry={entry}
-                onSave={handleSaveEntry}
-                onDelete={entryDelete.confirm}
-                dragging={dragSourceIndex === index}
-                isDropTarget={dragOverIndex === index && dragSourceIndex !== index}
-                onDragStart={(e) => handleDragStart(index, e)}
-                onDragOver={() => handleDragOver(index)}
-                onDrop={() => handleDrop(index)}
-                onDragEnd={() => {
-                  dragIndex.current = null;
-                  setDragSourceIndex(null);
-                  setDragOverIndex(null);
-                }}
-              />
-            ))
+            <SortableList
+              items={entries}
+              getKey={(e) => e.id}
+              onReorder={handleReorder}
+              renderItem={(entry) => (
+                <SortableItem
+                  key={entry.id}
+                  id={entry.id}
+                  draggingClassName="opacity-40 bg-teal-50 dark:bg-teal-900/10 shadow-lg"
+                >
+                  <EntryRow entry={entry} onSave={handleSaveEntry} onDelete={entryDelete.confirm} />
+                </SortableItem>
+              )}
+            />
           )}
         </div>
 

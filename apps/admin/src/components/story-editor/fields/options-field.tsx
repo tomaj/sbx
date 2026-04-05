@@ -2,8 +2,9 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useApi } from '@/lib/swr';
-import { ChevronDown, ChevronUp, Search, GripVertical, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Search, X } from 'lucide-react';
 import type { OptionsFieldDef } from '@/components/block-library/edit-block-modal/types';
+import { SortableList, SortableItem, SortableDragHandle } from '@/components/ui/sortable-list';
 import { fieldLabel } from '../field-label';
 import { FieldLabel } from '../FieldLabel';
 import { StoryPickerMultiModal } from '../StoryPickerMultiModal';
@@ -25,7 +26,6 @@ export function OptionsField({ fieldKey, def, value, onChange, spaceId }: Props)
   const [search, setSearch] = useState('');
   const [pending, setPending] = useState<string[]>(selected);
   const containerRef = useRef<HTMLDivElement>(null);
-  const dragIndex = useRef<number | null>(null);
 
   // For internal_stories: display names keyed by story id/uuid
   const [selectedLabels, setSelectedLabels] = useState<Record<string, string>>({});
@@ -102,25 +102,6 @@ export function OptionsField({ fieldKey, def, value, onChange, spaceId }: Props)
     onChange(next);
   }
 
-  function onDragStart(i: number) {
-    dragIndex.current = i;
-  }
-
-  function onDragOver(e: React.DragEvent, i: number) {
-    e.preventDefault();
-    const from = dragIndex.current;
-    if (from === null || from === i) return;
-    const next = [...selected];
-    const [item] = next.splice(from, 1);
-    next.splice(i, 0, item);
-    dragIndex.current = i;
-    onChange(next);
-  }
-
-  function onDragEnd() {
-    dragIndex.current = null;
-  }
-
   const orderedSelected = isInternalStories
     ? selected.map((val) => ({ value: val, name: selectedLabels[val] ?? val }))
     : selected
@@ -153,49 +134,51 @@ export function OptionsField({ fieldKey, def, value, onChange, spaceId }: Props)
                     Clear selected
                   </button>
                 </div>
-                {orderedSelected.map((opt, i) => (
-                  <div
-                    key={opt.value}
-                    draggable
-                    onDragStart={() => onDragStart(i)}
-                    onDragOver={(e) => onDragOver(e, i)}
-                    onDragEnd={onDragEnd}
-                    className="group flex items-center gap-2 px-3 py-2.5 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-grab active:cursor-grabbing select-none"
-                  >
-                    <GripVertical className="w-4 h-4 text-gray-300 dark:text-gray-600 flex-shrink-0" />
-                    <span className="flex-1 text-sm text-gray-800 dark:text-gray-200">
-                      {opt.name}
-                    </span>
-                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        type="button"
-                        onClick={() => removeItem(opt.value)}
-                        title="Remove"
-                        className="p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => moveUp(i)}
-                        disabled={i === 0}
-                        title="Move up"
-                        className="p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-30"
-                      >
-                        <ChevronUp className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => moveDown(i)}
-                        disabled={i === orderedSelected.length - 1}
-                        title="Move down"
-                        className="p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-30"
-                      >
-                        <ChevronDown className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                <SortableList
+                  items={orderedSelected}
+                  getKey={(opt) => opt.value}
+                  onReorder={(newItems) => onChange(newItems.map((o) => o.value))}
+                  renderItem={(opt, i) => (
+                    <SortableItem
+                      key={opt.value}
+                      id={opt.value}
+                      className="group flex items-center gap-2 px-3 py-2.5 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800/50 select-none"
+                    >
+                      <SortableDragHandle className="text-gray-300 dark:text-gray-600 flex-shrink-0" />
+                      <span className="flex-1 text-sm text-gray-800 dark:text-gray-200">
+                        {opt.name}
+                      </span>
+                      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          type="button"
+                          onClick={() => removeItem(opt.value)}
+                          title="Remove"
+                          className="p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moveUp(i)}
+                          disabled={i === 0}
+                          title="Move up"
+                          className="p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-30"
+                        >
+                          <ChevronUp className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moveDown(i)}
+                          disabled={i === orderedSelected.length - 1}
+                          title="Move down"
+                          className="p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-30"
+                        >
+                          <ChevronDown className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </SortableItem>
+                  )}
+                />
               </div>
             )}
 
@@ -254,47 +237,51 @@ export function OptionsField({ fieldKey, def, value, onChange, spaceId }: Props)
                 Clear selected
               </button>
             </div>
-            {orderedSelected.map((opt, i) => (
-              <div
-                key={opt.value}
-                draggable
-                onDragStart={() => onDragStart(i)}
-                onDragOver={(e) => onDragOver(e, i)}
-                onDragEnd={onDragEnd}
-                className="group flex items-center gap-2 px-3 py-2.5 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-grab active:cursor-grabbing select-none"
-              >
-                <GripVertical className="w-4 h-4 text-gray-300 dark:text-gray-600 flex-shrink-0" />
-                <span className="flex-1 text-sm text-gray-800 dark:text-gray-200">{opt.name}</span>
-                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button
-                    type="button"
-                    onClick={() => removeItem(opt.value)}
-                    title="Remove"
-                    className="p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => moveUp(i)}
-                    disabled={i === 0}
-                    title="Move up"
-                    className="p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-30"
-                  >
-                    <ChevronUp className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => moveDown(i)}
-                    disabled={i === orderedSelected.length - 1}
-                    title="Move down"
-                    className="p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-30"
-                  >
-                    <ChevronDown className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            ))}
+            <SortableList
+              items={orderedSelected}
+              getKey={(opt) => opt.value}
+              onReorder={(newItems) => onChange(newItems.map((o) => o.value))}
+              renderItem={(opt, i) => (
+                <SortableItem
+                  key={opt.value}
+                  id={opt.value}
+                  className="group flex items-center gap-2 px-3 py-2.5 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800/50 select-none"
+                >
+                  <SortableDragHandle className="text-gray-300 dark:text-gray-600 flex-shrink-0" />
+                  <span className="flex-1 text-sm text-gray-800 dark:text-gray-200">
+                    {opt.name}
+                  </span>
+                  <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      type="button"
+                      onClick={() => removeItem(opt.value)}
+                      title="Remove"
+                      className="p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveUp(i)}
+                      disabled={i === 0}
+                      title="Move up"
+                      className="p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-30"
+                    >
+                      <ChevronUp className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveDown(i)}
+                      disabled={i === orderedSelected.length - 1}
+                      title="Move down"
+                      className="p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-30"
+                    >
+                      <ChevronDown className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </SortableItem>
+              )}
+            />
           </div>
         )}
 

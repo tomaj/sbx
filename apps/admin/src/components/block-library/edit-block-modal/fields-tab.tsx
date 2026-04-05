@@ -1,7 +1,23 @@
 'use client';
 
 import { useState } from 'react';
-import { Settings, GripVertical, X } from 'lucide-react';
+import { Settings, X } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type Modifier,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { SortableItem, SortableDragHandle, arrayMove } from '@/components/ui/sortable-list';
 import { FieldIcon } from './field-icon';
 import {
   type WorkingField,
@@ -106,57 +122,38 @@ function TypePicker({ selected, onSelect, onClose }: TypePickerProps) {
   );
 }
 
+/** Restricts drag movement to the vertical axis only */
+const restrictToVerticalAxis: Modifier = ({ transform }) => ({
+  ...transform,
+  x: 0,
+});
+
 // ─── Field row ────────────────────────────────────────────────────────────────
 
 interface FieldRowProps {
   field: WorkingField;
   onEdit: () => void;
   onDelete: () => void;
-  isDragOver: boolean;
-  dragFieldKey: string;
-  onDragStart: (key: string, e: React.DragEvent) => void;
-  onDragOver: (key: string, e: React.DragEvent) => void;
-  onDrop: (key: string, e: React.DragEvent) => void;
-  onDragEnd: () => void;
 }
 
-function FieldRow({
-  field,
-  onEdit,
-  onDelete,
-  isDragOver,
-  dragFieldKey,
-  onDragStart,
-  onDragOver,
-  onDrop,
-  onDragEnd,
-}: FieldRowProps) {
+function FieldRow({ field, onEdit, onDelete }: FieldRowProps) {
   const label = FIELD_TYPE_LABELS[field.def.type as FieldType] ?? field.def.type;
-  const isBeingDragged = dragFieldKey === field.key;
 
   return (
-    <div
-      draggable
-      onDragStart={(e) => onDragStart(field.key, e)}
-      onDragOver={(e) => onDragOver(field.key, e)}
-      onDrop={(e) => onDrop(field.key, e)}
-      onDragEnd={onDragEnd}
-      className={`flex items-center gap-4 px-4 py-4 border rounded-lg cursor-pointer transition-all select-none ${
-        isDragOver
-          ? 'border-teal-400 bg-teal-50/40 dark:bg-teal-900/10'
-          : isBeingDragged
-            ? 'opacity-40 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900'
-            : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:border-gray-300 dark:hover:border-gray-600'
-      }`}
-      onClick={onEdit}
+    <SortableItem
+      id={field.key}
+      className="flex items-center gap-4 px-4 py-4 border rounded-lg cursor-pointer transition-all select-none border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:border-gray-300 dark:hover:border-gray-600 mb-2"
+      draggingClassName="opacity-50 shadow-lg border-teal-400"
     >
-      <GripVertical className="w-5 h-5 text-gray-300 dark:text-gray-600 flex-shrink-0 cursor-grab active:cursor-grabbing" />
-      <FieldIcon type={field.def.type as FieldType} size={28} />
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
-          {field.key}
-        </p>
-        <p className="text-xs text-gray-400 dark:text-gray-500 truncate mt-0.5">{label}</p>
+      <div onClick={onEdit} className="flex items-center gap-4 flex-1 min-w-0">
+        <SortableDragHandle className="w-5 h-5" />
+        <FieldIcon type={field.def.type as FieldType} size={28} />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
+            {field.key}
+          </p>
+          <p className="text-xs text-gray-400 dark:text-gray-500 truncate mt-0.5">{label}</p>
+        </div>
       </div>
       <button
         type="button"
@@ -168,7 +165,7 @@ function FieldRow({
       >
         <X className="w-4 h-4" />
       </button>
-    </div>
+    </SortableItem>
   );
 }
 
@@ -197,13 +194,17 @@ export function FieldsTab({
   const [activeTabKey, setActiveTabKey] = useState<string>(tabs[0]?.key ?? DEFAULT_TAB_KEY);
   const [nameError, setNameError] = useState<string | null>(null);
 
-  // ─── Drag & drop state ───────────────────────────────────────────────────────
+  // Track which field is being dragged (for cross-tab drop highlighting)
   const [draggingKey, setDraggingKey] = useState<string | null>(null);
-  const [dragOverFieldKey, setDragOverFieldKey] = useState<string | null>(null);
   const [dragOverTabKey, setDragOverTabKey] = useState<string | null>(null);
 
   const _activeTab = tabs.find((t) => t.key === activeTabKey) ?? tabs[0];
   const tabFields = fields.filter((f) => f.tabKey === activeTabKey);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
   function handleAdd() {
     const name = newFieldName.trim().replace(/\s/g, '_').toLowerCase();
@@ -227,64 +228,60 @@ export function FieldsTab({
     onFieldsChange(fields.filter((f) => f.key !== key));
   }
 
-  // ─── DnD: field start/over/drop ──────────────────────────────────────────────
-  function handleFieldDragStart(key: string, e: React.DragEvent) {
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', key);
-    // Delay state so the drag image captures non-dimmed element
-    setTimeout(() => setDraggingKey(key), 0);
+  // ─── dnd-kit: reorder within the current tab ─────────────────────────────────
+  function handleDragStart(event: { active: { id: string | number } }) {
+    setDraggingKey(String(event.active.id));
   }
 
-  function handleFieldDragOver(key: string, e: React.DragEvent) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    setDragOverFieldKey(key);
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    setDraggingKey(null);
     setDragOverTabKey(null);
+
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = tabFields.findIndex((f) => f.key === active.id);
+    const newIndex = tabFields.findIndex((f) => f.key === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const reordered = arrayMove(tabFields, oldIndex, newIndex);
+    const otherFields = fields.filter((f) => f.tabKey !== activeTabKey);
+    onFieldsChange([...otherFields, ...reordered]);
   }
 
-  function handleFieldDrop(targetKey: string, e: React.DragEvent) {
-    e.preventDefault();
-    const fromKey = e.dataTransfer.getData('text/plain');
-    clearDragState();
-    if (!fromKey || fromKey === targetKey) return;
+  // ─── Cross-tab drop: native drag events on tab buttons ───────────────────────
+  // When a dnd-kit drag is active, the pointer events on tabs are blocked by the
+  // overlay. Instead we use a simple "drop zone" approach: during dnd-kit drag,
+  // we detect pointer-over on tab buttons via onPointerEnter/Leave and commit the
+  // cross-tab move in handleDragEnd if the pointer was last over a different tab.
 
-    const allTabFields = [...tabFields];
-    const fromIdx = allTabFields.findIndex((f) => f.key === fromKey);
-    const toIdx = allTabFields.findIndex((f) => f.key === targetKey);
-
-    if (fromIdx !== -1 && toIdx !== -1) {
-      // Reorder within same tab
-      const [moved] = allTabFields.splice(fromIdx, 1);
-      allTabFields.splice(toIdx, 0, moved);
-      const otherFields = fields.filter((f) => f.tabKey !== activeTabKey);
-      onFieldsChange([...otherFields, ...allTabFields]);
+  function handleTabPointerEnter(tabKey: string) {
+    if (draggingKey && tabKey !== activeTabKey) {
+      setDragOverTabKey(tabKey);
     }
   }
 
-  // ─── DnD: tab drop target ────────────────────────────────────────────────────
-  function handleTabDragOver(tabKey: string, e: React.DragEvent) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    setDragOverTabKey(tabKey);
-    setDragOverFieldKey(null);
-  }
-
-  function handleTabDrop(tabKey: string, e: React.DragEvent) {
-    e.preventDefault();
-    const fromKey = e.dataTransfer.getData('text/plain');
-    clearDragState();
-    if (!fromKey) return;
-
-    // Move field to the target tab
-    onFieldsChange(fields.map((f) => (f.key === fromKey ? { ...f, tabKey } : f)));
-    // Switch to target tab so user sees the moved field
-    setActiveTabKey(tabKey);
-  }
-
-  function clearDragState() {
-    setDraggingKey(null);
-    setDragOverFieldKey(null);
+  function handleTabPointerLeave() {
     setDragOverTabKey(null);
+  }
+
+  // Override handleDragEnd to also handle cross-tab moves
+  function handleDragEndWithCrossTab(event: DragEndEvent) {
+    const { active } = event;
+    const fieldKey = String(active.id);
+
+    if (dragOverTabKey && dragOverTabKey !== activeTabKey) {
+      // Cross-tab move: move the field to the target tab
+      onFieldsChange(
+        fields.map((f) => (f.key === fieldKey ? { ...f, tabKey: dragOverTabKey } : f)),
+      );
+      setActiveTabKey(dragOverTabKey);
+      setDraggingKey(null);
+      setDragOverTabKey(null);
+      return;
+    }
+
+    handleDragEnd(event);
   }
 
   return (
@@ -363,9 +360,8 @@ export function FieldsTab({
               key={tab.key}
               type="button"
               onClick={() => setActiveTabKey(tab.key)}
-              onDragOver={(e) => handleTabDragOver(tab.key, e)}
-              onDragLeave={() => setDragOverTabKey(null)}
-              onDrop={(e) => handleTabDrop(tab.key, e)}
+              onPointerEnter={() => handleTabPointerEnter(tab.key)}
+              onPointerLeave={handleTabPointerLeave}
               className={`px-3 py-1.5 text-sm font-medium rounded-t-md whitespace-nowrap transition-colors ${
                 dragOverTabKey === tab.key
                   ? 'bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300'
@@ -389,27 +385,34 @@ export function FieldsTab({
       </div>
 
       {/* Field list */}
-      <div className="flex-1 overflow-y-auto px-8 py-6 space-y-2">
+      <div className="flex-1 overflow-y-auto px-8 py-6">
         {tabFields.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-gray-400">
             <p className="text-sm">No fields in this tab</p>
             <p className="text-xs mt-1">Add a field using the input above</p>
           </div>
         ) : (
-          tabFields.map((field) => (
-            <FieldRow
-              key={field.key}
-              field={field}
-              onEdit={() => onEditField(field.key)}
-              onDelete={() => handleDelete(field.key)}
-              isDragOver={dragOverFieldKey === field.key}
-              dragFieldKey={draggingKey ?? ''}
-              onDragStart={handleFieldDragStart}
-              onDragOver={handleFieldDragOver}
-              onDrop={handleFieldDrop}
-              onDragEnd={clearDragState}
-            />
-          ))
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            modifiers={[restrictToVerticalAxis]}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEndWithCrossTab}
+          >
+            <SortableContext
+              items={tabFields.map((f) => f.key)}
+              strategy={verticalListSortingStrategy}
+            >
+              {tabFields.map((field) => (
+                <FieldRow
+                  key={field.key}
+                  field={field}
+                  onEdit={() => onEditField(field.key)}
+                  onDelete={() => handleDelete(field.key)}
+                />
+              ))}
+            </SortableContext>
+          </DndContext>
         )}
       </div>
     </div>

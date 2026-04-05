@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useRef } from 'react';
-import { Pencil, GripVertical, Trash2, Plus, ChevronDown, Lock, Unlock } from 'lucide-react';
+import { useState } from 'react';
+import { Pencil, Trash2, Plus, ChevronDown, Lock, Unlock } from 'lucide-react';
+import { SortableList, SortableItem, SortableDragHandle } from '@/components/ui/sortable-list';
 import { useApi } from '@/lib/swr';
 import { FieldIcon } from './field-icon';
 import {
@@ -146,9 +147,6 @@ function OptionsList({
   options: SimpleOption[];
   onChange: (opts: SimpleOption[]) => void;
 }) {
-  const dragIdx = useRef<number | null>(null);
-  const dragOverIdx = useRef<number | null>(null);
-
   function update(idx: number, field: 'name' | 'value', val: string) {
     const next = options.map((o, i) => (i === idx ? { ...o, [field]: val } : o));
     onChange(next);
@@ -162,17 +160,8 @@ function OptionsList({
     onChange([...options, { name: '', value: '', _uid: `uid_${Date.now()}` }]);
   }
 
-  function handleDrop() {
-    const from = dragIdx.current;
-    const to = dragOverIdx.current;
-    if (from === null || to === null || from === to) return;
-    const next = [...options];
-    const [moved] = next.splice(from, 1);
-    next.splice(to, 0, moved);
-    onChange(next);
-    dragIdx.current = null;
-    dragOverIdx.current = null;
-  }
+  // Ensure every option has a stable _uid for dnd-kit keys
+  const stableOptions = options.map((o, i) => (o._uid ? o : { ...o, _uid: `uid_fallback_${i}` }));
 
   return (
     <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
@@ -183,44 +172,41 @@ function OptionsList({
         <span className="w-7" />
       </div>
 
-      {options.map((opt, idx) => (
-        <div
-          key={opt._uid ?? idx}
-          draggable
-          onDragStart={() => {
-            dragIdx.current = idx;
-          }}
-          onDragOver={(e) => {
-            e.preventDefault();
-            dragOverIdx.current = idx;
-          }}
-          onDrop={handleDrop}
-          className="flex items-center gap-1 px-2 py-1.5 border-b border-gray-100 dark:border-gray-800/60 last:border-0"
-        >
-          <GripVertical className="w-4 h-4 text-gray-300 flex-shrink-0 cursor-grab" />
-          <input
-            type="text"
-            value={opt.name}
-            placeholder="Name"
-            onChange={(e) => update(idx, 'name', e.target.value)}
-            className="flex-1 px-2 py-1 text-sm border border-transparent hover:border-gray-200 focus:border-teal-400 focus:outline-none rounded bg-transparent focus:bg-white dark:focus:bg-gray-900 dark:text-gray-200"
-          />
-          <input
-            type="text"
-            value={opt.value}
-            placeholder="Value"
-            onChange={(e) => update(idx, 'value', e.target.value)}
-            className="flex-1 px-2 py-1 text-sm border border-transparent hover:border-gray-200 focus:border-teal-400 focus:outline-none rounded bg-transparent focus:bg-white dark:focus:bg-gray-900 dark:text-gray-200"
-          />
-          <button
-            type="button"
-            onClick={() => remove(idx)}
-            className="p-1 text-gray-300 hover:text-red-500 transition-colors"
+      <SortableList
+        items={stableOptions}
+        getKey={(opt) => opt._uid!}
+        onReorder={(reordered) => onChange(reordered)}
+        renderItem={(opt, idx) => (
+          <SortableItem
+            key={opt._uid}
+            id={opt._uid!}
+            className="flex items-center gap-1 px-2 py-1.5 border-b border-gray-100 dark:border-gray-800/60 last:border-0 bg-white dark:bg-gray-900"
           >
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      ))}
+            <SortableDragHandle className="shrink-0" />
+            <input
+              type="text"
+              value={opt.name}
+              placeholder="Name"
+              onChange={(e) => update(idx, 'name', e.target.value)}
+              className="flex-1 px-2 py-1 text-sm border border-transparent hover:border-gray-200 focus:border-teal-400 focus:outline-none rounded bg-transparent focus:bg-white dark:focus:bg-gray-900 dark:text-gray-200"
+            />
+            <input
+              type="text"
+              value={opt.value}
+              placeholder="Value"
+              onChange={(e) => update(idx, 'value', e.target.value)}
+              className="flex-1 px-2 py-1 text-sm border border-transparent hover:border-gray-200 focus:border-teal-400 focus:outline-none rounded bg-transparent focus:bg-white dark:focus:bg-gray-900 dark:text-gray-200"
+            />
+            <button
+              type="button"
+              onClick={() => remove(idx)}
+              className="p-1 text-gray-300 hover:text-red-500 transition-colors"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </SortableItem>
+        )}
+      />
 
       <div className="px-2 py-1.5">
         <button

@@ -6,11 +6,11 @@ import {
   ChevronRight,
   Plus,
   Trash2,
-  GripVertical,
   Copy,
   Scissors,
   MessageSquare,
 } from 'lucide-react';
+import { SortableList, SortableItem, SortableDragHandle } from '@/components/ui/sortable-list';
 import { parseSchema } from '@/components/block-library/edit-block-modal/types';
 function uuidv4() {
   return crypto.randomUUID();
@@ -236,12 +236,6 @@ interface BlockRowProps {
   onUpdate: (block: BlockItem) => void;
   onRemove: () => void;
   onDuplicate: () => void;
-  isDragging: boolean;
-  isDragOver: boolean;
-  onDragStart: () => void;
-  onDragEnd: () => void;
-  onDragOver: (e: React.DragEvent) => void;
-  onDrop: () => void;
 }
 
 function BlockRow({
@@ -252,12 +246,6 @@ function BlockRow({
   onUpdate,
   onRemove,
   onDuplicate,
-  isDragging,
-  isDragOver,
-  onDragStart,
-  onDragEnd,
-  onDragOver,
-  onDrop,
 }: BlockRowProps) {
   const [expanded, setExpanded] = useState(false);
 
@@ -274,19 +262,7 @@ function BlockRow({
   }
 
   return (
-    <div
-      className={`group transition-all ${isDragging ? 'opacity-40' : ''} ${
-        isDragOver ? 'ring-2 ring-teal-400 ring-inset' : ''
-      }`}
-      draggable
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
-      onDragOver={onDragOver}
-      onDrop={(e) => {
-        e.preventDefault();
-        onDrop();
-      }}
-    >
+    <div className="group transition-all">
       {/* Block header */}
       <div
         className={`flex items-center gap-2 px-3 py-2.5 cursor-pointer select-none hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors ${
@@ -295,10 +271,12 @@ function BlockRow({
         onClick={() => setExpanded(!expanded)}
       >
         {/* Grip — hover only */}
-        <GripVertical
-          className="w-4 h-4 text-gray-300 dark:text-gray-600 flex-shrink-0 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity"
+        <div
+          className="opacity-0 group-hover:opacity-100 transition-opacity"
           onClick={(e) => e.stopPropagation()}
-        />
+        >
+          <SortableDragHandle className="text-gray-300 dark:text-gray-600" />
+        </div>
 
         {expanded ? (
           <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />
@@ -392,8 +370,6 @@ export function BloksField({
   isActiveDiscussion,
 }: Props) {
   const blocks = value ?? [];
-  const [draggingIdx, setDraggingIdx] = useState<number | null>(null);
-  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
   const [insertAt, setInsertAt] = useState(0);
 
@@ -440,20 +416,6 @@ export function BloksField({
     onChange(next);
   }
 
-  function handleDrop(toIndex: number) {
-    if (draggingIdx === null || draggingIdx === toIndex) {
-      setDraggingIdx(null);
-      setDragOverIdx(null);
-      return;
-    }
-    const next = [...blocks];
-    const [item] = next.splice(draggingIdx, 1);
-    next.splice(toIndex, 0, item);
-    onChange(next);
-    setDraggingIdx(null);
-    setDragOverIdx(null);
-  }
-
   const atMax = def.maximum !== undefined && blocks.length >= def.maximum;
 
   return (
@@ -494,9 +456,13 @@ export function BloksField({
       )}
 
       {blocks.length > 0 ? (
-        <div className="border border-gray-200 dark:border-gray-700 rounded-lg">
-          {blocks.map((block, i) => (
-            <div key={block._uid}>
+        <SortableList
+          items={blocks}
+          getKey={(block) => block._uid}
+          onReorder={onChange}
+          className="border border-gray-200 dark:border-gray-700 rounded-lg"
+          renderItem={(block, i) => (
+            <SortableItem key={block._uid} id={block._uid} draggingClassName="opacity-40 shadow-lg">
               <BlockRow
                 block={block}
                 allComponents={allComponents}
@@ -505,23 +471,11 @@ export function BloksField({
                 onUpdate={(updated) => updateBlock(i, updated)}
                 onRemove={() => removeBlock(i)}
                 onDuplicate={() => duplicateBlock(i)}
-                isDragging={draggingIdx === i}
-                isDragOver={dragOverIdx === i && draggingIdx !== i}
-                onDragStart={() => setDraggingIdx(i)}
-                onDragEnd={() => {
-                  setDraggingIdx(null);
-                  setDragOverIdx(null);
-                }}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setDragOverIdx(i);
-                }}
-                onDrop={() => handleDrop(i)}
               />
               {!atMax && <AddBlockDivider onAdd={() => openPanelAt(i + 1)} />}
-            </div>
-          ))}
-        </div>
+            </SortableItem>
+          )}
+        />
       ) : (
         !atMax && <AddBlockDivider onAdd={() => openPanelAt(0)} empty />
       )}

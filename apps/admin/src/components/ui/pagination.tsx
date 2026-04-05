@@ -34,6 +34,7 @@ export function Pagination({
         <SelectDropdown
           compact
           dropUp
+          noPlaceholder
           value={String(perPage)}
           onChange={(v) => {
             if (v) {
@@ -60,6 +61,8 @@ export function Pagination({
         <span>Page</span>
         <SelectDropdown
           compact
+          dropUp
+          noPlaceholder
           value={String(page)}
           onChange={(v) => {
             if (v) onPageChange(Number(v));
