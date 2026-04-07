@@ -66,10 +66,10 @@ export function NavLinks() {
   if (isSpace) {
     const base = `/spaces/${spaceId}`;
     return (
-      <nav className="flex-1 px-3 py-3 space-y-1 overflow-y-auto">
+      <nav className="flex-1 px-3 py-3 space-y-1.5 overflow-y-auto">
         <Link
           href="/spaces"
-          className="flex items-center gap-3 px-3 py-2.5 rounded-md text-slate-400 hover:bg-white/10 hover:text-slate-200 transition-colors text-sm mb-3"
+          className="flex items-center gap-3 px-3 py-3 rounded-md text-slate-400 hover:bg-white/10 hover:text-slate-200 transition-colors text-sm mb-3"
         >
           <ArrowLeft className="size-4 shrink-0" />
           {spaceName || 'My Spaces'}
@@ -85,7 +85,7 @@ export function NavLinks() {
               key={href}
               href={href}
               className={cn(
-                'flex items-center gap-3 px-3 py-2.5 rounded-md transition-colors text-sm',
+                'flex items-center gap-3 px-3 py-3 rounded-md transition-colors text-sm',
                 isActive
                   ? 'bg-white/15 text-white'
                   : 'text-slate-300 hover:bg-white/10 hover:text-white',
@@ -102,10 +102,10 @@ export function NavLinks() {
 
   if (isOrg) {
     return (
-      <nav className="flex-1 px-3 py-3 space-y-1 overflow-y-auto">
+      <nav className="flex-1 px-3 py-3 space-y-1.5 overflow-y-auto">
         <Link
           href="/spaces"
-          className="flex items-center gap-3 px-3 py-2.5 rounded-md text-slate-400 hover:bg-white/10 hover:text-slate-200 transition-colors text-sm mb-3"
+          className="flex items-center gap-3 px-3 py-3 rounded-md text-slate-400 hover:bg-white/10 hover:text-slate-200 transition-colors text-sm mb-3"
         >
           <ArrowLeft className="size-4 shrink-0" />
           My Spaces
@@ -120,7 +120,7 @@ export function NavLinks() {
               key={href}
               href={href}
               className={cn(
-                'flex items-center gap-3 px-3 py-2.5 rounded-md transition-colors text-sm',
+                'flex items-center gap-3 px-3 py-3 rounded-md transition-colors text-sm',
                 isActive
                   ? 'bg-white/15 text-white'
                   : 'text-slate-300 hover:bg-white/10 hover:text-white',
@@ -136,13 +136,13 @@ export function NavLinks() {
   }
 
   return (
-    <nav className="flex-1 px-3 py-3 space-y-1 overflow-y-auto">
+    <nav className="flex-1 px-3 py-3 space-y-1.5 overflow-y-auto">
       {mainNavItems.map(({ href, icon: Icon, label }) => (
         <Link
           key={href}
           href={href}
           className={cn(
-            'flex items-center gap-3 px-3 py-2.5 rounded-md transition-colors text-sm',
+            'flex items-center gap-3 px-3 py-3 rounded-md transition-colors text-sm',
             pathname === href || pathname.startsWith(`${href}/`)
               ? 'bg-white/15 text-white'
               : 'text-slate-300 hover:bg-white/10 hover:text-white',

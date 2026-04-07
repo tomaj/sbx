@@ -40,6 +40,9 @@ export const spaces = pgTable('spaces', {
     .default({}),
   // AI settings (provider config + branding context)
   aiSettings: json('ai_settings').$type<Record<string, unknown>>().notNull().default({}),
+  // Space options JSON — mirrors Storyblok's space.options object
+  // Currently used: { maintenance: boolean }
+  options: json('options').$type<Record<string, unknown>>().notNull().default({}),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });

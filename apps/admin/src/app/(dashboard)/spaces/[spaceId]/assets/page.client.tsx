@@ -2,52 +2,27 @@
 
 import { useState, use } from 'react';
 import { usePerPage } from '@/hooks/use-per-page';
-import { FolderPlus, Upload, Images, Trash2, Search, LayoutGrid, List, Tag } from 'lucide-react';
+import { Trash2, Tag, Folder } from 'lucide-react';
 import { Pagination } from '@/components/ui/pagination';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
-import {
-  SearchFilterBar,
-  type ActiveFilter,
-  type SortOption,
-  type FilterField,
-} from '@/components/ui/search-filter-bar';
-import { FolderTree, type AssetFolder } from '@/components/assets/folder-tree';
+import { BulkActionBar } from '@/components/ui/bulk-action-bar';
+import type { ActiveFilter } from '@/components/ui/search-filter-bar';
+import type { AssetFolder } from '@/components/assets/folder-tree';
 import { CreateFolderModal } from '@/components/assets/create-folder-modal';
+import { MoveFolderModal } from '@/components/assets/move-folder-modal';
 import { AssetGrid, type Asset } from '@/components/assets/asset-grid';
 import { AssetList } from '@/components/assets/asset-list';
-import { AssetDetailModal } from '@/components/assets/asset-detail-modal';
+import { AssetDetailModal } from '@/components/assets/asset-detail';
 import { UploadAssetsModal } from '@/components/assets/upload-assets-modal';
 import { TagsView, type ComponentInternalTag } from '@/components/block-library/tags-view';
 import { RenameModal } from '@/components/ui/rename-modal';
 import { SplitPageLayout } from '@/components/ui/split-page-layout';
 import { useApi } from '@/lib/swr';
-
-const SORT_OPTIONS: SortOption[] = [
-  { value: 'created_at_desc', label: 'Default' },
-  { value: 'created_at_asc', label: 'Creation Date (asc)' },
-  { value: 'created_at_desc', label: 'Creation Date (desc)' },
-  { value: 'updated_at_asc', label: 'Update Date (asc)' },
-  { value: 'updated_at_desc', label: 'Update Date (desc)' },
-  { value: 'filename_asc', label: 'Name (asc)' },
-  { value: 'filename_desc', label: 'Name (desc)' },
-];
-
-const FILTER_FIELDS: FilterField[] = [
-  {
-    key: 'content_type',
-    label: 'Type',
-    type: 'select',
-    options: [
-      { value: 'image/', label: 'Images' },
-      { value: 'video/', label: 'Videos' },
-      { value: 'audio/', label: 'Audio' },
-      { value: 'application/pdf', label: 'PDF' },
-      { value: 'application/json', label: 'JSON' },
-    ],
-  },
-  { key: 'created_after', label: 'Created after', type: 'date' },
-  { key: 'created_before', label: 'Created before', type: 'date' },
-];
+import type { Tag as TagType } from '@sbx/types';
+import { useAssetsState } from './use-assets-state';
+import { BulkTagModal } from './bulk-tag-modal';
+import { AssetsToolbar } from './assets-toolbar';
+import { AssetsSidebar } from './assets-sidebar';
 
 function parseSortOption(sort: string): { field: string; dir: string } {
   const lastUnderscore = sort.lastIndexOf('_');
@@ -60,8 +35,21 @@ function parseSortOption(sort: string): { field: string; dir: string } {
 export default function AssetsPage({ params }: { params: Promise<{ spaceId: string }> }) {
   const { spaceId } = use(params);
 
+  // ─── Assets state (selection, view mode, bulk tag) ─────────────────────────
+  const {
+    selectedIds,
+    viewMode,
+    setViewMode,
+    bulkTagOpen,
+    setBulkTagOpen,
+    bulkTagSaving,
+    setBulkTagSaving,
+    toggleSelect,
+    selectAll,
+    clearSelection,
+  } = useAssetsState();
+
   // ─── UI state ──────────────────────────────────────────────────────────────
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [showDeleted, setShowDeleted] = useState(false);
   const [selectedFolder, setSelectedFolder] = useState<number | null | undefined>(undefined);
   // undefined = "All Assets" (no folder filter), null = root (no folder), number = specific folder
@@ -86,8 +74,11 @@ export default function AssetsPage({ params }: { params: Promise<{ spaceId: stri
   const [createFolderParentId, setCreateFolderParentId] = useState<number | null>(null);
   const [renameFolder, setRenameFolder] = useState<AssetFolder | null>(null);
   const [deleteFolderTarget, setDeleteFolderTarget] = useState<AssetFolder | null>(null);
+  const [moveFolderTarget, setMoveFolderTarget] = useState<AssetFolder | null>(null);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [bulkMoveOpen, setBulkMoveOpen] = useState(false);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
 
   // ─── Data fetching ────────────────────────────────────────────────────────
   const { data: foldersData, mutate: mutateFolders } = useApi<{ asset_folders: AssetFolder[] }>(
@@ -181,6 +172,17 @@ export default function AssetsPage({ params }: { params: Promise<{ spaceId: stri
     }
   }
 
+  async function handleMoveFolder(folderId: number | null) {
+    if (!moveFolderTarget) return;
+    await fetch(`/api/admin/spaces/${spaceId}/assets/folders/${moveFolderTarget.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ parent_id: folderId }),
+    });
+    setMoveFolderTarget(null);
+    await mutateFolders();
+  }
+
   // ─── Asset delete/restore ────────────────────────────────────────────────
 
   async function handleRestoreAsset(asset: Asset) {
@@ -189,6 +191,51 @@ export default function AssetsPage({ params }: { params: Promise<{ spaceId: stri
     });
     await mutateAssets();
     await mutateCounts();
+  }
+
+  // ─── Bulk operations ─────────────────────────────────────────────────────
+
+  async function handleBulkMove(folderId: number | null) {
+    await fetch(`/api/admin/spaces/${spaceId}/assets/bulk_update`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: [...selectedIds], asset_folder_id: folderId }),
+    });
+    setBulkMoveOpen(false);
+    clearSelection();
+    await mutateAssets();
+  }
+
+  async function handleBulkDelete() {
+    await fetch(`/api/admin/spaces/${spaceId}/assets/bulk_destroy`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: [...selectedIds] }),
+    });
+    setBulkDeleteOpen(false);
+    clearSelection();
+    await mutateAssets();
+    await mutateCounts();
+  }
+
+  async function handleBulkTag(tags: TagType[]) {
+    setBulkTagSaving(true);
+    try {
+      await Promise.all(
+        [...selectedIds].map((id) =>
+          fetch(`/api/admin/spaces/${spaceId}/assets/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ internal_tag_ids: tags.map((t) => t.id) }),
+          }),
+        ),
+      );
+      setBulkTagOpen(false);
+      clearSelection();
+      await mutateAssets();
+    } finally {
+      setBulkTagSaving(false);
+    }
   }
 
   // ─── Asset tag CRUD ──────────────────────────────────────────────────────
@@ -221,134 +268,72 @@ export default function AssetsPage({ params }: { params: Promise<{ spaceId: stri
     await mutateTags();
   }
 
+  const selectionCount = selectedIds.size;
+
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="flex items-center justify-between px-8 pt-6 pb-4 border-b border-gray-200 dark:border-gray-700">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Assets</h1>
-        {!isTagsView && (
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => {
-                setCreateFolderParentId(null);
-                setCreateFolderOpen(true);
-              }}
-              className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-            >
-              <FolderPlus className="w-4 h-4" />
-              Create Folder
-            </button>
-            <button
-              onClick={() => setUploadOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-2 text-sm bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
-            >
-              <Upload className="w-4 h-4" />
-              Upload files
-            </button>
-          </div>
-        )}
-      </div>
+      <AssetsToolbar
+        search={search}
+        onSearchChange={(v) => {
+          setSearch(v);
+          setPage(1);
+        }}
+        sort={sort}
+        onSortChange={(v) => {
+          setSort(v);
+          setPage(1);
+        }}
+        activeFilters={activeFilters}
+        onFiltersChange={(f) => {
+          setActiveFilters(f);
+          setPage(1);
+        }}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+        isTagsView={isTagsView}
+        onCreateFolder={() => {
+          setCreateFolderParentId(null);
+          setCreateFolderOpen(true);
+        }}
+        onUpload={() => setUploadOpen(true)}
+      />
 
       {/* Body: sidebar + content */}
       <SplitPageLayout
         sidebar={
-          <>
-            {/* All Assets */}
-            <button
-              onClick={() => {
-                setIsTagsView(false);
-                setShowDeleted(false);
-                setSelectedFolder(undefined);
-              }}
-              className={`flex items-center justify-between px-2 py-1.5 rounded-md text-sm transition-colors ${
-                !isTagsView && !showDeleted && selectedFolder === undefined
-                  ? 'text-teal-700 dark:text-teal-300 font-medium'
-                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
-              }`}
-            >
-              <span className="flex items-center gap-2">
-                <Images className="w-4 h-4 text-gray-400" />
-                All Assets
-              </span>
-              <span className="text-xs text-gray-400">{totalCount}</span>
-            </button>
-
-            {/* Tags */}
-            <button
-              onClick={() => setIsTagsView(true)}
-              className={`flex items-center justify-between px-2 py-1.5 rounded-md text-sm transition-colors ${
-                isTagsView
-                  ? 'text-teal-700 dark:text-teal-300 font-medium'
-                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
-              }`}
-            >
-              <span className="flex items-center gap-2">
-                <Tag className="w-4 h-4 text-gray-400" />
-                Tags
-              </span>
-              {assetTags.length > 0 && (
-                <span className="text-xs text-gray-400">{assetTags.length}</span>
-              )}
-            </button>
-
-            {/* Deleted assets */}
-            <button
-              onClick={() => {
-                setIsTagsView(false);
-                setShowDeleted(true);
-                setSelectedFolder(undefined);
-              }}
-              className={`flex items-center justify-between px-2 py-1.5 rounded-md text-sm transition-colors ${
-                !isTagsView && showDeleted
-                  ? 'text-teal-700 dark:text-teal-300 font-medium'
-                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
-              }`}
-            >
-              <span className="flex items-center gap-2">
-                <Trash2 className="w-4 h-4 text-gray-400" />
-                Deleted assets
-              </span>
-              {deletedCount > 0 && <span className="text-xs text-gray-400">{deletedCount}</span>}
-            </button>
-
-            {/* Separator */}
-            <div className="border-t border-gray-200 dark:border-gray-700 my-2" />
-
-            {/* Folders section */}
-            <p className="px-2 text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">
-              Folders
-            </p>
-
-            {/* Folder search */}
-            <div className="relative mb-1">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
-              <input
-                type="text"
-                value={folderSearch}
-                onChange={(e) => setFolderSearch(e.target.value)}
-                placeholder="Search folders..."
-                className="w-full pl-7 pr-3 py-1.5 text-xs border border-gray-200 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-teal-500"
-              />
-            </div>
-
-            {/* Folder tree */}
-            <FolderTree
-              folders={folders}
-              selectedId={!showDeleted && selectedFolder !== undefined ? selectedFolder : -1}
-              onSelect={(id) => {
-                setShowDeleted(false);
-                setSelectedFolder(id ?? undefined);
-              }}
-              search={folderSearch}
-              onCreateFolder={(parentId) => {
-                setCreateFolderParentId(parentId);
-                setCreateFolderOpen(true);
-              }}
-              onRenameFolder={setRenameFolder}
-              onMoveFolder={() => {}} // TODO: move modal
-              onDeleteFolder={setDeleteFolderTarget}
-            />
-          </>
+          <AssetsSidebar
+            isTagsView={isTagsView}
+            showDeleted={showDeleted}
+            selectedFolder={selectedFolder}
+            totalCount={totalCount}
+            deletedCount={deletedCount}
+            assetTagsCount={assetTags.length}
+            folders={folders}
+            folderSearch={folderSearch}
+            onFolderSearchChange={setFolderSearch}
+            onSelectAllAssets={() => {
+              setIsTagsView(false);
+              setShowDeleted(false);
+              setSelectedFolder(undefined);
+            }}
+            onSelectTags={() => setIsTagsView(true)}
+            onSelectDeleted={() => {
+              setIsTagsView(false);
+              setShowDeleted(true);
+              setSelectedFolder(undefined);
+            }}
+            onSelectFolder={(id) => {
+              setShowDeleted(false);
+              setSelectedFolder(id ?? undefined);
+            }}
+            onCreateFolder={(parentId) => {
+              setCreateFolderParentId(parentId);
+              setCreateFolderOpen(true);
+            }}
+            onRenameFolder={setRenameFolder}
+            onMoveFolder={setMoveFolderTarget}
+            onDeleteFolder={setDeleteFolderTarget}
+          />
         }
       >
         {isTagsView ? (
@@ -361,58 +346,6 @@ export default function AssetsPage({ params }: { params: Promise<{ spaceId: stri
           />
         ) : (
           <>
-            {/* Toolbar */}
-            <div className="px-6 pt-4 pb-3 flex flex-col gap-3">
-              <div className="flex items-start gap-3">
-                <div className="flex-1">
-                  <SearchFilterBar
-                    searchPlaceholder="Search assets..."
-                    search={search}
-                    onSearchChange={(v) => {
-                      setSearch(v);
-                      setPage(1);
-                    }}
-                    sortOptions={SORT_OPTIONS}
-                    sort={sort}
-                    onSortChange={(v) => {
-                      setSort(v);
-                      setPage(1);
-                    }}
-                    filterFields={FILTER_FIELDS}
-                    activeFilters={activeFilters}
-                    onFiltersChange={(f) => {
-                      setActiveFilters(f);
-                      setPage(1);
-                    }}
-                  />
-                </div>
-
-                {/* View toggle */}
-                <div className="flex items-center border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden shrink-0">
-                  <button
-                    onClick={() => setViewMode('grid')}
-                    className={`p-2 transition-colors ${
-                      viewMode === 'grid'
-                        ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
-                        : 'text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
-                    }`}
-                  >
-                    <LayoutGrid className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => setViewMode('list')}
-                    className={`p-2 transition-colors ${
-                      viewMode === 'list'
-                        ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
-                        : 'text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
-                    }`}
-                  >
-                    <List className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            </div>
-
             {/* Asset listing */}
             <div className="flex-1 overflow-y-auto px-6 pb-4">
               {viewMode === 'grid' ? (
@@ -421,6 +354,8 @@ export default function AssetsPage({ params }: { params: Promise<{ spaceId: stri
                   spaceId={spaceId}
                   isLoading={isLoading}
                   onAssetClick={setSelectedAsset}
+                  selectedIds={selectedIds}
+                  onToggleSelect={toggleSelect}
                 />
               ) : (
                 <AssetList
@@ -430,6 +365,8 @@ export default function AssetsPage({ params }: { params: Promise<{ spaceId: stri
                   showRestore={showDeleted}
                   onRestore={handleRestoreAsset}
                   onAssetClick={setSelectedAsset}
+                  selectedIds={selectedIds}
+                  onToggleSelect={toggleSelect}
                 />
               )}
             </div>
@@ -450,6 +387,34 @@ export default function AssetsPage({ params }: { params: Promise<{ spaceId: stri
         )}
       </SplitPageLayout>
 
+      {/* Bulk action bar */}
+      <BulkActionBar
+        selectedCount={selectionCount}
+        actions={[
+          {
+            label: 'Select All',
+            onClick: () => selectAll(assets.map((a) => a.id)),
+          },
+          {
+            label: 'Tag',
+            icon: <Tag className="w-4 h-4" />,
+            onClick: () => setBulkTagOpen(true),
+          },
+          {
+            label: 'Move',
+            icon: <Folder className="w-4 h-4" />,
+            onClick: () => setBulkMoveOpen(true),
+          },
+          {
+            label: 'Delete',
+            icon: <Trash2 className="w-4 h-4" />,
+            onClick: () => setBulkDeleteOpen(true),
+            variant: 'danger',
+          },
+        ]}
+        onClearSelection={clearSelection}
+      />
+
       {/* Create folder modal */}
       <CreateFolderModal
         open={createFolderOpen}
@@ -468,6 +433,16 @@ export default function AssetsPage({ params }: { params: Promise<{ spaceId: stri
         onClose={() => setRenameFolder(null)}
       />
 
+      {/* Move folder modal */}
+      <MoveFolderModal
+        open={!!moveFolderTarget}
+        count={1}
+        folders={folders}
+        excludeId={moveFolderTarget?.id}
+        onConfirm={handleMoveFolder}
+        onCancel={() => setMoveFolderTarget(null)}
+      />
+
       {/* Delete folder confirm */}
       <ConfirmModal
         open={!!deleteFolderTarget}
@@ -479,11 +454,42 @@ export default function AssetsPage({ params }: { params: Promise<{ spaceId: stri
         onCancel={() => setDeleteFolderTarget(null)}
       />
 
+      {/* Bulk move modal */}
+      <MoveFolderModal
+        open={bulkMoveOpen}
+        count={selectionCount}
+        folders={folders}
+        onConfirm={handleBulkMove}
+        onCancel={() => setBulkMoveOpen(false)}
+      />
+
+      {/* Bulk delete confirm */}
+      <ConfirmModal
+        open={bulkDeleteOpen}
+        title={`Delete ${selectionCount} asset${selectionCount === 1 ? '' : 's'}`}
+        message={`Are you sure you want to delete ${selectionCount} selected asset${selectionCount === 1 ? '' : 's'}? They can be restored from the Deleted assets view.`}
+        confirmLabel="Delete"
+        dangerous
+        onConfirm={handleBulkDelete}
+        onCancel={() => setBulkDeleteOpen(false)}
+      />
+
+      {/* Bulk tag modal */}
+      <BulkTagModal
+        open={bulkTagOpen}
+        spaceId={spaceId}
+        selectedCount={selectionCount}
+        onApply={handleBulkTag}
+        onCancel={() => setBulkTagOpen(false)}
+        saving={bulkTagSaving}
+      />
+
       {/* Asset detail modal */}
       {selectedAsset && (
         <AssetDetailModal
           asset={selectedAsset}
           spaceId={spaceId}
+          folders={folders}
           onClose={() => setSelectedAsset(null)}
           onDeleted={() => {
             setSelectedAsset(null);

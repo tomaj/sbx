@@ -253,6 +253,7 @@ export class ComponentsService {
       icon?: string | null;
       preview_field?: string | null;
       preview_tmpl?: string | null;
+      content_type_asset_preview?: string | null;
       internal_tags_list?: { id: string | number; name: string }[];
     },
     userId?: number | null,
@@ -271,6 +272,8 @@ export class ComponentsService {
     if ('icon' in data) set.icon = data.icon;
     if ('preview_field' in data) set.previewField = data.preview_field;
     if ('preview_tmpl' in data) set.previewTmpl = data.preview_tmpl;
+    if ('content_type_asset_preview' in data)
+      set.contentTypeAssetPreview = data.content_type_asset_preview;
     if ('internal_tags_list' in data) {
       set.internalTagsList = data.internal_tags_list;
       set.internalTagIds = (data.internal_tags_list ?? []).map((t) => String(t.id));

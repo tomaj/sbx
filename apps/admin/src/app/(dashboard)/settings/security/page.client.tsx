@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Check } from 'lucide-react';
 import { useUnsavedChanges } from '@/hooks/use-unsaved-changes';
 import { UnsavedChangesModal } from '@/components/ui/unsaved-changes-modal';
+import { inputCls } from '@/components/ui/form-field';
 
 export default function SecurityPage() {
   const [showPasswordForm, setShowPasswordForm] = useState(false);
@@ -40,6 +41,7 @@ export default function SecurityPage() {
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Account Security</h1>
         <button
+          type="button"
           disabled
           className="flex items-center gap-2 bg-teal-200 text-teal-700 text-sm font-medium px-4 py-2 rounded-md opacity-60 cursor-not-allowed"
         >
@@ -53,6 +55,7 @@ export default function SecurityPage() {
         <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-4">Password</h2>
         {!showPasswordForm ? (
           <button
+            type="button"
             onClick={() => setShowPasswordForm(true)}
             className="px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-md text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
           >
@@ -65,17 +68,18 @@ export default function SecurityPage() {
               placeholder="Current password"
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
-              className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-md text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
+              className={inputCls}
             />
             <input
               type="password"
               placeholder="New password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-md text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
+              className={inputCls}
             />
             <div className="flex gap-2">
               <button
+                type="button"
                 onClick={handleSavePassword}
                 disabled={saving}
                 className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm rounded-md transition-colors disabled:opacity-60"
@@ -83,6 +87,7 @@ export default function SecurityPage() {
                 {saving ? 'Saving...' : 'Save password'}
               </button>
               <button
+                type="button"
                 onClick={() => setShowPasswordForm(false)}
                 className="px-4 py-2 border border-gray-200 dark:border-gray-700 text-sm rounded-md hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-gray-700 dark:text-gray-300"
               >

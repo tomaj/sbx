@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import { Home, HelpCircle, ChevronDown, X, Plus, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useApi } from '@/lib/swr';
+import { FormField, inputCls } from '@/components/ui/form-field';
 import type { StoryDetail } from './types';
 
 interface Props {
@@ -321,30 +322,24 @@ export function ConfigTab({ spaceId, story, onSave, isFormOnly }: Props) {
           </div>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Name <span className="text-red-500">*</span>
-          </label>
+        <FormField label="Name" required>
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
+            className={inputCls}
           />
-        </div>
+        </FormField>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Slug
-          </label>
+        <FormField label="Slug">
           <input
             type="text"
             value={slug}
             onChange={(e) => setSlug(e.target.value)}
             disabled={isStartpage}
-            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-50 dark:disabled:bg-gray-900"
+            className={`${inputCls} disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-50 dark:disabled:bg-gray-900`}
           />
-        </div>
+        </FormField>
 
         <div className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
           <input
@@ -371,12 +366,9 @@ export function ConfigTab({ spaceId, story, onSave, isFormOnly }: Props) {
           </div>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Tags
-          </label>
+        <FormField label="Tags">
           <StoryTagsSelect spaceId={spaceId} value={tags} onChange={setTags} />
-        </div>
+        </FormField>
 
         <div>
           <FieldLabel
@@ -389,7 +381,7 @@ export function ConfigTab({ spaceId, story, onSave, isFormOnly }: Props) {
               value={sortByDate}
               onChange={(e) => setSortByDate(e.target.value)}
               placeholder="Select date (YY-MM-DD)"
-              className="w-full px-3 py-2 pl-9 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
+              className={`${inputCls} pl-9`}
             />
             <svg
               className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
@@ -414,19 +406,15 @@ export function ConfigTab({ spaceId, story, onSave, isFormOnly }: Props) {
             onChange={(e) => setPath(e.target.value)}
             rows={3}
             placeholder="/"
-            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
+            className={`${inputCls} resize-none`}
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Full slug
-          </label>
+        <FormField label="Full slug" description="Computed from parent path + slug">
           <div className="px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-500">
             {story.full_slug}
           </div>
-          <p className="text-xs text-gray-400 mt-1">Computed from parent path + slug</p>
-        </div>
+        </FormField>
 
         {story.is_folder && (
           <div className="pt-2 border-t border-gray-200 dark:border-gray-700">

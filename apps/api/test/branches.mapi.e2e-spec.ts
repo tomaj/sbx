@@ -51,7 +51,12 @@ describe('Branches MAPI (e2e)', () => {
     await db.delete(branches).where(eq(branches.spaceId, SPACE_ID));
     const [branch] = await db
       .insert(branches)
-      .values({ id: seedBranchId, spaceId: SPACE_ID, name: 'seed-branch', url: 'https://seed.example.com' })
+      .values({
+        id: seedBranchId,
+        spaceId: SPACE_ID,
+        name: 'seed-branch',
+        url: 'https://seed.example.com',
+      })
       .returning();
     testBranchId = branch.id;
   });

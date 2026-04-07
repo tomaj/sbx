@@ -39,7 +39,7 @@ async function fetchEntriesForSpace(spaceId: number, token: string) {
       const { data, headers } = await apiFetch(url, token);
       const batch: any[] = data.datasource_entries ?? [];
       entries.push(...batch);
-      const total = parseInt(headers['total'] ?? '0', 10);
+      const total = parseInt(headers.total ?? '0', 10);
       process.stdout.write(`\r    ${ds.slug}: ${entries.length}/${total}   `);
       if (entries.length >= total || batch.length < 500) break;
       page++;
@@ -66,4 +66,7 @@ async function main() {
   console.log('\nDone.');
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

@@ -11,6 +11,7 @@ import { useDelete } from '@/hooks/use-delete';
 import { useApi } from '@/lib/swr';
 import { Pagination } from '@/components/ui/pagination';
 import { SkeletonBlock } from '@/components/ui/skeleton';
+import { FormField, inputCls } from '@/components/ui/form-field';
 import type { DatasourceEntry, DatasourceWithDimensions } from '@sbx/types';
 
 // ---- Entry row ----
@@ -64,6 +65,7 @@ function EntryRow({ entry, onSave, onDelete }: EntryRowProps) {
       />
 
       <button
+        type="button"
         onClick={handleSave}
         disabled={saving || !isDirty}
         className="shrink-0 px-3 py-1.5 text-sm border border-gray-200 dark:border-gray-700 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 text-gray-700 dark:text-gray-300 transition-colors"
@@ -72,6 +74,7 @@ function EntryRow({ entry, onSave, onDelete }: EntryRowProps) {
       </button>
 
       <button
+        type="button"
         onClick={() => onDelete(entry)}
         className="shrink-0 p-1.5 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
       >
@@ -254,6 +257,7 @@ export default function DatasourceDetailPage({
               {datasource?.name ?? '...'}
             </h1>
             <button
+              type="button"
               onClick={openEdit}
               className="px-4 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
             >
@@ -284,6 +288,7 @@ export default function DatasourceDetailPage({
               }}
             />
             <button
+              type="button"
               onClick={handleAdd}
               disabled={adding || !newName.trim() || !newValue.trim()}
               className="px-4 py-2 text-sm bg-teal-600 hover:bg-teal-700 disabled:opacity-60 text-white rounded font-medium transition-colors shrink-0"
@@ -307,9 +312,9 @@ export default function DatasourceDetailPage({
         {/* Entries list */}
         <div className="flex-1">
           {isLoading ? (
-            Array.from({ length: 8 }).map((_, i) => (
+            ['sk0', 'sk1', 'sk2', 'sk3', 'sk4', 'sk5', 'sk6', 'sk7'].map((id) => (
               <div
-                key={i}
+                key={id}
                 className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 dark:border-gray-800"
               >
                 <SkeletonBlock className="size-4" />
@@ -367,10 +372,7 @@ export default function DatasourceDetailPage({
             {editError}
           </p>
         )}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-            Name <span className="text-red-500">*</span>
-          </label>
+        <FormField label="Name" required>
           <input
             type="text"
             value={editName}
@@ -378,13 +380,10 @@ export default function DatasourceDetailPage({
               setEditName(e.target.value);
               setEditIsDirty(true);
             }}
-            className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-md text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
+            className={inputCls}
           />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-            ID/Slug <span className="text-red-500">*</span>
-          </label>
+        </FormField>
+        <FormField label="ID/Slug" required>
           <input
             type="text"
             value={editSlug}
@@ -392,9 +391,9 @@ export default function DatasourceDetailPage({
               setEditSlug(e.target.value);
               setEditIsDirty(true);
             }}
-            className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-md text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
+            className={inputCls}
           />
-        </div>
+        </FormField>
       </CrudSidebarForm>
 
       {entryDelete.modal}

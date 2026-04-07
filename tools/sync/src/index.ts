@@ -14,7 +14,6 @@ import { syncActivities } from './resources/activities';
 import { syncStories } from './resources/stories';
 import { syncAssets } from './resources/assets';
 import { syncStoryVersions } from './resources/story_versions';
-import { MAPI_TOKEN } from './utils';
 
 const SPACES = [
   { id: 285923, name: 'Live' },
@@ -28,7 +27,7 @@ const SPACES = [
 const args = process.argv.slice(2);
 const argSpace = (() => {
   const i = args.indexOf('--space');
-  return i !== -1 ? parseInt(args[i + 1]) : null;
+  return i !== -1 ? parseInt(args[i + 1], 10) : null;
 })();
 const argResource = (() => {
   const i = args.indexOf('--resource');
@@ -57,12 +56,15 @@ function loadToken(): string {
 
 async function main() {
   const token = loadToken();
-  console.log(`Sync${full ? ' (FULL)' : ''} — spaces: ${spaces.map((s) => s.id).join(', ')}, resource: ${argResource ?? 'all'}\n`);
+  console.log(
+    `Sync${full ? ' (FULL)' : ''} — spaces: ${spaces.map((s) => s.id).join(', ')}, resource: ${argResource ?? 'all'}\n`,
+  );
 
   for (const space of spaces) {
     console.log(`\n[${space.id}] ${space.name}`);
 
-    const runSmall = !argResource || !['activities', 'stories', 'assets', 'story_versions'].includes(argResource);
+    const runSmall =
+      !argResource || !['activities', 'stories', 'assets', 'story_versions'].includes(argResource);
     const runActivities = !argResource || argResource === 'activities';
     const runStories = !argResource || argResource === 'stories';
     const runAssets = !argResource || argResource === 'assets';

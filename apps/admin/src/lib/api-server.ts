@@ -23,7 +23,11 @@ export async function getSessionToken(): Promise<string> {
   return cookieStore.get('sbx.session')?.value ?? '';
 }
 
-/** Decode the session JWT to get basic user info (no signature verification needed — cookie is httpOnly). */
+/**
+ * Fetch the current user's profile from the API.
+ * This verifies the JWT signature server-side and returns up-to-date user data
+ * (including name). Returns null when the session is missing or invalid.
+ */
 export async function getServerSession(): Promise<{
   id: number;
   email: string;
@@ -32,14 +36,13 @@ export async function getServerSession(): Promise<{
   const token = await getSessionToken();
   if (!token) return null;
   try {
-    const payloadB64 = token.split('.')[1];
-    if (!payloadB64) return null;
-    const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString()) as {
-      sub?: number;
-      email?: string;
-      name?: string;
+    const res = await apiFetch('/v1/user/me');
+    if (!res.ok) return null;
+    const { user } = (await res.json()) as {
+      user: { id: number; email: string; firstname: string; lastname: string };
     };
-    return { id: payload.sub ?? 0, email: payload.email ?? '', name: payload.name ?? '' };
+    const name = [user.firstname, user.lastname].filter(Boolean).join(' ');
+    return { id: user.id, email: user.email, name };
   } catch {
     return null;
   }
@@ -53,6 +56,7 @@ export async function apiFetch(path: string, init: RequestInit = {}): Promise<Re
   const token = await getSessionToken();
   const headers: Record<string, string> = {
     Authorization: `Bearer ${token}`,
+    'x-request-id': crypto.randomUUID(),
     ...(init.headers as Record<string, string>),
   };
   if (init.body !== undefined && init.body !== null && !(init.body instanceof FormData)) {

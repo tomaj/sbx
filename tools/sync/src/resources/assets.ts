@@ -60,7 +60,7 @@ function binPath(spaceId: number, asset: AssetMeta): string {
 }
 
 function metaFilePath(spaceId: number, asset: AssetMeta): string {
-  return binPath(spaceId, asset) + '.meta.json';
+  return `${binPath(spaceId, asset)}.meta.json`;
 }
 
 function manifestFilePath(spaceId: number): string {
@@ -100,7 +100,7 @@ async function mapiGet<T>(urlPath: string, token: string): Promise<{ data: T; to
     }
     // Storyblok returns total count in the 'total' response header
     const total = parseInt(res.headers.get('total') ?? '0', 10);
-    const data = await res.json() as T;
+    const data = (await res.json()) as T;
     return { data, total };
   }
   throw new Error(`Max retries exceeded for ${urlPath}`);
@@ -159,8 +159,11 @@ class ConcurrencyLimiter {
       this.running++;
       return Promise.resolve();
     }
-    return new Promise(resolve => {
-      this.queue.push(() => { this.running++; resolve(); });
+    return new Promise((resolve) => {
+      this.queue.push(() => {
+        this.running++;
+        resolve();
+      });
     });
   }
 
@@ -237,8 +240,8 @@ export async function syncAssets(spaceId: number, token: string, full: boolean):
 
   // Deletion detection
   if (isIncremental && manifest!.asset_ids.length > 0) {
-    const remoteIds = new Set(assets.map(a => a.id));
-    const deleted = manifest!.asset_ids.filter(id => !remoteIds.has(id));
+    const remoteIds = new Set(assets.map((a) => a.id));
+    const deleted = manifest!.asset_ids.filter((id) => !remoteIds.has(id));
     if (deleted.length > 0) {
       console.log(`    ${deleted.length} deleted assets detected (not auto-removed)`);
     }
@@ -250,56 +253,60 @@ export async function syncAssets(spaceId: number, token: string, full: boolean):
   let failed = 0;
   const total = assets.length;
 
-  const tasks = assets.map(asset => (async () => {
-    try {
-      // External URLs: just save/update meta, no binary
-      if (asset.is_external_url || !asset.filename.includes('a.storyblok.com')) {
-        writeFileSafe(metaFilePath(spaceId, asset), JSON.stringify(asset, null, 2));
-        external++;
-        return;
-      }
-
-      const mPath = metaFilePath(spaceId, asset);
-
-      if (isIncremental) {
-        const localMeta = readLocalMeta(mPath);
-        if (localMeta && new Date(asset.updated_at) <= new Date(localMeta.updated_at)) {
-          skipped++;
+  const tasks = assets.map((asset) =>
+    (async () => {
+      try {
+        // External URLs: just save/update meta, no binary
+        if (asset.is_external_url || !asset.filename.includes('a.storyblok.com')) {
+          writeFileSafe(metaFilePath(spaceId, asset), JSON.stringify(asset, null, 2));
+          external++;
           return;
         }
-      } else {
-        // Full sync: skip if already downloaded (resume-safe)
-        if (fs.existsSync(mPath)) {
-          skipped++;
-          return;
+
+        const mPath = metaFilePath(spaceId, asset);
+
+        if (isIncremental) {
+          const localMeta = readLocalMeta(mPath);
+          if (localMeta && new Date(asset.updated_at) <= new Date(localMeta.updated_at)) {
+            skipped++;
+            return;
+          }
+        } else {
+          // Full sync: skip if already downloaded (resume-safe)
+          if (fs.existsSync(mPath)) {
+            skipped++;
+            return;
+          }
         }
+
+        const buffer = await downloadBinary(asset.filename);
+        writeFileSafe(binPath(spaceId, asset), buffer);
+        writeFileSafe(mPath, JSON.stringify(asset, null, 2));
+        downloaded++;
+      } catch (err) {
+        failed++;
+        console.error(`\n    ERROR asset ${asset.id}: ${err}`);
       }
 
-      const buffer = await downloadBinary(asset.filename);
-      writeFileSafe(binPath(spaceId, asset), buffer);
-      writeFileSafe(mPath, JSON.stringify(asset, null, 2));
-      downloaded++;
-    } catch (err) {
-      failed++;
-      console.error(`\n    ERROR asset ${asset.id}: ${err}`);
-    }
-
-    const done = downloaded + skipped + external + failed;
-    process.stdout.write(
-      `    [${done}/${total}] ↓${downloaded} ⏭${skipped} ext${external} ✗${failed}\r`,
-    );
-  })());
+      const done = downloaded + skipped + external + failed;
+      process.stdout.write(
+        `    [${done}/${total}] ↓${downloaded} ⏭${skipped} ext${external} ✗${failed}\r`,
+      );
+    })(),
+  );
 
   await Promise.all(tasks);
   process.stdout.write('\n');
-  console.log(`    ↓${downloaded} downloaded, ⏭${skipped} skipped, ext${external} external, ✗${failed} failed`);
+  console.log(
+    `    ↓${downloaded} downloaded, ⏭${skipped} skipped, ext${external} external, ✗${failed} failed`,
+  );
 
   const newManifest: Manifest = {
     space_id: spaceId,
     last_synced_at: new Date().toISOString(),
     total_count: assets.length,
     downloaded_count: downloaded + skipped + external,
-    asset_ids: assets.map(a => a.id),
+    asset_ids: assets.map((a) => a.id),
   };
   writeFileSafe(manifestFilePath(spaceId), JSON.stringify(newManifest, null, 2));
 }

@@ -136,9 +136,7 @@ describe('Tags CDN (e2e)', () => {
 
   describe('GET /v2/cdn/tags', () => {
     it('returns tags array', async () => {
-      const res = await request(app.getHttpServer())
-        .get(`${BASE}?token=${TOKEN}`)
-        .expect(200);
+      const res = await request(app.getHttpServer()).get(`${BASE}?token=${TOKEN}`).expect(200);
 
       expect(res.body).toHaveProperty('tags');
       expect(Array.isArray(res.body.tags)).toBe(true);
@@ -146,9 +144,7 @@ describe('Tags CDN (e2e)', () => {
     });
 
     it('tag object has name and taggings_count', async () => {
-      const res = await request(app.getHttpServer())
-        .get(`${BASE}?token=${TOKEN}`)
-        .expect(200);
+      const res = await request(app.getHttpServer()).get(`${BASE}?token=${TOKEN}`).expect(200);
 
       const tag = res.body.tags[0];
       expect(tag).toHaveProperty('name');
@@ -158,9 +154,7 @@ describe('Tags CDN (e2e)', () => {
     });
 
     it('tags are sorted alphabetically', async () => {
-      const res = await request(app.getHttpServer())
-        .get(`${BASE}?token=${TOKEN}`)
-        .expect(200);
+      const res = await request(app.getHttpServer()).get(`${BASE}?token=${TOKEN}`).expect(200);
 
       const names = res.body.tags.map((t: any) => t.name);
       expect(names).toEqual([...names].sort());

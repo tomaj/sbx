@@ -1,6 +1,6 @@
 'use client';
 
-import { RotateCcw } from 'lucide-react';
+import { Check, RotateCcw } from 'lucide-react';
 import { AssetThumb } from './asset-thumb';
 import type { Asset } from './asset-grid';
 import { formatDateTime } from '@/lib/date';
@@ -24,6 +24,8 @@ interface AssetListProps {
   showRestore?: boolean;
   onRestore?: (asset: Asset) => void;
   onAssetClick?: (asset: Asset) => void;
+  selectedIds?: Set<number>;
+  onToggleSelect?: (id: number) => void;
 }
 
 export function AssetList({
@@ -33,7 +35,11 @@ export function AssetList({
   showRestore,
   onRestore,
   onAssetClick,
+  selectedIds,
+  onToggleSelect,
 }: AssetListProps) {
+  const isSelecting = selectedIds !== undefined && selectedIds.size > 0;
+
   if (isLoading) {
     return (
       <div className="flex flex-col gap-1">
@@ -65,63 +71,98 @@ export function AssetList({
 
   return (
     <div className="flex flex-col divide-y divide-gray-100 dark:divide-gray-800">
-      {assets.map((asset) => (
-        <div
-          key={asset.id}
-          className="flex items-center gap-4 py-3 px-1 hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded-lg group cursor-pointer"
-          onClick={() => onAssetClick?.(asset)}
-        >
-          {/* Thumbnail */}
-          <div className="w-16 h-16 rounded-lg bg-gray-100 dark:bg-gray-800 shrink-0 flex items-center justify-center p-1.5">
-            <AssetThumb
-              filename={asset.filename}
-              contentType={asset.content_type}
-              spaceId={spaceId}
-              alt={asset.alt}
-              size={80}
-              imgClassName="max-w-full max-h-full w-auto h-auto object-contain"
-              iconClassName="w-7 h-7 text-gray-400"
-            />
+      {assets.map((asset) => {
+        const isSelected = selectedIds?.has(asset.id) ?? false;
+
+        function handleClick() {
+          if (isSelecting) {
+            // In selection mode: clicking the row toggles selection
+            onToggleSelect?.(asset.id);
+          } else {
+            // Normal mode: clicking opens detail
+            onAssetClick?.(asset);
+          }
+        }
+
+        return (
+          <div
+            key={asset.id}
+            className={`flex items-center gap-4 py-3 px-1 rounded-lg group cursor-pointer transition-colors ${
+              isSelected
+                ? 'bg-teal-50 dark:bg-teal-950/40'
+                : 'hover:bg-gray-50 dark:hover:bg-gray-800/50'
+            }`}
+            onClick={handleClick}
+          >
+            {/* Checkbox */}
+            {selectedIds !== undefined && (
+              <div
+                className={`w-5 h-5 rounded-md shrink-0 flex items-center justify-center transition-all ${
+                  isSelected
+                    ? 'bg-teal-500'
+                    : 'border border-gray-300 dark:border-gray-600 opacity-0 group-hover:opacity-100'
+                }`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleSelect?.(asset.id);
+                }}
+              >
+                {isSelected && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+              </div>
+            )}
+
+            {/* Thumbnail */}
+            <div className="w-16 h-16 rounded-lg bg-gray-100 dark:bg-gray-800 shrink-0 flex items-center justify-center p-1.5">
+              <AssetThumb
+                filename={asset.filename}
+                contentType={asset.content_type}
+                spaceId={spaceId}
+                alt={asset.alt}
+                size={80}
+                imgClassName="max-w-full max-h-full w-auto h-auto object-contain"
+                iconClassName="w-7 h-7 text-gray-400"
+              />
+            </div>
+
+            {/* Name + ext */}
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                {asset.short_filename || asset.filename.split('/').pop()}
+              </p>
+              <p className="text-xs text-gray-400">.{formatExt(asset.content_type)}</p>
+            </div>
+
+            {/* Size */}
+            <span className="text-sm text-gray-500 dark:text-gray-400 w-20 text-right shrink-0">
+              {formatBytes(asset.content_length)}
+            </span>
+
+            {/* MIME type */}
+            <span className="text-sm text-gray-500 dark:text-gray-400 w-36 shrink-0 hidden md:block">
+              {asset.content_type}
+            </span>
+
+            {/* Date */}
+            <span className="text-sm text-gray-500 dark:text-gray-400 w-40 shrink-0 hidden lg:block">
+              {formatDateTime(asset.updated_at)}
+            </span>
+
+            {/* Restore button (deleted view) */}
+            {showRestore && onRestore && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRestore(asset);
+                }}
+                title="Restore"
+                className="opacity-0 group-hover:opacity-100 p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 shrink-0"
+              >
+                <RotateCcw className="w-4 h-4" />
+              </button>
+            )}
           </div>
-
-          {/* Name + ext */}
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-              {asset.short_filename || asset.filename.split('/').pop()}
-            </p>
-            <p className="text-xs text-gray-400">.{formatExt(asset.content_type)}</p>
-          </div>
-
-          {/* Size */}
-          <span className="text-sm text-gray-500 dark:text-gray-400 w-20 text-right shrink-0">
-            {formatBytes(asset.content_length)}
-          </span>
-
-          {/* MIME type */}
-          <span className="text-sm text-gray-500 dark:text-gray-400 w-36 shrink-0 hidden md:block">
-            {asset.content_type}
-          </span>
-
-          {/* Date */}
-          <span className="text-sm text-gray-500 dark:text-gray-400 w-40 shrink-0 hidden lg:block">
-            {formatDateTime(asset.updated_at)}
-          </span>
-
-          {/* Restore button (deleted view) */}
-          {showRestore && onRestore && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onRestore(asset);
-              }}
-              title="Restore"
-              className="opacity-0 group-hover:opacity-100 p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 shrink-0"
-            >
-              <RotateCcw className="w-4 h-4" />
-            </button>
-          )}
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

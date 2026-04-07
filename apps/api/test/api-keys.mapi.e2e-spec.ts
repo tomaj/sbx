@@ -132,13 +132,16 @@ describe('API Keys MAPI (e2e)', () => {
   describe('DELETE /v1/spaces/:spaceId/api_keys/:id', () => {
     it('returns 200 and deletes the api key', async () => {
       const tmpId = SPACE_ID * 1000 + 3;
-      await db.insert(apiTokens).values({
-        id: tmpId,
-        spaceId: SPACE_ID,
-        name: 'Key To Delete',
-        token: `key-to-delete-${tmpId}`,
-        tokenType: 'public',
-      }).onConflictDoNothing();
+      await db
+        .insert(apiTokens)
+        .values({
+          id: tmpId,
+          spaceId: SPACE_ID,
+          name: 'Key To Delete',
+          token: `key-to-delete-${tmpId}`,
+          tokenType: 'public',
+        })
+        .onConflictDoNothing();
 
       const res = await request(app.getHttpServer())
         .delete(`/v1/spaces/${SPACE_ID}/api_keys/${tmpId}?token=${TOKEN}`)

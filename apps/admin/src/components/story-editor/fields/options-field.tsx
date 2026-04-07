@@ -9,6 +9,8 @@ import { fieldLabel } from '../field-label';
 import { FieldLabel } from '../FieldLabel';
 import { StoryPickerMultiModal } from '../StoryPickerMultiModal';
 
+type SimpleOption = { name: string; value: string; _uid?: string };
+
 interface Props {
   fieldKey: string;
   def: OptionsFieldDef;
@@ -19,9 +21,46 @@ interface Props {
 
 export function OptionsField({ fieldKey, def, value, onChange, spaceId }: Props) {
   const isInternalStories = def.source === 'internal_stories';
-  const staticOptions = def.options ?? [];
+  const isExternalDatasource = def.source === 'external_datasource' && !!def.external_datasource;
+
+  // For external datasource: fetch options from configured URL
+  const [externalOpts, setExternalOpts] = useState<SimpleOption[] | null>(null);
+  const [externalLoading, setExternalLoading] = useState(false);
+  const [externalError, setExternalError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!isExternalDatasource || !def.external_datasource) return;
+    setExternalLoading(true);
+    setExternalError(null);
+    fetch(def.external_datasource)
+      .then((r) => r.json())
+      .then((data) => {
+        const raw: Array<{ name?: string; value?: string }> = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.options)
+            ? data.options
+            : [];
+        setExternalOpts(
+          raw.map((o) => ({ name: String(o.name ?? o.value ?? ''), value: String(o.value ?? '') })),
+        );
+      })
+      .catch(() => setExternalError('Failed to load options'))
+      .finally(() => setExternalLoading(false));
+  }, [isExternalDatasource, def.external_datasource]);
+
+  const staticOptions: SimpleOption[] = isExternalDatasource
+    ? (externalOpts ?? [])
+    : (def.options ?? []);
 
   const selected = value ?? [];
+  const minError =
+    def.min !== undefined && selected.length < def.min
+      ? `Select at least ${def.min} option${def.min === 1 ? '' : 's'}`
+      : null;
+  const maxError =
+    def.max !== undefined && selected.length > def.max
+      ? `Select at most ${def.max} option${def.max === 1 ? '' : 's'}`
+      : null;
+  const countError = minError ?? maxError;
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [pending, setPending] = useState<string[]>(selected);
@@ -61,6 +100,19 @@ export function OptionsField({ fieldKey, def, value, onChange, spaceId }: Props)
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
+
+  if (isExternalDatasource && externalError) {
+    return (
+      <div>
+        <FieldLabel
+          label={fieldLabel(def.display_name, fieldKey)}
+          required={def.required}
+          description={def.description}
+        />
+        <p className="text-xs text-red-500 mt-1">{externalError}</p>
+      </div>
+    );
+  }
 
   const filtered = staticOptions.filter(
     (o) => !search.trim() || o.name.toLowerCase().includes(search.toLowerCase()),
@@ -119,6 +171,7 @@ export function OptionsField({ fieldKey, def, value, onChange, spaceId }: Props)
             required={def.required}
             description={def.description}
           />
+          {countError && <p className="text-xs text-red-500 mb-1">{countError}</p>}
           <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
             {orderedSelected.length > 0 && (
               <div className="border-b border-gray-200 dark:border-gray-700">
@@ -211,6 +264,76 @@ export function OptionsField({ fieldKey, def, value, onChange, spaceId }: Props)
     );
   }
 
+  // ── checkbox list appearance ──────────────────────────────────────────────
+  if (def.appearance === 'link') {
+    return (
+      <div>
+        <FieldLabel
+          label={fieldLabel(def.display_name, fieldKey)}
+          required={def.required}
+          description={def.description}
+        />
+        {countError && <p className="text-xs text-red-500 mb-1">{countError}</p>}
+        <div className="flex flex-col gap-1.5">
+          {staticOptions.map((opt) => (
+            <label key={opt._uid ?? opt.value} className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={selected.includes(opt.value)}
+                onChange={() => {
+                  const next = selected.includes(opt.value)
+                    ? selected.filter((v) => v !== opt.value)
+                    : [...selected, opt.value];
+                  onChange(next);
+                }}
+                className="w-4 h-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+              />
+              <span className="text-sm text-gray-700 dark:text-gray-300">{opt.name}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // ── card grid appearance ──────────────────────────────────────────────────
+  if (def.appearance === 'card') {
+    return (
+      <div>
+        <FieldLabel
+          label={fieldLabel(def.display_name, fieldKey)}
+          required={def.required}
+          description={def.description}
+        />
+        {countError && <p className="text-xs text-red-500 mb-1">{countError}</p>}
+        <div className="grid grid-cols-2 gap-2">
+          {staticOptions.map((opt) => {
+            const isSelected = selected.includes(opt.value);
+            return (
+              <button
+                key={opt._uid ?? opt.value}
+                type="button"
+                onClick={() => {
+                  const next = isSelected
+                    ? selected.filter((v) => v !== opt.value)
+                    : [...selected, opt.value];
+                  onChange(next);
+                }}
+                className={`px-3 py-2.5 text-sm text-left rounded-lg border transition-colors ${
+                  isSelected
+                    ? 'border-teal-500 bg-teal-50 dark:bg-teal-900/20 text-teal-700 dark:text-teal-300 font-medium'
+                    : 'border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
+                }`}
+              >
+                {opt.name}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
   // ── static options: inline dropdown ─────────────────────────────────────────
   return (
     <div>
@@ -219,6 +342,7 @@ export function OptionsField({ fieldKey, def, value, onChange, spaceId }: Props)
         required={def.required}
         description={def.description}
       />
+      {countError && <p className="text-xs text-red-500 mb-1">{countError}</p>}
       <div
         ref={containerRef}
         className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden"
@@ -310,7 +434,9 @@ export function OptionsField({ fieldKey, def, value, onChange, spaceId }: Props)
               />
             </div>
             <div className="max-h-56 overflow-y-auto">
-              {filtered.length === 0 ? (
+              {externalLoading ? (
+                <p className="px-3 py-3 text-sm text-gray-400">Loading options...</p>
+              ) : filtered.length === 0 ? (
                 <p className="px-3 py-3 text-sm text-gray-400">No options found</p>
               ) : (
                 filtered.map((opt) => (

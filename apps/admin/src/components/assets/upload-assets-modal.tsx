@@ -49,38 +49,89 @@ export function UploadAssetsModal({
     setFiles((prev) => prev.filter((_, i) => i !== idx));
   }
 
+  async function uploadOne(f: UploadFile, index: number): Promise<boolean> {
+    try {
+      // Step 1: Sign — register upload intent, get asset ID + upload URL
+      const signRes = await fetch(`/api/admin/spaces/${spaceId}/assets`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filename: f.file.name,
+          size: f.file.size,
+          content_type: f.file.type || 'application/octet-stream',
+          asset_folder_id: folderId ?? null,
+        }),
+      });
+      if (!signRes.ok) {
+        const err = await signRes.json().catch(() => ({}));
+        setFiles((prev) =>
+          prev.map((item, i) =>
+            i === index ? { ...item, status: 'error', error: err.message ?? 'Sign failed' } : item,
+          ),
+        );
+        return false;
+      }
+      const { id, post_url } = await signRes.json();
+
+      // Step 2: Upload the file to our server (MinIO storage)
+      const fd = new FormData();
+      fd.append('file', f.file);
+      const uploadRes = await fetch(`/api/admin${post_url}`, { method: 'POST', body: fd });
+      if (!uploadRes.ok) {
+        const err = await uploadRes.json().catch(() => ({}));
+        setFiles((prev) =>
+          prev.map((item, i) =>
+            i === index
+              ? { ...item, status: 'error', error: err.message ?? 'Upload failed' }
+              : item,
+          ),
+        );
+        return false;
+      }
+
+      // Step 3: Finish upload — create DB record
+      const finishRes = await fetch(`/api/admin/spaces/${spaceId}/assets/${id}/finish_upload`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      });
+      if (!finishRes.ok) {
+        const err = await finishRes.json().catch(() => ({}));
+        setFiles((prev) =>
+          prev.map((item, i) =>
+            i === index
+              ? { ...item, status: 'error', error: err.message ?? 'Finish failed' }
+              : item,
+          ),
+        );
+        return false;
+      }
+
+      setFiles((prev) => prev.map((item, i) => (i === index ? { ...item, status: 'done' } : item)));
+      return true;
+    } catch {
+      setFiles((prev) =>
+        prev.map((item, i) =>
+          i === index ? { ...item, status: 'error', error: 'Network error' } : item,
+        ),
+      );
+      return false;
+    }
+  }
+
   async function handleUpload() {
     if (files.length === 0) return;
     setUploading(true);
-
-    const fd = new FormData();
-    files.forEach((f) => fd.append('files', f.file));
-    if (folderId != null) fd.append('folder_id', String(folderId));
-
-    // Mark all as uploading
     setFiles((prev) => prev.map((f) => ({ ...f, status: 'uploading' })));
 
-    try {
-      const res = await fetch(`/api/admin/spaces/${spaceId}/assets/upload`, {
-        method: 'POST',
-        body: fd,
-      });
-      if (res.ok) {
-        setFiles((prev) => prev.map((f) => ({ ...f, status: 'done' })));
-        setTimeout(() => {
-          onUploaded();
-          onClose();
-        }, 800);
-      } else {
-        const err = await res.json().catch(() => ({}));
-        setFiles((prev) =>
-          prev.map((f) => ({ ...f, status: 'error', error: err.message ?? 'Upload failed' })),
-        );
-      }
-    } catch {
-      setFiles((prev) => prev.map((f) => ({ ...f, status: 'error', error: 'Network error' })));
-    } finally {
-      setUploading(false);
+    const results = await Promise.all(files.map((f, i) => uploadOne(f, i)));
+
+    setUploading(false);
+    if (results.every(Boolean)) {
+      setTimeout(() => {
+        onUploaded();
+        onClose();
+      }, 600);
     }
   }
 

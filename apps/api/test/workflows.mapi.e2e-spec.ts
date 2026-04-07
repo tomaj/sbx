@@ -62,9 +62,7 @@ describe('Workflows MAPI (e2e)', () => {
 
   describe('GET /v1/spaces/:spaceId/workflows', () => {
     it('returns 401 without token', () => {
-      return request(app.getHttpServer())
-        .get(`/v1/spaces/${TEST_SPACE_ID}/workflows`)
-        .expect(401);
+      return request(app.getHttpServer()).get(`/v1/spaces/${TEST_SPACE_ID}/workflows`).expect(401);
     });
 
     it('returns empty list of workflows', async () => {

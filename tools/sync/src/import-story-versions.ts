@@ -27,7 +27,7 @@ const SPACES = [285923, 285922, 293665, 327730];
 const args = process.argv.slice(2);
 const argSpace = (() => {
   const i = args.indexOf('--space');
-  return i !== -1 ? parseInt(args[i + 1]) : null;
+  return i !== -1 ? parseInt(args[i + 1], 10) : null;
 })();
 const spaces = argSpace ? [argSpace] : SPACES;
 
@@ -41,7 +41,8 @@ async function main() {
       continue;
     }
 
-    const chunkFiles = fs.readdirSync(dir)
+    const chunkFiles = fs
+      .readdirSync(dir)
       .filter((f) => f.startsWith('chunk_') && f.endsWith('.json'))
       .sort();
 
@@ -100,21 +101,21 @@ async function main() {
         const status = v.status === 'published' ? 'published' : 'draft';
 
         batch.push([
-          v.id,                // id — original Storyblok version ID
-          v.story_id,          // story_id
-          spaceId,             // space_id
-          null,                // release_id
-          v.user_id ?? null,   // user_id — Storyblok user IDs == our user IDs
-          action,              // action
-          status,              // status
-          story.name,          // name
-          story.slug,          // slug
-          story.full_slug,     // full_slug
-          v.content,           // content
+          v.id, // id — original Storyblok version ID
+          v.story_id, // story_id
+          spaceId, // space_id
+          null, // release_id
+          v.user_id ?? null, // user_id — Storyblok user IDs == our user IDs
+          action, // action
+          status, // status
+          story.name, // name
+          story.slug, // slug
+          story.full_slug, // full_slug
+          v.content, // content
           JSON.stringify(story.tag_list ?? []), // tag_list
-          story.path ?? null,  // path
-          story.is_startpage,  // is_startpage
-          v.created_at,        // created_at
+          story.path ?? null, // path
+          story.is_startpage, // is_startpage
+          v.created_at, // created_at
         ]);
 
         // Insert in batches
@@ -131,7 +132,9 @@ async function main() {
         totalInserted += batch.length;
       }
 
-      process.stdout.write(`\r[${spaceId}] ${chunkFile}: inserted ${totalInserted}, skipped ${totalSkipped}...`);
+      process.stdout.write(
+        `\r[${spaceId}] ${chunkFile}: inserted ${totalInserted}, skipped ${totalSkipped}...`,
+      );
     }
 
     process.stdout.write('\n');
@@ -146,9 +149,9 @@ async function insertBatch(pool: Pool, rows: any[][]) {
   if (rows.length === 0) return;
 
   const cols = 15;
-  const placeholders = rows.map((_, i) =>
-    `(${Array.from({ length: cols }, (_, j) => `$${i * cols + j + 1}`).join(', ')})`
-  ).join(', ');
+  const placeholders = rows
+    .map((_, i) => `(${Array.from({ length: cols }, (_, j) => `$${i * cols + j + 1}`).join(', ')})`)
+    .join(', ');
 
   const values = rows.flat();
   // For content (index 9 in each row), cast to jsonb

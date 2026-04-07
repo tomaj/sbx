@@ -10,12 +10,12 @@
     "ignoreUnknown": true,
     "includes": [
       "**",
-      "!**/dist/**",
-      "!**/.next/**",
-      "!**/coverage/**",
-      "!**/node_modules/**",
-      "!**/.turbo/**",
-      "!**/golden/**",
+      "!**/dist",
+      "!**/.next",
+      "!**/coverage",
+      "!**/node_modules",
+      "!**/.turbo",
+      "!**/golden",
       "!**/pnpm-lock.yaml",
       "!**/globals.css"
     ]
@@ -80,6 +80,17 @@
         "rules": {
           "suspicious": {
             "noExplicitAny": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["tools/**"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noExplicitAny": "off",
+            "useIterableCallbackReturn": "off"
           }
         }
       }

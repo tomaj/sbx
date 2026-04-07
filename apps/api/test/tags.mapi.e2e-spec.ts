@@ -55,11 +55,7 @@ describe('Tags MAPI (e2e)', () => {
     if (tag) {
       testTagId = tag.id;
     } else {
-      const [existing] = await db
-        .select()
-        .from(tags)
-        .where(eq(tags.spaceId, SPACE_ID))
-        .limit(1);
+      const [existing] = await db.select().from(tags).where(eq(tags.spaceId, SPACE_ID)).limit(1);
       testTagId = existing.id;
     }
   });

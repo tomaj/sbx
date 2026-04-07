@@ -10,6 +10,7 @@ import { LinksCdnService } from './links-cdn.service';
 import { StoryVersionsController } from './story-versions.controller';
 import { StoryVersionsService } from './story-versions.service';
 import { WebhooksModule } from '../webhooks/webhooks.module';
+import { MaintenanceModeGuard } from '../shared/maintenance-mode.guard';
 
 @Module({
   imports: [WebhooksModule],
@@ -26,6 +27,7 @@ import { WebhooksModule } from '../webhooks/webhooks.module';
     StoriesCdnService,
     LinksCdnService,
     StoryVersionsService,
+    MaintenanceModeGuard,
   ],
 })
 export class StoriesModule {}

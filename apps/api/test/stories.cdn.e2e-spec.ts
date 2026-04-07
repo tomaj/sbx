@@ -76,81 +76,105 @@ describe('Stories CDN (e2e)', () => {
 
     // Seed tokens
     await db.insert(apiTokens).values([
-      { id: SPACE_ID * 1000 + 1, spaceId: SPACE_ID, name: 'Public', token: PUBLIC_TOKEN, tokenType: 'public' },
-      { id: SPACE_ID * 1000 + 2, spaceId: SPACE_ID, name: 'Preview', token: PREVIEW_TOKEN, tokenType: 'private' },
+      {
+        id: SPACE_ID * 1000 + 1,
+        spaceId: SPACE_ID,
+        name: 'Public',
+        token: PUBLIC_TOKEN,
+        tokenType: 'public',
+      },
+      {
+        id: SPACE_ID * 1000 + 2,
+        spaceId: SPACE_ID,
+        name: 'Preview',
+        token: PREVIEW_TOKEN,
+        tokenType: 'private',
+      },
     ]);
 
     // Seed stories
     const baseId = BigInt(SPACE_ID) * 100000n;
 
     publishedStoryId = baseId + 1n;
-    await db.insert(stories).values(storyRow(publishedStoryId, {
-      name: 'Published Story',
-      slug: 'published-story',
-      fullSlug: 'published-story',
-      content: { component: 'page', _uid: 'uid-pub', title: 'Hello World' },
-      published: true,
-      contentType: 'page',
-      position: 10,
-    }));
+    await db.insert(stories).values(
+      storyRow(publishedStoryId, {
+        name: 'Published Story',
+        slug: 'published-story',
+        fullSlug: 'published-story',
+        content: { component: 'page', _uid: 'uid-pub', title: 'Hello World' },
+        published: true,
+        contentType: 'page',
+        position: 10,
+      }),
+    );
 
     draftStoryId = baseId + 2n;
-    await db.insert(stories).values(storyRow(draftStoryId, {
-      name: 'Draft Story',
-      slug: 'draft-story',
-      fullSlug: 'draft-story',
-      content: { component: 'page', _uid: 'uid-draft' },
-      published: false,
-      publishedAt: null,
-      firstPublishedAt: null,
-      position: 20,
-    }));
+    await db.insert(stories).values(
+      storyRow(draftStoryId, {
+        name: 'Draft Story',
+        slug: 'draft-story',
+        fullSlug: 'draft-story',
+        content: { component: 'page', _uid: 'uid-draft' },
+        published: false,
+        publishedAt: null,
+        firstPublishedAt: null,
+        position: 20,
+      }),
+    );
 
     blogStory1Id = baseId + 3n;
-    await db.insert(stories).values(storyRow(blogStory1Id, {
-      name: 'Blog Post 1',
-      slug: 'post-1',
-      fullSlug: 'blog/post-1',
-      content: { component: 'article', _uid: 'uid-blog1', priority: '5' },
-      published: true,
-      contentType: 'article',
-      position: 30,
-      tagList: ['news', 'tech'],
-    }));
+    await db.insert(stories).values(
+      storyRow(blogStory1Id, {
+        name: 'Blog Post 1',
+        slug: 'post-1',
+        fullSlug: 'blog/post-1',
+        content: { component: 'article', _uid: 'uid-blog1', priority: '5' },
+        published: true,
+        contentType: 'article',
+        position: 30,
+        tagList: ['news', 'tech'],
+      }),
+    );
 
     blogStory2Id = baseId + 4n;
-    await db.insert(stories).values(storyRow(blogStory2Id, {
-      name: 'Blog Post 2',
-      slug: 'post-2',
-      fullSlug: 'blog/post-2',
-      content: { component: 'article', _uid: 'uid-blog2', priority: '10' },
-      published: true,
-      contentType: 'article',
-      position: 40,
-      tagList: ['news'],
-    }));
+    await db.insert(stories).values(
+      storyRow(blogStory2Id, {
+        name: 'Blog Post 2',
+        slug: 'post-2',
+        fullSlug: 'blog/post-2',
+        content: { component: 'article', _uid: 'uid-blog2', priority: '10' },
+        published: true,
+        contentType: 'article',
+        position: 40,
+        tagList: ['news'],
+      }),
+    );
 
     articleStoryId = baseId + 5n;
-    await db.insert(stories).values(storyRow(articleStoryId, {
-      name: 'Featured Article',
-      slug: 'featured',
-      fullSlug: 'blog/featured',
-      content: { component: 'article', _uid: 'uid-feat' },
-      published: true,
-      contentType: 'article',
-      isStartpage: true,
-      position: 5,
-    }));
+    await db.insert(stories).values(
+      storyRow(articleStoryId, {
+        name: 'Featured Article',
+        slug: 'featured',
+        fullSlug: 'blog/featured',
+        content: { component: 'article', _uid: 'uid-feat' },
+        published: true,
+        contentType: 'article',
+        isStartpage: true,
+        position: 5,
+      }),
+    );
 
     taggedStoryId = baseId + 6n;
-    await db.insert(stories).values(storyRow(taggedStoryId, {
-      name: 'Tagged Story',
-      slug: 'tagged',
-      fullSlug: 'tagged',
-      published: true,
-      tagList: ['special'],
-      position: 50,
-    }));
+    await db.insert(stories).values(
+      storyRow(taggedStoryId, {
+        name: 'Tagged Story',
+        slug: 'tagged',
+        fullSlug: 'tagged',
+        published: true,
+        tagList: ['special'],
+        position: 50,
+      }),
+    );
   });
 
   afterAll(async () => {
@@ -237,9 +261,7 @@ describe('Stories CDN (e2e)', () => {
         .expect(200);
 
       expect(res.body.stories.length).toBeGreaterThan(0);
-      const allArticles = res.body.stories.every(
-        (s: any) => s.content.component === 'article',
-      );
+      const allArticles = res.body.stories.every((s: any) => s.content.component === 'article');
       expect(allArticles).toBe(true);
     });
 
@@ -334,8 +356,14 @@ describe('Stories CDN (e2e)', () => {
     });
 
     it('returns stories in order of by_uuids_ordered', async () => {
-      const [r1] = await db.select({ uuid: stories.uuid }).from(stories).where(eq(stories.id, blogStory1Id));
-      const [r2] = await db.select({ uuid: stories.uuid }).from(stories).where(eq(stories.id, blogStory2Id));
+      const [r1] = await db
+        .select({ uuid: stories.uuid })
+        .from(stories)
+        .where(eq(stories.id, blogStory1Id));
+      const [r2] = await db
+        .select({ uuid: stories.uuid })
+        .from(stories)
+        .where(eq(stories.id, blogStory2Id));
 
       const res = await request(app.getHttpServer())
         .get(`${BASE}?token=${PUBLIC_TOKEN}&by_uuids_ordered=${r2.uuid},${r1.uuid}`)
@@ -406,9 +434,7 @@ describe('Stories CDN (e2e)', () => {
           .expect(200);
 
         expect(res.body.stories.length).toBeGreaterThan(0);
-        expect(
-          res.body.stories.every((s: any) => s.content.component === 'article'),
-        ).toBe(true);
+        expect(res.body.stories.every((s: any) => s.content.component === 'article')).toBe(true);
       });
 
       it('filters by content field with not_in operator', async () => {
@@ -416,9 +442,7 @@ describe('Stories CDN (e2e)', () => {
           .get(`${BASE}?token=${PUBLIC_TOKEN}&filter_query[component][not_in]=article`)
           .expect(200);
 
-        expect(
-          res.body.stories.every((s: any) => s.content.component !== 'article'),
-        ).toBe(true);
+        expect(res.body.stories.every((s: any) => s.content.component !== 'article')).toBe(true);
       });
 
       it('filters by content field with like operator', async () => {
@@ -461,9 +485,7 @@ describe('Stories CDN (e2e)', () => {
         // All returned stories should have published_at after yesterday
         res.body.stories.forEach((s: any) => {
           if (s.published_at) {
-            expect(new Date(s.published_at).getTime()).toBeGreaterThan(
-              new Date(past).getTime(),
-            );
+            expect(new Date(s.published_at).getTime()).toBeGreaterThan(new Date(past).getTime());
           }
         });
       });

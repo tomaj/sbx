@@ -108,7 +108,7 @@ export function StoryFiltersBar({
     );
     // Only run when options first load
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterOptionsData]);
+  }, [filterOptionsData, onFiltersChange, filterFields.find, activeFilters.map]);
 
   const searchPlaceholder = showFavoritesOnly
     ? 'Search favorites...'

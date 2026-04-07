@@ -129,10 +129,14 @@ function EmptyCard({ onClick }: { onClick: () => void }) {
 
 export function AssetField({ fieldKey, def, value, onChange, spaceId }: SingleProps) {
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [externalMode, setExternalMode] = useState(false);
 
   function handleSelect(assets: Asset[]) {
     if (assets[0]) onChange(assetToValue(assets[0]));
   }
+
+  const isExternalUrl =
+    !!value?.filename && /^https?:\/\//i.test(value.filename) && value.id === undefined;
 
   return (
     <div>
@@ -146,17 +150,57 @@ export function AssetField({ fieldKey, def, value, onChange, spaceId }: SinglePr
         <AssetCard
           value={value}
           spaceId={spaceId}
-          onRemove={() => onChange(undefined)}
-          onClick={() => setPickerOpen(true)}
+          onRemove={() => {
+            onChange(undefined);
+            setExternalMode(false);
+          }}
+          onClick={() => (isExternalUrl ? setExternalMode(true) : setPickerOpen(true))}
         />
+      ) : externalMode && def.allow_external_url ? (
+        <div className="flex items-center gap-2">
+          <input
+            type="url"
+            placeholder="https://example.com/image.jpg"
+            className="flex-1 px-3 py-2.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                const url = (e.currentTarget as HTMLInputElement).value.trim();
+                if (url) onChange({ filename: url });
+                setExternalMode(false);
+              } else if (e.key === 'Escape') {
+                setExternalMode(false);
+              }
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => setExternalMode(false)}
+            className="text-xs text-gray-500 hover:text-gray-700"
+          >
+            Cancel
+          </button>
+        </div>
       ) : (
-        <EmptyCard onClick={() => setPickerOpen(true)} />
+        <div className="space-y-2">
+          <EmptyCard onClick={() => setPickerOpen(true)} />
+          {def.allow_external_url && (
+            <button
+              type="button"
+              onClick={() => setExternalMode(true)}
+              className="text-xs text-teal-600 dark:text-teal-400 hover:underline"
+            >
+              Or use external URL
+            </button>
+          )}
+        </div>
       )}
 
       {pickerOpen && (
         <AssetPickerModal
           spaceId={spaceId}
           mode="single"
+          filetypes={def.filetypes}
+          initialFolderId={def.asset_folder_id ?? undefined}
           onSelect={handleSelect}
           onClose={() => setPickerOpen(false)}
         />
@@ -203,6 +247,8 @@ export function MultiassetField({ fieldKey, def, value, onChange, spaceId }: Mul
         <AssetPickerModal
           spaceId={spaceId}
           mode="multi"
+          filetypes={def.filetypes}
+          initialFolderId={def.asset_folder_id ?? undefined}
           onSelect={handleSelect}
           onClose={() => setPickerOpen(false)}
         />

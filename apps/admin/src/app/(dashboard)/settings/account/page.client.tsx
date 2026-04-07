@@ -6,6 +6,7 @@ import { Check, HelpCircle } from 'lucide-react';
 import { UserAvatar } from '@/components/ui/user-avatar';
 import { useUnsavedChanges } from '@/hooks/use-unsaved-changes';
 import { UnsavedChangesModal } from '@/components/ui/unsaved-changes-modal';
+import { inputCls } from '@/components/ui/form-field';
 
 const ROLES = [
   { value: 'developer', label: '💻 Developer' },
@@ -77,6 +78,7 @@ export default function AccountPage() {
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Account</h1>
         <button
+          type="button"
           onClick={handleSave}
           disabled={saving}
           className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 disabled:opacity-60 text-white text-sm font-medium px-4 py-2 rounded-md transition-colors"
@@ -102,6 +104,7 @@ export default function AccountPage() {
             onChange={handleAvatarChange}
           />
           <button
+            type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
             className="text-sm text-teal-600 hover:underline font-medium disabled:opacity-50"
@@ -115,11 +118,15 @@ export default function AccountPage() {
       <div className="space-y-6">
         {/* Email */}
         <div>
-          <label className="flex items-center gap-1 text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+          <label
+            htmlFor="account-email"
+            className="flex items-center gap-1 text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5"
+          >
             Email <span className="text-red-500">*</span>
             <HelpCircle className="size-3.5 text-gray-400" />
           </label>
           <input
+            id="account-email"
             type="email"
             value={me?.user?.email ?? ''}
             readOnly
@@ -129,44 +136,53 @@ export default function AccountPage() {
 
         {/* First name */}
         <div>
-          <label className="flex items-center gap-1 text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+          <label
+            htmlFor="account-firstname"
+            className="flex items-center gap-1 text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5"
+          >
             First name <HelpCircle className="size-3.5 text-gray-400" />
           </label>
           <input
+            id="account-firstname"
             type="text"
             value={firstname}
             onChange={(e) => {
               setFirstname(e.target.value);
               setIsDirty(true);
             }}
-            className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-md text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
+            className={inputCls}
           />
         </div>
 
         {/* Last name */}
         <div>
-          <label className="flex items-center gap-1 text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+          <label
+            htmlFor="account-lastname"
+            className="flex items-center gap-1 text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5"
+          >
             Last name <HelpCircle className="size-3.5 text-gray-400" />
           </label>
           <input
+            id="account-lastname"
             type="text"
             value={lastname}
             onChange={(e) => {
               setLastname(e.target.value);
               setIsDirty(true);
             }}
-            className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-md text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
+            className={inputCls}
           />
         </div>
 
         {/* Role */}
         <div>
-          <label className="flex items-center gap-1 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          <span className="flex items-center gap-1 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             Role <span className="text-red-500">*</span>
-          </label>
+          </span>
           <div className="grid grid-cols-2 gap-2">
             {ROLES.map((r) => (
               <button
+                type="button"
                 key={r.value}
                 onClick={() => {
                   setRole(r.value);

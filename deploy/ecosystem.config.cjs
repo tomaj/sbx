@@ -5,15 +5,17 @@ const path = require('path');
 const envFile = path.join(__dirname, '.env.prod');
 const env = {};
 if (fs.existsSync(envFile)) {
-  fs.readFileSync(envFile, 'utf8').split('\n').forEach(line => {
-    const trimmed = line.trim();
-    if (trimmed && !trimmed.startsWith('#')) {
-      const idx = trimmed.indexOf('=');
-      if (idx > 0) {
-        env[trimmed.slice(0, idx)] = trimmed.slice(idx + 1);
+  fs.readFileSync(envFile, 'utf8')
+    .split('\n')
+    .forEach((line) => {
+      const trimmed = line.trim();
+      if (trimmed && !trimmed.startsWith('#')) {
+        const idx = trimmed.indexOf('=');
+        if (idx > 0) {
+          env[trimmed.slice(0, idx)] = trimmed.slice(idx + 1);
+        }
       }
-    }
-  });
+    });
 }
 
 module.exports = {

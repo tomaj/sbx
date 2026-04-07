@@ -36,6 +36,7 @@ interface ConfigTabProps {
   groups: ComponentGroup[];
   schemaFields: WorkingField[];
   previewField: string | null;
+  previewCardField: string | null;
   previewTmpl: string;
   internalTags: { id: number; name: string }[];
   color: string | null;
@@ -46,6 +47,7 @@ interface ConfigTabProps {
   onBlockTypeChange: (v: BlockType) => void;
   onGroupUuidChange: (v: string | null) => void;
   onPreviewFieldChange: (v: string | null) => void;
+  onPreviewCardFieldChange: (v: string | null) => void;
   onPreviewTmplChange: (v: string) => void;
   onInternalTagsChange: (v: { id: number; name: string }[]) => void;
   onColorChange: (v: string | null) => void;
@@ -62,6 +64,7 @@ export function ConfigTab({
   groups,
   schemaFields,
   previewField,
+  previewCardField,
   previewTmpl,
   internalTags,
   color,
@@ -72,6 +75,7 @@ export function ConfigTab({
   onBlockTypeChange,
   onGroupUuidChange,
   onPreviewFieldChange,
+  onPreviewCardFieldChange,
   onPreviewTmplChange,
   onInternalTagsChange,
   onColorChange,
@@ -120,17 +124,17 @@ export function ConfigTab({
               {
                 value: 'nestable' as BlockType,
                 title: 'Nestable block',
-                desc: 'e.g. Hero, Grid, Section, Newsletter Section...',
+                desc: 'e.g. Hero, Grid, Section, Newsletter Section, Chapter, Full Width Image, Slider...',
               },
               {
                 value: 'content_type' as BlockType,
                 title: 'Content type block',
-                desc: 'e.g. Landing pages, Post, Authors, Product...',
+                desc: 'e.g. Landing pages, Post, Authors, Product, Page, Team Members, FAQ article...',
               },
               {
                 value: 'universal' as BlockType,
                 title: 'Universal block',
-                desc: 'Can be used as both content type and nested block.',
+                desc: 'Block that can be used as content type block and nested block at same time.',
               },
             ] as Array<{ value: BlockType; title: string; desc: string }>
           ).map(({ value, title, desc }) => (
@@ -194,6 +198,22 @@ export function ConfigTab({
           onChange={(v) => onPreviewFieldChange(v || null)}
           options={previewFieldOptions}
           placeholder="Automatic"
+        />
+      </FormField>
+
+      {/* Preview card */}
+      <FormField
+        label="Preview card"
+        description="Field shown in the story card in the stories list."
+      >
+        <SelectDropdown
+          value={previewCardField ?? ''}
+          onChange={(v) => onPreviewCardFieldChange(v || null)}
+          options={[
+            { value: '', label: 'Select the field that will be shown in the story card' },
+            ...schemaFields.map((f) => ({ value: f.key, label: f.def.display_name || f.key })),
+          ]}
+          placeholder="Select the field that will be shown in the story card"
         />
       </FormField>
 

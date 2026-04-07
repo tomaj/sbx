@@ -5,7 +5,7 @@ import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
 import { DB } from './../src/db/db.module';
 import { spaces, apiTokens, assets, assetFolders } from './../src/db/schema';
-import { eq, inArray } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 
 const SPACE_ID = 999002;
 const TOKEN = 'test-assets-mapi-token';

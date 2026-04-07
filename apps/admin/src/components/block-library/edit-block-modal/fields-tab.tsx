@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Settings, X } from 'lucide-react';
+import { inputCls } from '@/components/ui/form-field';
 import {
   DndContext,
   closestCenter,
@@ -51,76 +52,6 @@ function TooltipHint({ text }: { text: string }) {
 }
 
 // ─── Field type picker popup ──────────────────────────────────────────────────
-
-interface TypePickerProps {
-  selected: FieldType;
-  onSelect: (t: FieldType) => void;
-  onClose: () => void;
-}
-
-function TypePicker({ selected, onSelect, onClose }: TypePickerProps) {
-  const [filter, setFilter] = useState('');
-  const filtered = ADDABLE_FIELD_TYPES.filter((ft) =>
-    ft.label.toLowerCase().includes(filter.toLowerCase()),
-  );
-
-  return (
-    <div className="absolute top-full left-0 right-0 mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl">
-      <div className="p-3 border-b border-gray-100 dark:border-gray-800">
-        <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">
-          Filter field types
-        </p>
-        <div className="relative">
-          <input
-            type="text"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            placeholder="Filter field types"
-            className="w-full pl-8 pr-3 py-1.5 border border-teal-400 rounded-lg text-sm bg-white dark:bg-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500"
-          />
-          <svg
-            className="absolute left-2.5 top-2 w-4 h-4 text-gray-400"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-            />
-          </svg>
-        </div>
-      </div>
-      <div className="p-3 grid grid-cols-4 gap-2 max-h-64 overflow-y-auto">
-        {filtered.map((ft) => (
-          <button
-            key={ft.type}
-            type="button"
-            onClick={() => {
-              onSelect(ft.type);
-              onClose();
-            }}
-            className={`flex flex-col items-center gap-1.5 p-2 rounded-lg transition-colors text-center ${
-              selected === ft.type
-                ? 'bg-gray-100 dark:bg-gray-800'
-                : 'hover:bg-gray-50 dark:hover:bg-gray-800/60'
-            }`}
-          >
-            <FieldIcon type={ft.type} size={28} />
-            <span className="text-[10px] text-gray-600 dark:text-gray-400 leading-tight">
-              {ft.label}
-            </span>
-          </button>
-        ))}
-        {filtered.length === 0 && (
-          <div className="col-span-4 text-center py-4 text-sm text-gray-400">No types found</div>
-        )}
-      </div>
-    </div>
-  );
-}
 
 /** Restricts drag movement to the vertical axis only */
 const restrictToVerticalAxis: Modifier = ({ transform }) => ({
@@ -304,9 +235,7 @@ export function FieldsTab({
               if (e.key === 'Enter') handleAdd();
             }}
             placeholder="e.g. news_items, title, columns..."
-            className={`flex-1 px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500 ${
-              nameError ? 'border-red-400' : 'border-gray-200 dark:border-gray-700'
-            }`}
+            className={`${inputCls} flex-1 ${nameError ? 'border-red-400' : ''}`}
           />
 
           {/* Type picker button */}

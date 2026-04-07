@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { X, RotateCcw, LayoutGrid } from 'lucide-react';
+import { X } from 'lucide-react';
 import { UnsavedChangesModal } from '@/components/ui/unsaved-changes-modal';
 import type { ComponentGroup } from '../group-tree';
 import type { Block } from '../block-list';
@@ -10,6 +10,9 @@ import { FieldEditor } from './field-editor';
 import { ManageTabs } from './manage-tabs';
 import { ConfigTab } from './config-tab';
 import { VersionsTab, type ComponentVersionDetail } from './versions-tab';
+import { BlockVersionPreview } from './block-version-preview';
+import { PresetsTab } from './presets-tab';
+import { ConditionsTab } from './conditions-tab';
 import {
   type WorkingTab,
   type WorkingField,
@@ -17,6 +20,7 @@ import {
   parseSchema,
   buildSchema,
 } from './types';
+import { TabItem } from './tab-item';
 
 type BlockType = 'nestable' | 'content_type' | 'universal';
 type MainTab = 'fields' | 'config' | 'presets' | 'versions' | 'conditions';
@@ -37,271 +41,6 @@ function blockTypeOf(block: Block): BlockType {
   return 'nestable';
 }
 
-// ─── Block Version Preview panel ───────────────────────────────────────────────
-
-type PreviewTab = 'fields' | 'compare';
-
-function BlockVersionPreview({
-  version,
-  spaceId,
-  blockId,
-  blockName,
-  onClose,
-  onRestored,
-}: {
-  version: ComponentVersionDetail;
-  spaceId: string;
-  blockId: string;
-  blockName: string;
-  onClose: () => void;
-  onRestored: () => void;
-}) {
-  const [previewTab, setPreviewTab] = useState<PreviewTab>('fields');
-  const [selectedField, setSelectedField] = useState<string | null>(null);
-  const [restoring, setRestoring] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const schema = version.schema ?? {};
-  const fieldKeys = Object.keys(schema).filter((k) => !k.startsWith('_'));
-
-  useEffect(() => {
-    if (fieldKeys.length > 0 && !selectedField) {
-      setSelectedField(fieldKeys[0]);
-    }
-  }, [selectedField, fieldKeys[0]]);
-
-  async function handleRestore() {
-    setRestoring(true);
-    setError(null);
-    try {
-      const res = await fetch(
-        `/api/admin/spaces/${spaceId}/components/${blockId}/versions/${version.id}/restore`,
-        { method: 'PUT' },
-      );
-      if (!res.ok) throw new Error();
-      onRestored();
-      onClose();
-    } catch {
-      setError('Failed to restore version');
-    } finally {
-      setRestoring(false);
-    }
-  }
-
-  const selectedDef = selectedField ? (schema[selectedField] as Record<string, any>) : null;
-
-  return (
-    <div className="relative flex flex-col flex-1 h-full bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 overflow-hidden min-w-0">
-      {/* Header */}
-      <div className="flex-shrink-0 flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-        <h2 className="text-base font-bold text-gray-900 dark:text-gray-100">Block Versions</h2>
-        <div className="flex items-center gap-2">
-          {error && <span className="text-xs text-red-500">{error}</span>}
-          <button
-            onClick={handleRestore}
-            disabled={restoring}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 transition-colors"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            {restoring ? 'Restoring...' : 'Restore Version'}
-          </button>
-          <button
-            onClick={onClose}
-            className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-            title="Close preview"
-          >
-            <LayoutGrid className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex-shrink-0 flex items-center border-b border-gray-200 dark:border-gray-700 px-6">
-        <button
-          onClick={() => setPreviewTab('fields')}
-          className={`px-3 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-            previewTab === 'fields'
-              ? 'border-teal-600 text-teal-600 dark:text-teal-400 dark:border-teal-400'
-              : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-          }`}
-        >
-          Fields
-        </button>
-        <button
-          onClick={() => setPreviewTab('compare')}
-          className={`px-3 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-            previewTab === 'compare'
-              ? 'border-teal-600 text-teal-600 dark:text-teal-400 dark:border-teal-400'
-              : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-          }`}
-        >
-          Compare
-        </button>
-      </div>
-
-      {/* Fields tab: two-column layout */}
-      {previewTab === 'fields' && (
-        <div className="flex flex-1 overflow-hidden">
-          {/* Left: field list */}
-          <div className="w-64 flex-shrink-0 overflow-y-auto border-r border-gray-200 dark:border-gray-700 py-4">
-            <p className="px-4 pb-2 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
-              General
-            </p>
-            {fieldKeys.map((key) => {
-              const def = schema[key] as Record<string, any>;
-              return (
-                <button
-                  key={key}
-                  onClick={() => setSelectedField(key)}
-                  className={`w-full text-left px-4 py-2.5 transition-colors ${
-                    selectedField === key
-                      ? 'bg-teal-50 dark:bg-teal-900/20 border-l-2 border-teal-500'
-                      : 'hover:bg-gray-50 dark:hover:bg-gray-800/50 border-l-2 border-transparent'
-                  }`}
-                >
-                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                    {key}
-                  </p>
-                  <p className="text-xs text-gray-400 dark:text-gray-500 capitalize">
-                    {def?.type ?? '—'}
-                  </p>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Right: field detail */}
-          <div className="flex-1 overflow-y-auto p-6">
-            {selectedDef ? (
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
-                    Field type
-                  </label>
-                  <div className="px-3 py-2 rounded-md border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300 capitalize">
-                    {selectedDef.type ?? '—'}
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
-                    Display name
-                  </label>
-                  <div className="px-3 py-2 rounded-md border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300">
-                    {selectedField}
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
-                    Field name
-                  </label>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">{selectedField}</p>
-                </div>
-                {selectedDef.description !== undefined && (
-                  <div>
-                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
-                      Description
-                    </label>
-                    <div className="px-3 py-2 rounded-md border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300 min-h-[60px]">
-                      {selectedDef.description || <span className="text-gray-400">—</span>}
-                    </div>
-                  </div>
-                )}
-                <div className="flex flex-col gap-2">
-                  {selectedDef.required !== undefined && (
-                    <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                      <input
-                        type="checkbox"
-                        checked={!!selectedDef.required}
-                        readOnly
-                        className="rounded"
-                      />
-                      Required field
-                    </label>
-                  )}
-                  {selectedDef.translatable !== undefined && (
-                    <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                      <input
-                        type="checkbox"
-                        checked={!!selectedDef.translatable}
-                        readOnly
-                        className="rounded"
-                      />
-                      Translatable
-                    </label>
-                  )}
-                </div>
-                {selectedDef.default_value !== undefined && (
-                  <div>
-                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
-                      Default value
-                    </label>
-                    <div className="px-3 py-2 rounded-md border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300">
-                      {String(selectedDef.default_value)}
-                    </div>
-                  </div>
-                )}
-                {selectedDef.max_length !== undefined && (
-                  <div>
-                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
-                      Maximum characters
-                    </label>
-                    <div className="px-3 py-2 rounded-md border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300">
-                      {selectedDef.max_length}
-                    </div>
-                  </div>
-                )}
-                {selectedDef.regex !== undefined && (
-                  <div>
-                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
-                      Regex validation
-                    </label>
-                    <div className="px-3 py-2 rounded-md border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm font-mono text-gray-700 dark:text-gray-300">
-                      {selectedDef.regex}
-                    </div>
-                  </div>
-                )}
-                {selectedDef.options &&
-                  Array.isArray(selectedDef.options) &&
-                  selectedDef.options.length > 0 && (
-                    <div>
-                      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
-                        Options
-                      </label>
-                      <div className="space-y-1">
-                        {(selectedDef.options as any[]).map((opt, i) => (
-                          <div
-                            key={i}
-                            className="px-3 py-1.5 rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-xs text-gray-600 dark:text-gray-400 flex gap-2"
-                          >
-                            <span className="font-medium">
-                              {opt.name ?? opt.label ?? opt.value}
-                            </span>
-                            {opt.value && <span className="text-gray-400">→ {opt.value}</span>}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-              </div>
-            ) : (
-              <p className="text-sm text-gray-400">Select a field to preview</p>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Compare tab */}
-      {previewTab === 'compare' && (
-        <div className="flex-1 flex items-center justify-center text-gray-400">
-          <p className="text-sm">Compare view coming soon</p>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Main modal ────────────────────────────────────────────────────────────────
-
 export function EditBlockModal({
   open,
   block,
@@ -320,6 +59,7 @@ export function EditBlockModal({
   const [blockType, setBlockType] = useState<BlockType>('nestable');
   const [groupUuid, setGroupUuid] = useState<string | null>(null);
   const [previewField, setPreviewField] = useState<string | null>(null);
+  const [previewCardField, setPreviewCardField] = useState<string | null>(null);
   const [previewTmpl, setPreviewTmpl] = useState('');
   const [internalTags, setInternalTags] = useState<{ id: number; name: string }[]>([]);
   const [color, setColor] = useState<string | null>(null);
@@ -353,6 +93,7 @@ export function EditBlockModal({
     setBlockType(blockTypeOf(block));
     setGroupUuid(block.component_group_uuid);
     setPreviewField(block.preview_field ?? null);
+    setPreviewCardField(block.content_type_asset_preview ?? null);
     setPreviewTmpl(block.preview_tmpl ?? '');
     setInternalTags(
       (block.internal_tags_list ?? []).map((t: any) => ({ id: Number(t.id), name: t.name })),
@@ -372,6 +113,50 @@ export function EditBlockModal({
     }, 300);
     return () => clearTimeout(t);
   }, [open, block]);
+
+  async function handleSave() {
+    setSaving(true);
+    setError(null);
+    try {
+      const schema = buildSchema(tabs, fields);
+      const isNestable = blockType === 'nestable' || blockType === 'universal';
+      const isRoot = blockType === 'content_type' || blockType === 'universal';
+
+      const res = await fetch(`/api/admin/spaces/${spaceId}/components/${block.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          schema,
+          display_name: displayName || null,
+          description: description || null,
+          is_nestable: isNestable,
+          is_root: isRoot,
+          component_group_uuid: groupUuid,
+          preview_field: previewField || null,
+          content_type_asset_preview: previewCardField || null,
+          preview_tmpl: previewTmpl || null,
+          internal_tags_list: internalTags,
+          internal_tag_ids: internalTags.map((t) => String(t.id)),
+          color: color || null,
+          icon: icon || null,
+          image: image || null,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message ?? 'Failed to save');
+      }
+
+      const data = await res.json();
+      setIsDirty(false);
+      onSaved(data.component);
+    } catch (e: any) {
+      setError(e.message ?? 'Failed to save');
+    } finally {
+      setSaving(false);
+    }
+  }
 
   // Keyboard close
   useEffect(() => {
@@ -401,7 +186,7 @@ export function EditBlockModal({
     }
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [open, view, previewVersion, isDirty, onClose, handleSave]);
+  }, [open, view, previewVersion, isDirty, onClose, handleSave]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!open) return null;
 
@@ -440,49 +225,6 @@ export function EditBlockModal({
     setEditingFieldKey(null);
   }
 
-  async function handleSave() {
-    setSaving(true);
-    setError(null);
-    try {
-      const schema = buildSchema(tabs, fields);
-      const isNestable = blockType === 'nestable' || blockType === 'universal';
-      const isRoot = blockType === 'content_type' || blockType === 'universal';
-
-      const res = await fetch(`/api/admin/spaces/${spaceId}/components/${block.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          schema,
-          display_name: displayName || null,
-          description: description || null,
-          is_nestable: isNestable,
-          is_root: isRoot,
-          component_group_uuid: groupUuid,
-          preview_field: previewField || null,
-          preview_tmpl: previewTmpl || null,
-          internal_tags_list: internalTags,
-          internal_tag_ids: internalTags.map((t) => String(t.id)),
-          color: color || null,
-          icon: icon || null,
-          image: image || null,
-        }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.message ?? 'Failed to save');
-      }
-
-      const data = await res.json();
-      setIsDirty(false);
-      onSaved(data.component);
-    } catch (e: any) {
-      setError(e.message ?? 'Failed to save');
-    } finally {
-      setSaving(false);
-    }
-  }
-
   const showEditFieldTab = view === 'edit-field';
   const showManageTabsTab = view === 'manage-tabs';
   const editingField = editingFieldKey
@@ -519,7 +261,6 @@ export function EditBlockModal({
           onClose={() => setPreviewVersion(null)}
           onRestored={() => {
             setPreviewVersion(null);
-            // Reload block data
             fetch(`/api/admin/spaces/${spaceId}/components/${block.id}`)
               .then((r) => r.json())
               .then((d) => d.component && onSaved(d.component))
@@ -634,6 +375,7 @@ export function EditBlockModal({
               groups={groups}
               schemaFields={fields}
               previewField={previewField}
+              previewCardField={previewCardField}
               previewTmpl={previewTmpl}
               internalTags={internalTags}
               color={color}
@@ -659,6 +401,10 @@ export function EditBlockModal({
                 setPreviewField(v);
                 if (canMarkDirtyRef.current) setIsDirty(true);
               }}
+              onPreviewCardFieldChange={(v) => {
+                setPreviewCardField(v);
+                if (canMarkDirtyRef.current) setIsDirty(true);
+              }}
               onPreviewTmplChange={(v) => {
                 setPreviewTmpl(v);
                 if (canMarkDirtyRef.current) setIsDirty(true);
@@ -682,9 +428,12 @@ export function EditBlockModal({
             />
           )}
           {view === 'presets' && (
-            <div className="flex-1 flex items-center justify-center text-gray-400">
-              <p className="text-sm">TODO: Presets</p>
-            </div>
+            <PresetsTab
+              spaceId={spaceId}
+              componentId={String(block.id)}
+              componentName={block.name}
+              schemaFields={fields}
+            />
           )}
           {view === 'versions' && (
             <VersionsTab
@@ -700,9 +449,13 @@ export function EditBlockModal({
             />
           )}
           {view === 'conditions' && (
-            <div className="flex-1 flex items-center justify-center text-gray-400">
-              <p className="text-sm">TODO: Conditions</p>
-            </div>
+            <ConditionsTab
+              fields={fields}
+              onFieldsChange={(v) => {
+                setFields(v);
+                if (canMarkDirtyRef.current) setIsDirty(true);
+              }}
+            />
           )}
         </div>
 
@@ -731,29 +484,5 @@ export function EditBlockModal({
         onCancel={() => setShowUnsavedModal(false)}
       />
     </div>
-  );
-}
-
-function TabItem({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`px-3 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
-        active
-          ? 'border-teal-600 text-teal-600 dark:text-teal-400 dark:border-teal-400'
-          : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-      }`}
-    >
-      {label}
-    </button>
   );
 }

@@ -233,6 +233,40 @@ export class StoriesQueryService {
 
     // by_uuids_ordered: preserve input order
     const formattedStories = rows.map((s) => this.formatStory(s, withSummary));
+
+    // Attach preview_asset from content_type_asset_preview component config
+    const contentTypes = [...new Set(rows.map((r) => r.contentType).filter(Boolean))] as string[];
+    if (contentTypes.length > 0) {
+      const previewComps = await this.db
+        .select({ name: components.name, previewField: components.contentTypeAssetPreview })
+        .from(components)
+        .where(
+          and(
+            eq(components.spaceId, spaceId),
+            inArray(components.name, contentTypes),
+            isNotNull(components.contentTypeAssetPreview),
+          ),
+        );
+      const previewFieldMap = new Map(
+        previewComps.filter((c) => c.previewField).map((c) => [c.name, c.previewField!]),
+      );
+      for (let i = 0; i < rows.length; i++) {
+        const fieldName = rows[i].contentType ? previewFieldMap.get(rows[i].contentType!) : null;
+        if (fieldName && rows[i].content) {
+          const content = rows[i].content as Record<string, any>;
+          const assetVal = content[fieldName];
+          formattedStories[i].preview_asset =
+            assetVal && typeof assetVal === 'object' && typeof assetVal.filename === 'string'
+              ? assetVal.filename
+              : typeof assetVal === 'string' && assetVal
+                ? assetVal
+                : null;
+        } else {
+          formattedStories[i].preview_asset = null;
+        }
+      }
+    }
+
     if (byUuidsOrdered?.length) {
       const orderMap = new Map(byUuidsOrdered.map((uuid, idx) => [uuid, idx]));
       formattedStories.sort(

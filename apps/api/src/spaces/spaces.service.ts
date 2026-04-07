@@ -91,6 +91,7 @@ export class SpacesService {
         limits: {},
         options: {
           languages: space.languageCodes ?? [],
+          ...(space.options as Record<string, unknown>),
         },
         collaborators: [],
         // Additional fields used by admin UI
@@ -99,6 +100,7 @@ export class SpacesService {
         mobile_width: space.mobileWidth,
         visual_editor_disabled: space.visualEditorDisabled,
         asset_library_settings: (space.assetLibrarySettings as Record<string, unknown>) ?? {},
+        maintenance: ((space.options as Record<string, unknown>)?.maintenance as boolean) ?? false,
       },
     };
   }
@@ -145,10 +147,23 @@ export class SpacesService {
       assetLibrarySettings?: Record<string, unknown>;
       storyPublishedHook?: string | null;
       environments?: { name: string; location: string }[];
+      maintenance?: boolean;
     },
   ) {
     // If environments is provided, use it as previewUrls (they map to the same DB field)
     const previewUrls = data.environments ?? data.previewUrls;
+
+    // If any options key is being updated, read current options and merge
+    let optionsUpdate: Record<string, unknown> | undefined;
+    if (data.maintenance !== undefined) {
+      const [current] = await this.db
+        .select({ options: spaces.options })
+        .from(spaces)
+        .where(eq(spaces.id, spaceId))
+        .limit(1);
+      const currentOptions = (current?.options as Record<string, unknown>) ?? {};
+      optionsUpdate = { ...currentOptions, maintenance: data.maintenance };
+    }
 
     const [updated] = await this.db
       .update(spaces)
@@ -166,6 +181,7 @@ export class SpacesService {
         ...(data.assetLibrarySettings !== undefined && {
           assetLibrarySettings: data.assetLibrarySettings,
         }),
+        ...(optionsUpdate !== undefined && { options: optionsUpdate }),
         updatedAt: new Date(),
       })
       .where(eq(spaces.id, spaceId))

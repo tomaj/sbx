@@ -80,51 +80,59 @@ describe('Links CDN (e2e)', () => {
 
     rootFolderUuid = crypto.randomUUID();
     rootFolderId = baseId + 1n;
-    await db.insert(stories).values(storyRow(rootFolderId, {
-      uuid: rootFolderUuid,
-      name: 'Blog',
-      slug: 'blog',
-      fullSlug: 'blog/',
-      isFolder: true,
-      isStartpage: false,
-      published: true,
-      position: 10,
-    }));
+    await db.insert(stories).values(
+      storyRow(rootFolderId, {
+        uuid: rootFolderUuid,
+        name: 'Blog',
+        slug: 'blog',
+        fullSlug: 'blog/',
+        isFolder: true,
+        isStartpage: false,
+        published: true,
+        position: 10,
+      }),
+    );
 
     rootStoryUuid = crypto.randomUUID();
-    await db.insert(stories).values(storyRow(baseId + 2n, {
-      uuid: rootStoryUuid,
-      name: 'Home',
-      slug: 'home',
-      fullSlug: 'home',
-      path: 'custom-home/',
-      published: true,
-      position: 5,
-    }));
+    await db.insert(stories).values(
+      storyRow(baseId + 2n, {
+        uuid: rootStoryUuid,
+        name: 'Home',
+        slug: 'home',
+        fullSlug: 'home',
+        path: 'custom-home/',
+        published: true,
+        position: 5,
+      }),
+    );
 
     childStoryUuid = crypto.randomUUID();
-    await db.insert(stories).values(storyRow(baseId + 3n, {
-      uuid: childStoryUuid,
-      name: 'Post One',
-      slug: 'post-one',
-      fullSlug: 'blog/post-one',
-      parentId: rootFolderId,
-      published: true,
-      position: 20,
-    }));
+    await db.insert(stories).values(
+      storyRow(baseId + 3n, {
+        uuid: childStoryUuid,
+        name: 'Post One',
+        slug: 'post-one',
+        fullSlug: 'blog/post-one',
+        parentId: rootFolderId,
+        published: true,
+        position: 20,
+      }),
+    );
 
     draftStoryUuid = crypto.randomUUID();
-    await db.insert(stories).values(storyRow(baseId + 4n, {
-      uuid: draftStoryUuid,
-      name: 'Draft Post',
-      slug: 'draft-post',
-      fullSlug: 'blog/draft-post',
-      parentId: rootFolderId,
-      published: false,
-      publishedAt: null,
-      firstPublishedAt: null,
-      position: 30,
-    }));
+    await db.insert(stories).values(
+      storyRow(baseId + 4n, {
+        uuid: draftStoryUuid,
+        name: 'Draft Post',
+        slug: 'draft-post',
+        fullSlug: 'blog/draft-post',
+        parentId: rootFolderId,
+        published: false,
+        publishedAt: null,
+        firstPublishedAt: null,
+        position: 30,
+      }),
+    );
   });
 
   afterAll(async () => {
@@ -142,9 +150,7 @@ describe('Links CDN (e2e)', () => {
 
   describe('GET /v2/cdn/links', () => {
     it('returns links as object keyed by UUID', async () => {
-      const res = await request(app.getHttpServer())
-        .get(`${BASE}?token=${TOKEN}`)
-        .expect(200);
+      const res = await request(app.getHttpServer()).get(`${BASE}?token=${TOKEN}`).expect(200);
 
       expect(res.body).toHaveProperty('links');
       expect(res.body).not.toHaveProperty('cv');
@@ -153,9 +159,7 @@ describe('Links CDN (e2e)', () => {
     });
 
     it('includes folders in links', async () => {
-      const res = await request(app.getHttpServer())
-        .get(`${BASE}?token=${TOKEN}`)
-        .expect(200);
+      const res = await request(app.getHttpServer()).get(`${BASE}?token=${TOKEN}`).expect(200);
 
       const folder = res.body.links[rootFolderUuid];
       expect(folder).toBeDefined();
@@ -164,9 +168,7 @@ describe('Links CDN (e2e)', () => {
     });
 
     it('includes stories in links', async () => {
-      const res = await request(app.getHttpServer())
-        .get(`${BASE}?token=${TOKEN}`)
-        .expect(200);
+      const res = await request(app.getHttpServer()).get(`${BASE}?token=${TOKEN}`).expect(200);
 
       const story = res.body.links[rootStoryUuid];
       expect(story).toBeDefined();
@@ -174,9 +176,7 @@ describe('Links CDN (e2e)', () => {
     });
 
     it('link object has correct fields', async () => {
-      const res = await request(app.getHttpServer())
-        .get(`${BASE}?token=${TOKEN}`)
-        .expect(200);
+      const res = await request(app.getHttpServer()).get(`${BASE}?token=${TOKEN}`).expect(200);
 
       const link = res.body.links[rootStoryUuid];
       expect(link).toHaveProperty('id');
@@ -193,9 +193,7 @@ describe('Links CDN (e2e)', () => {
     });
 
     it('real_path uses path field when set', async () => {
-      const res = await request(app.getHttpServer())
-        .get(`${BASE}?token=${TOKEN}`)
-        .expect(200);
+      const res = await request(app.getHttpServer()).get(`${BASE}?token=${TOKEN}`).expect(200);
 
       const link = res.body.links[rootStoryUuid];
       // story has path='custom-home/'
@@ -203,9 +201,7 @@ describe('Links CDN (e2e)', () => {
     });
 
     it('real_path uses slug when path is empty', async () => {
-      const res = await request(app.getHttpServer())
-        .get(`${BASE}?token=${TOKEN}`)
-        .expect(200);
+      const res = await request(app.getHttpServer()).get(`${BASE}?token=${TOKEN}`).expect(200);
 
       const link = res.body.links[childStoryUuid];
       // child has no path, slug='post-one'
@@ -213,9 +209,7 @@ describe('Links CDN (e2e)', () => {
     });
 
     it('excludes unpublished in default version', async () => {
-      const res = await request(app.getHttpServer())
-        .get(`${BASE}?token=${TOKEN}`)
-        .expect(200);
+      const res = await request(app.getHttpServer()).get(`${BASE}?token=${TOKEN}`).expect(200);
 
       expect(res.body.links[draftStoryUuid]).toBeUndefined();
     });
@@ -258,9 +252,7 @@ describe('Links CDN (e2e)', () => {
     });
 
     it('does not include date fields without include_dates', async () => {
-      const res = await request(app.getHttpServer())
-        .get(`${BASE}?token=${TOKEN}`)
-        .expect(200);
+      const res = await request(app.getHttpServer()).get(`${BASE}?token=${TOKEN}`).expect(200);
 
       const link = res.body.links[rootStoryUuid];
       expect(link.created_at).toBeUndefined();

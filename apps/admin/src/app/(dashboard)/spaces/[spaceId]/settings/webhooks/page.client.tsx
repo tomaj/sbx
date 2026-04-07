@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, use } from 'react';
-import { Plus, Trash2, History, Settings, ChevronRight } from 'lucide-react';
+import { History, ChevronRight, Settings, Trash2 } from 'lucide-react';
 import { z } from 'zod';
 import { Controller } from 'react-hook-form';
 import { CrudSidebarForm } from '@/components/ui/crud-sidebar-form';
+import { CrudSettingsPage } from '@/components/ui/crud-settings-page';
 import { Toggle } from '@/components/ui/toggle';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useDelete } from '@/hooks/use-delete';
@@ -14,7 +15,8 @@ import { useApi } from '@/lib/swr';
 import type { Webhook } from '@sbx/types';
 import { SkeletonText, SkeletonBlock } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { FormField, inputCls } from '@/components/ui/form-field';
+import { FormField, FormRootError, inputCls } from '@/components/ui/form-field';
+import { IconButton } from '@/components/ui/icon-button';
 
 // ─── Trigger definitions ──────────────────────────────────────────────────────
 
@@ -146,19 +148,8 @@ function WebhookCard({ webhook, spaceId, onEdit, onDelete }: WebhookCardProps) {
           </a>
         </div>
 
-        <button
-          onClick={onEdit}
-          className="flex items-center justify-center w-8 h-8 rounded-lg text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-        >
-          <Settings className="w-4 h-4" />
-        </button>
-
-        <button
-          onClick={onDelete}
-          className="flex items-center justify-center w-8 h-8 rounded-lg text-gray-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-        >
-          <Trash2 className="w-4 h-4" />
-        </button>
+        <IconButton icon={Settings} onClick={onEdit} title="Edit" />
+        <IconButton icon={Trash2} onClick={onDelete} title="Delete" variant="danger" />
       </div>
     </div>
   );
@@ -249,9 +240,7 @@ function WebhookForm({ spaceId, webhook, open, onClose, onSaved }: WebhookFormPr
       deleteMessage={`Are you sure you want to delete "${webhook?.name ?? ''}"?`}
       width="w-[480px]"
     >
-      {errors.root?.message && (
-        <p className="text-sm text-red-600 dark:text-red-400">{errors.root.message}</p>
-      )}
+      <FormRootError message={errors.root?.message} />
 
       <FormField label="Name" required>
         <input
@@ -439,23 +428,22 @@ export default function WebhooksPage({ params }: { params: Promise<{ spaceId: st
   }
 
   return (
-    <div className="max-w-3xl px-10 py-8">
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Webhooks</h1>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Notify external services when content changes.
-          </p>
-        </div>
-        <button
-          onClick={openCreate}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-teal-700 hover:bg-teal-800 rounded-lg transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          New Webhook
-        </button>
-      </div>
-
+    <CrudSettingsPage
+      title="Webhooks"
+      description="Notify external services when content changes."
+      addLabel="New Webhook"
+      onAdd={openCreate}
+      sidebar={
+        <WebhookForm
+          spaceId={spaceId}
+          webhook={selectedWebhook}
+          open={panelOpen}
+          onClose={close}
+          onSaved={handleSaved}
+        />
+      }
+      extras={webhookDelete.modal}
+    >
       {isLoading ? (
         <div className="space-y-3">
           {Array.from({ length: 3 }).map((_, i) => (
@@ -504,16 +492,6 @@ export default function WebhooksPage({ params }: { params: Promise<{ spaceId: st
           ))}
         </div>
       )}
-
-      <WebhookForm
-        spaceId={spaceId}
-        webhook={selectedWebhook}
-        open={panelOpen}
-        onClose={close}
-        onSaved={handleSaved}
-      />
-
-      {webhookDelete.modal}
-    </div>
+    </CrudSettingsPage>
   );
 }

@@ -55,6 +55,7 @@ export default function AppearancePage() {
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Appearance</h1>
         <button
+          type="button"
           onClick={handleSave}
           className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium px-4 py-2 rounded-md transition-colors"
         >
@@ -70,6 +71,7 @@ export default function AppearancePage() {
       <div className="grid grid-cols-2 gap-4 max-w-lg">
         {themes.map((t) => (
           <button
+            type="button"
             key={t.value}
             onClick={() => setTheme(t.value)}
             className={cn(

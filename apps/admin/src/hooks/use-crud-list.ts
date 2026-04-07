@@ -5,7 +5,7 @@ import { useApi } from '@/lib/swr';
 import { usePerPage } from '@/hooks/use-per-page';
 import type { SortState } from '@/components/ui/data-table';
 
-export interface UseCrudListOptions<T> {
+export interface UseCrudListOptions<_T> {
   /** Receives URLSearchParams and returns the full API URL string */
   apiUrl: (qs: URLSearchParams) => string;
   defaultSort?: SortState;

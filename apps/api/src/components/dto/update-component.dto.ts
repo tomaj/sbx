@@ -12,6 +12,7 @@ const UpdateComponentDataSchema = z.object({
   image: z.string().nullable().optional(),
   preview_field: z.string().nullable().optional(),
   preview_tmpl: z.string().nullable().optional(),
+  content_type_asset_preview: z.string().nullable().optional(),
   description: z.string().nullable().optional(),
   component_group_uuid: z.string().nullable().optional(),
   internal_tags_list: z.array(z.object({ id: z.number().int(), name: z.string() })).optional(),

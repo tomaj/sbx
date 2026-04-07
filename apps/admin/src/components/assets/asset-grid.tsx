@@ -1,5 +1,6 @@
 'use client';
 
+import { Check } from 'lucide-react';
 import { AssetThumb } from './asset-thumb';
 
 export interface Asset {
@@ -21,6 +22,8 @@ interface AssetGridProps {
   spaceId: string;
   isLoading?: boolean;
   onAssetClick?: (asset: Asset) => void;
+  selectedIds?: Set<number>;
+  onToggleSelect?: (id: number) => void;
 }
 
 function formatExt(contentType: string): string {
@@ -28,7 +31,17 @@ function formatExt(contentType: string): string {
   return parts[1] ?? parts[0] ?? '';
 }
 
-export function AssetGrid({ assets, spaceId, isLoading, onAssetClick }: AssetGridProps) {
+export function AssetGrid({
+  assets,
+  spaceId,
+  isLoading,
+  onAssetClick,
+  selectedIds,
+  onToggleSelect,
+}: AssetGridProps) {
+  // isSelecting: true when at least one item is selected → card clicks toggle selection
+  const isSelecting = selectedIds !== undefined && selectedIds.size > 0;
+
   if (isLoading) {
     return (
       <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
@@ -53,33 +66,67 @@ export function AssetGrid({ assets, spaceId, isLoading, onAssetClick }: AssetGri
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 gap-5 p-1">
-      {assets.map((asset) => (
-        <div
-          key={asset.id}
-          className="flex flex-col gap-2 group cursor-pointer"
-          onClick={() => onAssetClick?.(asset)}
-        >
-          {/* Image card — gray bg, image contained with padding */}
-          <div className="aspect-[4/3] rounded-xl bg-gray-100 dark:bg-gray-800 overflow-hidden hover:ring-2 hover:ring-teal-500 transition-all flex items-center justify-center p-3">
-            <AssetThumb
-              filename={asset.filename}
-              contentType={asset.content_type}
-              spaceId={spaceId}
-              alt={asset.alt}
-              size={400}
-              imgClassName="max-w-full max-h-full w-auto h-auto object-contain"
-              iconClassName="w-14 h-14 text-gray-400"
-            />
+      {assets.map((asset) => {
+        const isSelected = selectedIds?.has(asset.id) ?? false;
+
+        function handleClick() {
+          if (isSelecting) {
+            // In selection mode: clicking the card toggles selection
+            onToggleSelect?.(asset.id);
+          } else {
+            // Normal mode: clicking opens detail
+            onAssetClick?.(asset);
+          }
+        }
+
+        return (
+          <div
+            key={asset.id}
+            className="flex flex-col gap-2 group cursor-pointer"
+            onClick={handleClick}
+          >
+            <div
+              className={`relative aspect-[4/3] rounded-xl bg-gray-100 dark:bg-gray-800 overflow-hidden transition-all flex items-center justify-center p-3 ${
+                isSelected ? 'ring-2 ring-teal-500' : 'hover:ring-2 hover:ring-teal-500'
+              }`}
+            >
+              <AssetThumb
+                filename={asset.filename}
+                contentType={asset.content_type}
+                spaceId={spaceId}
+                alt={asset.alt}
+                size={400}
+                imgClassName="max-w-full max-h-full w-auto h-auto object-contain"
+                iconClassName="w-14 h-14 text-gray-400"
+              />
+
+              {/* Checkbox / checkmark badge */}
+              {selectedIds !== undefined && (
+                <div
+                  className={`absolute top-2 left-2 w-5 h-5 rounded-md flex items-center justify-center transition-all ${
+                    isSelected
+                      ? 'bg-teal-500 opacity-100'
+                      : 'bg-white/80 dark:bg-gray-700/80 opacity-0 group-hover:opacity-100 border border-gray-300 dark:border-gray-500'
+                  }`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleSelect?.(asset.id);
+                  }}
+                >
+                  {isSelected && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <p className="text-sm text-gray-800 dark:text-gray-200 truncate leading-snug font-medium">
+                {asset.short_filename || asset.filename.split('/').pop()}
+              </p>
+              <p className="text-xs text-gray-400 leading-snug">.{formatExt(asset.content_type)}</p>
+            </div>
           </div>
-          {/* Name + extension */}
-          <div>
-            <p className="text-sm text-gray-800 dark:text-gray-200 truncate leading-snug font-medium">
-              {asset.short_filename || asset.filename.split('/').pop()}
-            </p>
-            <p className="text-xs text-gray-400 leading-snug">.{formatExt(asset.content_type)}</p>
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

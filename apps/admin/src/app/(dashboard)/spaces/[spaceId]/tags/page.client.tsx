@@ -9,6 +9,7 @@ import { SearchBar } from '@/components/ui/search-bar';
 import { InputWithCounter } from '@/components/ui/input-with-counter';
 import { PageLayout } from '@/components/ui/page-layout';
 import { CrudSidebarForm } from '@/components/ui/crud-sidebar-form';
+import { FormField, FormRootError } from '@/components/ui/form-field';
 import { useApi } from '@/lib/swr';
 import { useCrudSidebar } from '@/hooks/use-crud-sidebar';
 import { useCrudForm } from '@/hooks/use-crud-form';
@@ -143,24 +144,22 @@ export default function TagsPage({ params }: { params: Promise<{ spaceId: string
             {sidebarMode === 'create' ? 'Create a new tag' : 'Edit tag details'}
           </span>
         </div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-          Name <span className="text-red-500">*</span>
-        </label>
-        <Controller
-          name="name"
-          control={control}
-          render={({ field }) => (
-            <InputWithCounter
-              value={field.value}
-              onChange={field.onChange}
-              maxLength={60}
-              placeholder="Tag name"
-              autoFocus
-            />
-          )}
-        />
-        {errors.name && <p className="mt-2 text-sm text-red-500">{errors.name.message}</p>}
-        {errors.root && <p className="mt-2 text-sm text-red-500">{errors.root.message}</p>}
+        <FormField label="Name" required error={errors.name?.message}>
+          <Controller
+            name="name"
+            control={control}
+            render={({ field }) => (
+              <InputWithCounter
+                value={field.value}
+                onChange={field.onChange}
+                maxLength={60}
+                placeholder="Tag name"
+                autoFocus
+              />
+            )}
+          />
+        </FormField>
+        <FormRootError message={errors.root?.message} />
       </CrudSidebarForm>
     </PageLayout>
   );

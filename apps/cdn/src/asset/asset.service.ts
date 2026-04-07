@@ -1,9 +1,13 @@
 import {
   BadRequestException,
+  ForbiddenException,
+  Inject,
   Injectable,
   NotFoundException,
   PayloadTooLargeException,
 } from '@nestjs/common';
+import type { Redis } from 'ioredis';
+import { REDIS } from '../redis/redis.module';
 import { StorageService } from '../storage/storage.service';
 import { splitOnMarker, parseOperations } from './url-parser';
 import { processImage, type ProcessResult } from './sharp-processor';
@@ -89,11 +93,21 @@ export interface AssetRequest {
 
 @Injectable()
 export class AssetService {
-  constructor(private readonly storage: StorageService) {}
+  constructor(
+    private readonly storage: StorageService,
+    @Inject(REDIS) private readonly redis: Redis,
+  ) {}
 
   async handle(req: AssetRequest): Promise<ProcessResult> {
     const { urlPath, accept, viewerCountry } = req;
     const ext = getExtension(urlPath);
+
+    // Block private (locked) assets — API sets this flag in Redis when an asset is locked
+    const objectKey = toObjectKey(stripTransformSuffix(urlPath));
+    const isPrivate = await this.redis.exists(`cdn:asset:private:${objectKey}`);
+    if (isPrivate) {
+      throw new ForbiddenException('Asset is private');
+    }
 
     // AVIF is not supported in China — downgrade to WebP
     const effectiveAccept =

@@ -90,7 +90,7 @@ export function useCrudForm<TItem, TFormValues extends FieldValues>({
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, item, mode]);
+  }, [open, item, mode, getInitialValues, form.reset, defaultValues]);
 
   const onSubmit = form.handleSubmit(async (values) => {
     const res = await buildRequest(values as TFormValues, mode, item);

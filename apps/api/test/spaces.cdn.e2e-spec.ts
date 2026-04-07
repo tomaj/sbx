@@ -56,9 +56,7 @@ describe('Spaces CDN (e2e)', () => {
     });
 
     it('returns 401 with invalid token', () => {
-      return request(app.getHttpServer())
-        .get('/v2/cdn/spaces/me?token=bad-token')
-        .expect(401);
+      return request(app.getHttpServer()).get('/v2/cdn/spaces/me?token=bad-token').expect(401);
     });
   });
 

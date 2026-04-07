@@ -23,6 +23,7 @@ function OrgSpaceCard({ space }: { space: Space }) {
           {space.name}
         </h3>
         <button
+          type="button"
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -69,6 +70,7 @@ function Section({
   return (
     <div className="mb-8">
       <button
+        type="button"
         onClick={() => setOpen((o) => !o)}
         className="flex items-center gap-2 mb-4 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
       >
@@ -126,6 +128,7 @@ export function OrgSpacesClient({ spaces }: { spaces: Space[] }) {
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Organization Spaces</h1>
         <button
+          type="button"
           onClick={() => setCreateOpen(true)}
           className="flex items-center gap-2 bg-teal-700 hover:bg-teal-800 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
         >
@@ -148,6 +151,7 @@ export function OrgSpacesClient({ spaces }: { spaces: Space[] }) {
         </div>
         <div className="relative">
           <button
+            type="button"
             onClick={() => setSortOpen((o) => !o)}
             className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors whitespace-nowrap"
           >
@@ -158,6 +162,7 @@ export function OrgSpacesClient({ spaces }: { spaces: Space[] }) {
             <div className="absolute right-0 z-10 mt-1 w-44 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg overflow-hidden">
               {SORT_OPTIONS.map((opt) => (
                 <button
+                  type="button"
                   key={opt.value}
                   onClick={() => {
                     setSort(opt.value);

@@ -1,61 +1,61 @@
-'use client'
+'use client';
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react';
 
 interface DebugBarProps {
-  story: { id: number; name: string; full_slug: string; content: Record<string, any> } | null
-  isPreview: boolean
-  slug: string
+  story: { id: number; name: string; full_slug: string; content: Record<string, any> } | null;
+  isPreview: boolean;
+  slug: string;
 }
 
 interface BridgeEvent {
-  time: string
-  action: string
-  detail: string
+  time: string;
+  action: string;
+  detail: string;
 }
 
 export function DebugBar({ story, isPreview, slug }: DebugBarProps) {
-  const [isOpen, setIsOpen] = useState(true)
-  const [bridgeLoaded, setBridgeLoaded] = useState(false)
-  const [events, setEvents] = useState<BridgeEvent[]>([])
-  const [updateCount, setUpdateCount] = useState(0)
+  const [isOpen, setIsOpen] = useState(true);
+  const [bridgeLoaded, setBridgeLoaded] = useState(false);
+  const [events, setEvents] = useState<BridgeEvent[]>([]);
+  const [updateCount, setUpdateCount] = useState(0);
 
   // Listen for bridge events (postMessages from parent)
   useEffect(() => {
     function handleMessage(e: MessageEvent) {
-      const data = e.data
-      if (!data || typeof data.action !== 'string') return
+      const data = e.data;
+      if (!data || typeof data.action !== 'string') return;
 
-      const time = new Date().toLocaleTimeString('sk', { hour12: false })
-      let detail = ''
+      const time = new Date().toLocaleTimeString('sk', { hour12: false });
+      let detail = '';
 
       if (data.action === 'input') {
-        detail = `story.id=${data.story?.id}, content._uid=${data.story?.content?._uid}`
-        setUpdateCount((c) => c + 1)
+        detail = `story.id=${data.story?.id}, content._uid=${data.story?.content?._uid}`;
+        setUpdateCount((c) => c + 1);
       } else if (data.action === 'loaded') {
-        setBridgeLoaded(true)
-        detail = 'bridge ready'
+        setBridgeLoaded(true);
+        detail = 'bridge ready';
       } else {
-        detail = JSON.stringify(data).slice(0, 80)
+        detail = JSON.stringify(data).slice(0, 80);
       }
 
-      setEvents((prev) => [{ time, action: data.action, detail }, ...prev].slice(0, 20))
+      setEvents((prev) => [{ time, action: data.action, detail }, ...prev].slice(0, 20));
     }
 
-    window.addEventListener('message', handleMessage)
-    return () => window.removeEventListener('message', handleMessage)
-  }, [])
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
 
   // Check if StoryblokBridge is available
   useEffect(() => {
     const check = setInterval(() => {
       if ((window as any).StoryblokBridge) {
-        setBridgeLoaded(true)
-        clearInterval(check)
+        setBridgeLoaded(true);
+        clearInterval(check);
       }
-    }, 300)
-    return () => clearInterval(check)
-  }, [])
+    }, 300);
+    return () => clearInterval(check);
+  }, []);
 
   const styles = {
     bar: {
@@ -98,7 +98,7 @@ export function DebugBar({ story, isPreview, slug }: DebugBarProps) {
       borderBottom: '1px solid #27272a',
       alignItems: 'center',
     },
-  }
+  };
 
   return (
     <div style={styles.bar}>
@@ -142,13 +142,20 @@ export function DebugBar({ story, isPreview, slug }: DebugBarProps) {
                   ev.action === 'input'
                     ? '#0ea5e9'
                     : ev.action === 'loaded'
-                    ? '#16a34a'
-                    : '#a855f7',
+                      ? '#16a34a'
+                      : '#a855f7',
                 )}
               >
                 {ev.action}
               </span>
-              <span style={{ color: '#a1a1aa', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <span
+                style={{
+                  color: '#a1a1aa',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
                 {ev.detail}
               </span>
             </div>
@@ -156,5 +163,5 @@ export function DebugBar({ story, isPreview, slug }: DebugBarProps) {
         )}
       </div>
     </div>
-  )
+  );
 }

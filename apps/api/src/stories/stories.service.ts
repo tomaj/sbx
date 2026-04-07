@@ -1,36 +1,14 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import {
-  type SQL,
-  and,
-  asc,
-  count,
-  desc,
-  eq,
-  gt,
-  ilike,
-  isNull,
-  isNotNull,
-  lt,
-  notInArray,
-  or,
-  sql,
-  inArray,
-} from 'drizzle-orm';
-import { escapeLike } from '../shared/query-parser.util';
+import { and, eq, isNull } from 'drizzle-orm';
 import { DB } from '../db/db.module';
 import { DbType } from '../db/db.module';
-import {
-  stories,
-  tags,
-  components,
-  componentGroups,
-  storyReleases,
-  storyVersions,
-} from '../db/schema';
+import { stories, storyReleases } from '../db/schema';
 import { JobsClient } from '@sbx/jobs';
 import { JOBS_CLIENT } from '../jobs/jobs.module';
 import { WebhooksService } from '../webhooks/webhooks.service';
 import { WEBHOOK_ACTIONS } from '../webhooks/webhook-actions';
+import { StoriesQueryService } from './stories-query.service';
+import { StoriesVersionService } from './stories-version.service';
 
 @Injectable()
 export class StoriesService {
@@ -38,456 +16,11 @@ export class StoriesService {
     @Inject(DB) private db: DbType,
     @Inject(JOBS_CLIENT) private jobs: JobsClient,
     private readonly webhooks: WebhooksService,
+    private readonly query: StoriesQueryService,
+    private readonly versionService: StoriesVersionService,
   ) {}
 
-  private logVersion(params: {
-    storyId: number;
-    spaceId: number;
-    userId?: number | null;
-    releaseId?: number | null;
-    action: 'create' | 'save' | 'publish' | 'unpublish';
-    status: 'draft' | 'published' | 'unpublished';
-    name: string;
-    slug: string;
-    fullSlug: string;
-    content: Record<string, any>;
-    tagList: any;
-    path?: string | null;
-    isStartpage?: boolean;
-  }) {
-    void this.db
-      .execute(sql`SELECT nextval('story_versions_id_seq')`)
-      .then(({ rows }) => {
-        const versionId = Number((rows[0] as any).nextval);
-        return this.db.insert(storyVersions).values({
-          id: versionId,
-          storyId: params.storyId,
-          spaceId: params.spaceId,
-          userId: params.userId ?? null,
-          releaseId: params.releaseId ?? null,
-          action: params.action,
-          status: params.status,
-          name: params.name,
-          slug: params.slug,
-          fullSlug: params.fullSlug,
-          content: params.content,
-          tagList: params.tagList ?? [],
-          path: params.path ?? null,
-          isStartpage: params.isStartpage ?? false,
-        });
-      })
-      .catch(() => {
-        /* non-critical — never block main flow */
-      });
-  }
-
-  async listStoriesAdmin(
-    spaceId: number,
-    opts: {
-      page?: number;
-      perPage?: number;
-      search?: string;
-      sortField?: string;
-      sortDir?: 'asc' | 'desc';
-      parentId?: bigint | null | undefined;
-      contentType?: string;
-      tag?: string;
-      block?: string;
-      published?: boolean;
-      uuid?: string;
-      storyId?: number;
-      inRelease?: number;
-      byIds?: bigint[];
-      byUuids?: string[];
-      byUuidsOrdered?: string[];
-      excludingIds?: bigint[];
-      favouriteOf?: number;
-      mine?: number;
-      folderOnly?: boolean;
-      storyOnly?: boolean;
-      startsWith?: string;
-      inTrash?: boolean;
-      withSlug?: string;
-      bySlugs?: string[];
-      excludingSlugs?: string[];
-      inWorkflowStages?: number[];
-      scheduledAtGt?: Date;
-      scheduledAtLt?: Date;
-      referenceSearch?: string | string[];
-      withSummary?: boolean;
-    } = {},
-  ) {
-    const {
-      page = 1,
-      perPage = 25,
-      search,
-      sortField = 'position',
-      sortDir = 'asc',
-      parentId,
-      contentType,
-      tag,
-      block,
-      published,
-      uuid,
-      storyId,
-      inRelease,
-      byIds,
-      byUuids,
-      byUuidsOrdered,
-      excludingIds,
-      favouriteOf,
-      mine,
-      folderOnly,
-      storyOnly,
-      startsWith,
-      inTrash,
-      withSlug,
-      bySlugs,
-      excludingSlugs,
-      inWorkflowStages,
-      scheduledAtGt,
-      scheduledAtLt,
-      referenceSearch,
-      withSummary,
-    } = opts;
-
-    // When filtering by release, join story_releases and return release-specific content
-    if (inRelease !== undefined) {
-      return this.listStoriesInRelease(spaceId, inRelease, { page, perPage, search });
-    }
-
-    const s = search?.trim();
-
-    const conditions: (SQL | undefined)[] = [
-      eq(stories.spaceId, spaceId),
-      inTrash ? isNotNull(stories.deletedAt) : isNull(stories.deletedAt),
-      // text_search: name OR slug OR full_slug OR content (as text)
-      s
-        ? or(
-            ilike(stories.name, `%${escapeLike(s)}%`),
-            ilike(stories.slug, `%${escapeLike(s)}%`),
-            ilike(stories.fullSlug, `%${escapeLike(s)}%`),
-            sql`${stories.content}::text ilike ${`%${escapeLike(s)}%`}`,
-          )
-        : undefined,
-      // parent_id filter only when no search
-      s
-        ? undefined
-        : startsWith?.trim()
-          ? undefined // starts_with overrides parent filter
-          : parentId === undefined
-            ? undefined
-            : parentId === null
-              ? isNull(stories.parentId)
-              : eq(stories.parentId, parentId),
-      contentType?.trim()
-        ? (() => {
-            const types = contentType
-              .split(',')
-              .slice(0, 1000)
-              .map((t) => t.trim())
-              .filter(Boolean);
-            return types.length === 1
-              ? eq(stories.contentType, types[0])
-              : inArray(stories.contentType, types);
-          })()
-        : undefined,
-      tag?.trim()
-        ? sql`${stories.tagList}::text ilike ${`%${escapeLike(tag.trim())}%`}`
-        : undefined,
-      block?.trim()
-        ? sql`${stories.content}::text ilike ${`%"component":"${escapeLike(block.trim())}"%`}`
-        : undefined,
-      published !== undefined ? eq(stories.published, published) : undefined,
-      uuid?.trim() ? eq(stories.uuid, uuid.trim()) : undefined,
-      storyId !== undefined ? eq(stories.id, BigInt(storyId)) : undefined,
-      byIds?.length ? inArray(stories.id, byIds) : undefined,
-      byUuids?.length ? inArray(stories.uuid, byUuids) : undefined,
-      byUuidsOrdered?.length ? inArray(stories.uuid, byUuidsOrdered) : undefined,
-      excludingIds?.length ? notInArray(stories.id, excludingIds) : undefined,
-      mine !== undefined
-        ? sql`EXISTS (
-            SELECT 1 FROM workflow_stage_changes wsc
-            WHERE wsc.story_id = ${stories.id}
-              AND wsc.user_id = ${mine}
-              AND wsc.created_at = (
-                SELECT MAX(wsc2.created_at) FROM workflow_stage_changes wsc2
-                WHERE wsc2.story_id = ${stories.id}
-              )
-          )`
-        : undefined,
-      favouriteOf !== undefined
-        ? sql`${stories.favouriteForUserIds}::jsonb @> ${JSON.stringify([favouriteOf])}::jsonb`
-        : undefined,
-      folderOnly ? eq(stories.isFolder, true) : undefined,
-      storyOnly ? eq(stories.isFolder, false) : undefined,
-      startsWith?.trim() ? ilike(stories.fullSlug, `${escapeLike(startsWith.trim())}%`) : undefined,
-      withSlug?.trim() ? eq(stories.fullSlug, withSlug.trim()) : undefined,
-      bySlugs?.length
-        ? or(...bySlugs.map((sl) => ilike(stories.fullSlug, sl.replace(/\*/g, '%'))))
-        : undefined,
-      excludingSlugs?.length
-        ? and(
-            ...excludingSlugs.map(
-              (sl) => sql`${stories.fullSlug} not ilike ${sl.replace(/\*/g, '%')}`,
-            ),
-          )
-        : undefined,
-      inWorkflowStages?.length
-        ? sql`EXISTS (
-            SELECT 1 FROM workflow_stage_changes wsc
-            WHERE wsc.story_id = ${stories.id}
-              AND wsc.workflow_stage_id = ANY(${inWorkflowStages})
-              AND wsc.created_at = (
-                SELECT MAX(wsc2.created_at) FROM workflow_stage_changes wsc2
-                WHERE wsc2.story_id = ${stories.id}
-              )
-          )`
-        : undefined,
-      scheduledAtGt ? gt(stories.publishAt, scheduledAtGt) : undefined,
-      scheduledAtLt ? lt(stories.publishAt, scheduledAtLt) : undefined,
-      (() => {
-        if (!referenceSearch) return undefined;
-        const refs = Array.isArray(referenceSearch) ? referenceSearch : [referenceSearch];
-        if (refs.length === 0) return undefined;
-        return or(...refs.map((f) => sql`${stories.content}::text ilike ${`%${f}%`}`));
-      })(),
-    ];
-
-    const where = and(...conditions);
-
-    const [{ total }] = await this.db.select({ total: count() }).from(stories).where(where);
-
-    const orderCol =
-      sortField === 'name'
-        ? stories.name
-        : sortField === 'created_at'
-          ? stories.createdAt
-          : sortField === 'first_published_at'
-            ? stories.firstPublishedAt
-            : sortField === 'published_at'
-              ? stories.publishedAt
-              : sortField === 'updated_at'
-                ? stories.updatedAt
-                : sortField === 'slug'
-                  ? stories.slug
-                  : stories.position;
-
-    const order = sortDir === 'desc' ? desc(orderCol) : asc(orderCol);
-
-    const rows = await this.db
-      .select()
-      .from(stories)
-      .where(where)
-      .orderBy(order)
-      .limit(perPage)
-      .offset((page - 1) * perPage);
-
-    // by_uuids_ordered: preserve input order
-    const formattedStories = rows.map((s) => this.formatStory(s, withSummary));
-    if (byUuidsOrdered?.length) {
-      const orderMap = new Map(byUuidsOrdered.map((uuid, idx) => [uuid, idx]));
-      formattedStories.sort(
-        (a, b) => (orderMap.get(a.uuid) ?? 999) - (orderMap.get(b.uuid) ?? 999),
-      );
-    }
-
-    return {
-      stories: formattedStories,
-      total: Number(total),
-    };
-  }
-
-  private async listStoriesInRelease(
-    spaceId: number,
-    releaseId: number,
-    opts: { page: number; perPage: number; search?: string },
-  ) {
-    const { page, perPage, search } = opts;
-
-    // Filter by release_ids JSONB array — no join needed, story_releases snapshots
-    // are only created when a story is actually edited in release context.
-    const conditions: (SQL | undefined)[] = [
-      eq(stories.spaceId, spaceId),
-      isNull(stories.deletedAt),
-      sql`${stories.releaseIds} @> ${JSON.stringify([releaseId])}::jsonb`,
-      search?.trim() ? ilike(stories.name, `%${escapeLike(search.trim())}%`) : undefined,
-    ];
-    const where = and(...conditions);
-
-    const [{ total }] = await this.db.select({ total: count() }).from(stories).where(where);
-
-    const rows = await this.db
-      .select()
-      .from(stories)
-      .where(where)
-      .orderBy(asc(stories.position))
-      .limit(perPage)
-      .offset((page - 1) * perPage);
-
-    return {
-      stories: rows.map((s) => this.formatStory(s)),
-      total: Number(total),
-    };
-  }
-
-  async getFilterOptions(spaceId: number) {
-    const [contentTypeRows, tagRows, componentRows] = await Promise.all([
-      this.db
-        .selectDistinct({ value: stories.contentType })
-        .from(stories)
-        .where(
-          and(
-            eq(stories.spaceId, spaceId),
-            isNull(stories.deletedAt),
-            isNotNull(stories.contentType),
-          ),
-        )
-        .orderBy(asc(stories.contentType)),
-      this.db
-        .select({ name: tags.name })
-        .from(tags)
-        .where(eq(tags.spaceId, spaceId))
-        .orderBy(asc(tags.name)),
-      this.db
-        .select({ name: components.name, displayName: components.displayName })
-        .from(components)
-        .where(eq(components.spaceId, spaceId))
-        .orderBy(asc(components.name)),
-    ]);
-
-    return {
-      content_types: contentTypeRows.map((r) => r.value).filter(Boolean) as string[],
-      tags: tagRows.map((r) => r.name),
-      blocks: componentRows.map((r) => ({ value: r.name, label: r.displayName || r.name })),
-    };
-  }
-
-  async getAncestors(spaceId: number, storyId: bigint) {
-    const ancestors: ReturnType<typeof this.formatStory>[] = [];
-    let currentId: bigint | null = storyId;
-    const visited = new Set<string>();
-
-    while (currentId !== null) {
-      const key = currentId.toString();
-      if (visited.has(key)) break;
-      visited.add(key);
-
-      const [row] = await this.db
-        .select()
-        .from(stories)
-        .where(and(eq(stories.id, currentId), eq(stories.spaceId, spaceId)))
-        .limit(1);
-
-      if (!row) break;
-      ancestors.unshift(this.formatStory(row));
-      currentId = row.parentId;
-    }
-
-    return { ancestors };
-  }
-
-  async getStoryAdmin(spaceId: number, storyId: number, releaseId?: number) {
-    const [story] = await this.db
-      .select()
-      .from(stories)
-      .where(
-        and(
-          eq(stories.id, BigInt(storyId)),
-          eq(stories.spaceId, spaceId),
-          isNull(stories.deletedAt),
-        ),
-      )
-      .limit(1);
-
-    if (!story) throw new NotFoundException('Story not found');
-
-    // Overlay release snapshot if requested
-    let storyRow = story;
-    if (releaseId != null) {
-      const [snapshot] = await this.db
-        .select({ content: storyReleases.content })
-        .from(storyReleases)
-        .where(and(eq(storyReleases.storyId, storyId), eq(storyReleases.releaseId, releaseId)))
-        .limit(1);
-      if (snapshot) {
-        const d = snapshot.content as Record<string, any>;
-        storyRow = {
-          ...story,
-          ...(d.name !== undefined && { name: d.name }),
-          ...(d.slug !== undefined && { slug: d.slug }),
-          ...(d.full_slug !== undefined && { fullSlug: d.full_slug }),
-          ...(d.content !== undefined && { content: d.content }),
-          ...(d.tag_list !== undefined && { tagList: d.tag_list }),
-          ...('path' in d && { path: d.path }),
-          ...(d.is_startpage !== undefined && { isStartpage: d.is_startpage }),
-        };
-      }
-    }
-
-    // Check parent folder's disable_fe_editor
-    let parentDisableFEEditor = false;
-    if (story.parentId) {
-      const [parent] = await this.db
-        .select({ disableFEEditor: stories.disableFEEditor })
-        .from(stories)
-        .where(and(eq(stories.id, story.parentId), eq(stories.spaceId, spaceId)))
-        .limit(1);
-      if (parent) parentDisableFEEditor = parent.disableFEEditor;
-    }
-
-    let componentSchema: Record<string, any> | null = null;
-    if (story.contentType) {
-      const [comp] = await this.db
-        .select({ schema: components.schema })
-        .from(components)
-        .where(and(eq(components.spaceId, spaceId), eq(components.name, story.contentType)))
-        .limit(1);
-      if (comp) componentSchema = comp.schema as Record<string, any>;
-    }
-
-    const [allComponents, allGroups] = await Promise.all([
-      this.db
-        .select({
-          name: components.name,
-          displayName: components.displayName,
-          schema: components.schema,
-          previewField: components.previewField,
-          previewTmpl: components.previewTmpl,
-          color: components.color,
-          icon: components.icon,
-          description: components.description,
-          componentGroupUuid: components.componentGroupUuid,
-        })
-        .from(components)
-        .where(eq(components.spaceId, spaceId))
-        .orderBy(asc(components.name)),
-      this.db
-        .select({ uuid: componentGroups.uuid, name: componentGroups.name })
-        .from(componentGroups)
-        .where(eq(componentGroups.spaceId, spaceId))
-        .orderBy(asc(componentGroups.name)),
-    ]);
-
-    return {
-      story: this.formatStoryWithContent(storyRow),
-      component_schema: componentSchema,
-      parent_disable_fe_editor: parentDisableFEEditor,
-      all_components: allComponents.map((c) => ({
-        name: c.name,
-        display_name: c.displayName,
-        schema: c.schema as Record<string, any>,
-        preview_field: c.previewField ?? null,
-        preview_tmpl: c.previewTmpl ?? null,
-        color: c.color ?? null,
-        icon: c.icon ?? null,
-        description: c.description ?? null,
-        component_group_uuid: c.componentGroupUuid ?? null,
-        edit_mode: null,
-      })),
-      all_groups: allGroups.map((g) => ({ uuid: g.uuid, name: g.name })),
-    };
-  }
+  // ─── Mutations ───────────────────────────────────────────────────────────
 
   async updateStoryAdmin(
     spaceId: number,
@@ -508,7 +41,6 @@ export class StoriesService {
     },
     authorId?: number | null,
   ) {
-    // If release_id is provided, save as release snapshot instead of main content
     if (data.release_id != null) {
       return this.updateStoryInRelease(spaceId, storyId, data.release_id, {
         name: data.name,
@@ -587,7 +119,6 @@ export class StoriesService {
         ),
       );
 
-    // Schedule/cancel delayed jobs when publish_at or expire_at changes
     const storyIdStr = storyId.toString();
 
     if ('publish_at' in data) {
@@ -610,11 +141,10 @@ export class StoriesService {
       }
     }
 
-    const result = await this.getStoryAdmin(spaceId, storyId);
+    const result = await this.query.getStoryAdmin(spaceId, storyId);
     const s = result.story as Record<string, any>;
 
     if (data.slug !== undefined) {
-      // Slug changed → story.moved
       void this.webhooks.dispatch(spaceId, WEBHOOK_ACTIONS.STORY_MOVED, {
         action: 'move',
         space_id: spaceId,
@@ -632,7 +162,7 @@ export class StoriesService {
       });
     }
 
-    this.logVersion({
+    this.versionService.logVersion({
       storyId,
       spaceId,
       userId: authorId,
@@ -687,7 +217,6 @@ export class StoriesService {
       .limit(1);
     if (!story) throw new NotFoundException('Story not found');
 
-    // Fetch existing snapshot to merge with
     const [existing] = await this.db
       .select({ content: storyReleases.content })
       .from(storyReleases)
@@ -702,7 +231,6 @@ export class StoriesService {
     const effectiveIsStartpage =
       changes.is_startpage ?? existingData.is_startpage ?? story.isStartpage;
 
-    // Recompute full_slug if slug or is_startpage changed
     let effectiveFullSlug = existingData.full_slug ?? story.fullSlug;
     if (changes.slug !== undefined || changes.is_startpage !== undefined) {
       if (story.parentId) {
@@ -721,7 +249,6 @@ export class StoriesService {
       }
     }
 
-    // Build merged snapshot: base story → existing snapshot → new changes
     const snapshot = {
       name: changes.name ?? existingData.name ?? story.name,
       slug: effectiveSlug,
@@ -732,7 +259,6 @@ export class StoriesService {
       is_startpage: effectiveIsStartpage,
     };
 
-    // Wrap all DB writes in a transaction (release snapshot upsert + story releaseIds update)
     await this.db.transaction(async (tx) => {
       await tx
         .insert(storyReleases)
@@ -750,8 +276,7 @@ export class StoriesService {
       }
     });
 
-    // Side effects AFTER transaction (version logging)
-    this.logVersion({
+    this.versionService.logVersion({
       storyId,
       spaceId,
       releaseId,
@@ -766,7 +291,7 @@ export class StoriesService {
       isStartpage: snapshot.is_startpage,
     });
 
-    return this.getStoryAdmin(spaceId, storyId);
+    return this.query.getStoryAdmin(spaceId, storyId);
   }
 
   async publishStory(spaceId: number, storyId: number, userId?: number | null, _lang?: string) {
@@ -825,7 +350,7 @@ export class StoriesService {
     });
 
     if (current) {
-      this.logVersion({
+      this.versionService.logVersion({
         storyId,
         spaceId,
         userId,
@@ -841,7 +366,7 @@ export class StoriesService {
       });
     }
 
-    return this.getStoryAdmin(spaceId, storyId);
+    return this.query.getStoryAdmin(spaceId, storyId);
   }
 
   async unpublishStory(spaceId: number, storyId: number, userId?: number | null) {
@@ -871,7 +396,7 @@ export class StoriesService {
     });
 
     if (current) {
-      this.logVersion({
+      this.versionService.logVersion({
         storyId,
         spaceId,
         userId,
@@ -885,7 +410,7 @@ export class StoriesService {
       });
     }
 
-    return this.getStoryAdmin(spaceId, storyId);
+    return this.query.getStoryAdmin(spaceId, storyId);
   }
 
   async createStory(
@@ -925,7 +450,6 @@ export class StoriesService {
     const now = new Date();
     const lastAuthorId = authorId ?? null;
 
-    // Wrap all DB writes in a transaction (story insert + optional release snapshot)
     await this.db.transaction(async (tx) => {
       await tx.insert(stories).values({
         id,
@@ -952,7 +476,6 @@ export class StoriesService {
         updatedAt: now,
       });
 
-      // Associate with release if release_id provided
       if (releaseId != null) {
         const snapshot = {
           name: data.name,
@@ -977,7 +500,6 @@ export class StoriesService {
       }
     });
 
-    // Side effects AFTER transaction (webhooks, job queue, version logging)
     void this.webhooks.dispatch(spaceId, 'story.created', {
       action: 'created',
       space_id: spaceId,
@@ -986,7 +508,6 @@ export class StoriesService {
       text: `Story "${data.name}" was created.`,
     });
 
-    // Schedule delayed jobs when publish_at or expire_at is set at creation
     const storyIdStr = Number(id).toString();
     if (data.publish_at) {
       const delay = new Date(data.publish_at).getTime() - Date.now();
@@ -1001,7 +522,7 @@ export class StoriesService {
       }
     }
 
-    this.logVersion({
+    this.versionService.logVersion({
       storyId: Number(id),
       spaceId,
       userId: authorId,
@@ -1016,7 +537,7 @@ export class StoriesService {
       isStartpage: data.is_startpage,
     });
 
-    return this.getStoryAdmin(spaceId, Number(id));
+    return this.query.getStoryAdmin(spaceId, Number(id));
   }
 
   async deleteStory(spaceId: number, storyId: number) {
@@ -1034,58 +555,10 @@ export class StoriesService {
         text: `Story "${deleted.name ?? storyId}" was deleted.`,
       });
 
-      return { story: this.formatStory(deleted) };
+      return { story: this.query.formatStory(deleted) };
     }
 
     return { story: {} };
-  }
-
-  private formatStoryWithContent(s: typeof stories.$inferSelect): Record<string, any> {
-    return {
-      ...this.formatStory(s),
-      content: s.content as Record<string, any>,
-      tag_list: s.tagList as string[],
-      sort_by_date: s.sortByDate,
-    };
-  }
-
-  private formatStory(s: typeof stories.$inferSelect, withSummary = false): Record<string, any> {
-    const base: Record<string, any> = {
-      id: Number(s.id),
-      uuid: s.uuid,
-      name: s.name,
-      slug: s.slug,
-      full_slug: s.fullSlug,
-      path: s.path,
-      parent_id: s.parentId ? Number(s.parentId) : null,
-      content_type: s.contentType,
-      is_folder: s.isFolder,
-      is_startpage: s.isStartpage,
-      published: s.published,
-      unpublished_changes: s.unpublishedChanges,
-      position: s.position,
-      created_at: s.createdAt,
-      updated_at: s.updatedAt,
-      published_at: s.publishedAt,
-      first_published_at: s.firstPublishedAt,
-      publish_at: s.publishAt,
-      expire_at: s.expireAt,
-      last_author_id: s.lastAuthorId,
-      release_ids: (s.releaseIds as number[]) ?? [],
-      favourite_for_user_ids: (s.favouriteForUserIds as number[]) ?? [],
-      disable_fe_editor: s.disableFEEditor ?? false,
-    };
-
-    if (withSummary && s.content) {
-      // Build a shallow summary of the content (component name + top-level keys)
-      const content = s.content as Record<string, any>;
-      const summary: Record<string, any> = {};
-      if (content.component) summary.component = content.component;
-      if (content._uid) summary._uid = content._uid;
-      base.content_summary = summary;
-    }
-
-    return base;
   }
 
   async partialUpdateStory(
@@ -1107,7 +580,7 @@ export class StoriesService {
     if (!story) throw new NotFoundException('Story not found');
 
     if (updates.favourite_for_user_ids === undefined) {
-      return { story: this.formatStory(story) };
+      return { story: this.query.formatStory(story) };
     }
 
     const [updated] = await this.db
@@ -1116,6 +589,6 @@ export class StoriesService {
       .where(eq(stories.id, BigInt(storyId)))
       .returning();
 
-    return { story: this.formatStory(updated) };
+    return { story: this.query.formatStory(updated) };
   }
 }

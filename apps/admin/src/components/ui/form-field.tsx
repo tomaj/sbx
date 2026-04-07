@@ -1,5 +1,11 @@
 import type { ReactNode } from 'react';
 
+/** Renders form.formState.errors.root — pass errors.root?.message directly. */
+export function FormRootError({ message }: { message?: string }) {
+  if (!message) return null;
+  return <p className="text-sm text-red-600 dark:text-red-400 -mt-2 mb-2">{message}</p>;
+}
+
 /**
  * Shared Tailwind class for standard text inputs and textareas.
  * Import this in form components for consistent styling.

@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, use } from 'react';
-import { Settings, Trash2, GripVertical } from 'lucide-react';
+import { GripVertical } from 'lucide-react';
 import { z } from 'zod';
 import { CrudSidebarForm } from '@/components/ui/crud-sidebar-form';
+import { CrudSettingsPage } from '@/components/ui/crud-settings-page';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useDelete } from '@/hooks/use-delete';
 import { useCrudSidebar } from '@/hooks/use-crud-sidebar';
@@ -11,7 +12,8 @@ import { useApi } from '@/lib/swr';
 import { useCrudForm } from '@/hooks/use-crud-form';
 import type { Branch } from '@sbx/types';
 import { SkeletonText, SkeletonBlock } from '@/components/ui/skeleton';
-import { FormField, inputCls } from '@/components/ui/form-field';
+import { FormField, FormRootError, inputCls } from '@/components/ui/form-field';
+import { RowActions, RowActionsSkeleton } from '@/components/ui/row-actions';
 
 // ─── Edit form (inside RightSidebar) ─────────────────────────────────────────
 
@@ -69,11 +71,7 @@ function BranchForm({ spaceId, branch, open, onClose, onSaved }: BranchFormProps
       deleteTitle="Delete Pipeline"
       deleteMessage={`Are you sure you want to delete "${branch?.name ?? ''}"?`}
     >
-      {form.formState.errors.root?.message && (
-        <p className="text-sm text-red-600 dark:text-red-400">
-          {form.formState.errors.root.message}
-        </p>
-      )}
+      <FormRootError message={form.formState.errors.root?.message} />
 
       <FormField label="Name" required error={form.formState.errors.name?.message}>
         <input
@@ -135,15 +133,23 @@ export default function PipelinesPage({ params }: { params: Promise<{ spaceId: s
   }
 
   return (
-    <div className="max-w-3xl px-10 py-8">
-      <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">Pipelines</h1>
-      <p className="text-sm text-gray-600 dark:text-gray-400 mb-8">
-        With pipelines, stages define a strict content staging workflow in your space. This is
-        crucial if you want to create a reliable production environment. You can define multiple
-        stages, each with its own API access token for your content, to preview and test before it
-        goes live.
-      </p>
-
+    <CrudSettingsPage
+      title="Pipelines"
+      description="With pipelines, stages define a strict content staging workflow in your space. This is crucial if you want to create a reliable production environment. You can define multiple stages, each with its own API access token for your content, to preview and test before it goes live."
+      sidebar={
+        <BranchForm
+          spaceId={spaceId}
+          branch={selectedBranch}
+          open={panelOpen}
+          onClose={close}
+          onSaved={() => {
+            close();
+            mutate();
+          }}
+        />
+      }
+      extras={branchDelete.modal}
+    >
       {/* Add pipeline inline */}
       <div className="flex gap-2 mb-8">
         <input
@@ -152,7 +158,7 @@ export default function PipelinesPage({ params }: { params: Promise<{ spaceId: s
           onChange={(e) => setNewName(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
           placeholder="Pipeline name e.g Staging, Live"
-          className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-teal-500"
+          className={`flex-1 ${inputCls}`}
         />
         <button
           onClick={handleAdd}
@@ -175,10 +181,7 @@ export default function PipelinesPage({ params }: { params: Promise<{ spaceId: s
                 <SkeletonBlock height="h-4" width="w-4" />
                 <SkeletonText width="w-28" />
                 <SkeletonText width="w-48" className="flex-1" />
-                <div className="flex gap-1">
-                  <SkeletonBlock height="h-7" width="w-7" />
-                  <SkeletonBlock height="h-7" width="w-7" />
-                </div>
+                <RowActionsSkeleton count={2} />
               </div>
             ))}
           </div>
@@ -224,38 +227,12 @@ export default function PipelinesPage({ params }: { params: Promise<{ spaceId: s
                     <span className="text-gray-300 dark:text-gray-600">—</span>
                   )}
                 </span>
-                <div className="flex items-center justify-end gap-1">
-                  <button
-                    onClick={() => openEdit(b)}
-                    className="flex items-center justify-center w-8 h-8 rounded-lg text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                  >
-                    <Settings className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => branchDelete.confirm(b)}
-                    className="flex items-center justify-center w-8 h-8 rounded-lg text-gray-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
+                <RowActions onEdit={() => openEdit(b)} onDelete={() => branchDelete.confirm(b)} />
               </div>
             ))}
           </div>
         </>
       )}
-
-      <BranchForm
-        spaceId={spaceId}
-        branch={selectedBranch}
-        open={panelOpen}
-        onClose={close}
-        onSaved={() => {
-          close();
-          mutate();
-        }}
-      />
-
-      {branchDelete.modal}
-    </div>
+    </CrudSettingsPage>
   );
 }

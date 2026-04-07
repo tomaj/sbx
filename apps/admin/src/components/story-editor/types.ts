@@ -8,6 +8,7 @@ export interface ComponentMeta {
   icon: string | null;
   description: string | null;
   component_group_uuid: string | null;
+  internal_tags_list?: { id: string | number; name: string }[];
   edit_mode: string | null;
 }
 

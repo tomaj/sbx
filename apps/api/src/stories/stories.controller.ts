@@ -11,21 +11,26 @@ import {
   Put,
   Query,
   Req,
+  UseGuards,
 } from '@nestjs/common';
 import { Auth } from '../auth/auth.decorator';
 import { StoriesService } from './stories.service';
+import { StoriesQueryService } from './stories-query.service';
 import { StoryVersionsService } from './story-versions.service';
 import { CreateStoryDto } from './dto/create-story.dto';
 import { UpdateStoryDto } from './dto/update-story.dto';
 import { PartialUpdateStoryDto } from './dto/partial-update-story.dto';
 import { QueryParserUtil } from '../shared/query-parser.util';
 import { ResultGuard } from '../shared/result-guard.util';
+import { MaintenanceModeGuard } from '../shared/maintenance-mode.guard';
 
 @Controller('v1/spaces/:spaceId/stories')
 @Auth('session-or-token')
+@UseGuards(MaintenanceModeGuard)
 export class StoriesController {
   constructor(
     private readonly storiesService: StoriesService,
+    private readonly storiesQueryService: StoriesQueryService,
     private readonly storyVersionsService: StoryVersionsService,
   ) {}
 
@@ -127,7 +132,7 @@ export class StoriesController {
       page,
       perPage,
     );
-    const { stories, total } = await this.storiesService.listStoriesAdmin(spaceId, {
+    const { stories, total } = await this.storiesQueryService.listStoriesAdmin(spaceId, {
       page: parsedPage,
       perPage: parsedPerPage,
       search: textSearch ?? search,
@@ -165,7 +170,7 @@ export class StoriesController {
 
   @Get('filter-options')
   getFilterOptions(@Param('spaceId', ParseIntPipe) spaceId: number) {
-    return this.storiesService.getFilterOptions(spaceId);
+    return this.storiesQueryService.getFilterOptions(spaceId);
   }
 
   @Get('ancestors')
@@ -173,7 +178,7 @@ export class StoriesController {
     @Param('spaceId', ParseIntPipe) spaceId: number,
     @Query('story_id') storyId: string,
   ) {
-    return this.storiesService.getAncestors(spaceId, BigInt(storyId));
+    return this.storiesQueryService.getAncestors(spaceId, BigInt(storyId));
   }
 
   // Storyblok-compatible breadcrumbs endpoint: /v1/spaces/:spaceId/breadcrumbs?parent_id=:id&currentPage=1
@@ -182,7 +187,7 @@ export class StoriesController {
     @Param('spaceId', ParseIntPipe) spaceId: number,
     @Query('parent_id') parentId: string,
   ) {
-    const result = await this.storiesService.getAncestors(spaceId, BigInt(parentId));
+    const result = await this.storiesQueryService.getAncestors(spaceId, BigInt(parentId));
     return { breadcrumbs: result.ancestors };
   }
 
@@ -232,7 +237,7 @@ export class StoriesController {
   ) {
     const releaseId = QueryParserUtil.parseOptionalInt(releaseIdParam);
     return ResultGuard.throwIfNotFound(
-      await this.storiesService.getStoryAdmin(spaceId, id, releaseId),
+      await this.storiesQueryService.getStoryAdmin(spaceId, id, releaseId),
       'Story not found',
     );
   }

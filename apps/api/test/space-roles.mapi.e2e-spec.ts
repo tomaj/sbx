@@ -70,9 +70,7 @@ describe('Space Roles MAPI (e2e)', () => {
     });
 
     it('returns 401 without token', async () => {
-      await request(app.getHttpServer())
-        .get(`/v1/spaces/${TEST_SPACE_ID}/space_roles`)
-        .expect(401);
+      await request(app.getHttpServer()).get(`/v1/spaces/${TEST_SPACE_ID}/space_roles`).expect(401);
     });
   });
 

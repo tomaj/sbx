@@ -3,12 +3,13 @@
 import { use, useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
-import { ChevronDown, ChevronRight, ArrowLeft, Trash2, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Trash2, ExternalLink } from 'lucide-react';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { UnsavedChangesModal } from '@/components/ui/unsaved-changes-modal';
 import { useUnsavedChanges } from '@/hooks/use-unsaved-changes';
 import { SkeletonText, SkeletonBlock } from '@/components/ui/skeleton';
 import { useApi } from '@/lib/swr';
+import { SidebarSection } from './sidebar-section';
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
 
@@ -27,35 +28,6 @@ interface FieldType {
 interface Space {
   id: number;
   name: string;
-}
-
-function SidebarSection({
-  title,
-  children,
-  defaultOpen = true,
-}: {
-  title: string;
-  children: React.ReactNode;
-  defaultOpen?: boolean;
-}) {
-  const [open, setOpen] = useState(defaultOpen);
-  return (
-    <div className="border-b border-gray-200 dark:border-gray-700">
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className="flex items-center justify-between w-full px-4 py-3 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
-      >
-        {title}
-        {open ? (
-          <ChevronDown className="w-4 h-4 text-gray-400" />
-        ) : (
-          <ChevronRight className="w-4 h-4 text-gray-400" />
-        )}
-      </button>
-      {open && <div className="px-4 pb-4">{children}</div>}
-    </div>
-  );
 }
 
 export default function FieldTypeEditPage({

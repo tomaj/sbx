@@ -25,14 +25,17 @@ describe('Datasources MAPI (e2e)', () => {
     db = app.get<DbType>(DB);
 
     // Clean up any leftover test data
-    await db.delete(datasourceEntries).where(
-      eq(
-        datasourceEntries.datasourceId,
-        // delete all entries belonging to datasources of this space via subquery workaround:
-        // we'll do it in afterAll instead — just wipe the space cascade
-        0n as any,
-      ),
-    ).catch(() => {});
+    await db
+      .delete(datasourceEntries)
+      .where(
+        eq(
+          datasourceEntries.datasourceId,
+          // delete all entries belonging to datasources of this space via subquery workaround:
+          // we'll do it in afterAll instead — just wipe the space cascade
+          0n as any,
+        ),
+      )
+      .catch(() => {});
     await db.delete(datasources).where(eq(datasources.spaceId, TEST_SPACE_ID));
     await db.delete(apiTokens).where(eq(apiTokens.spaceId, TEST_SPACE_ID));
     await db.delete(spaces).where(eq(spaces.id, TEST_SPACE_ID));
@@ -268,9 +271,7 @@ describe('Datasources MAPI (e2e)', () => {
 
         expect(res.body.datasource_entries.length).toBeGreaterThanOrEqual(2);
         expect(
-          res.body.datasource_entries.every(
-            (e: any) => e.datasource_id === datasourceId,
-          ),
+          res.body.datasource_entries.every((e: any) => e.datasource_id === datasourceId),
         ).toBe(true);
       });
 
@@ -314,9 +315,7 @@ describe('Datasources MAPI (e2e)', () => {
 
       it('returns a single entry by id without datasource_id param', async () => {
         const res = await request(app.getHttpServer())
-          .get(
-            `/v1/spaces/${TEST_SPACE_ID}/datasource_entries/${entryId}?token=${TEST_TOKEN}`,
-          )
+          .get(`/v1/spaces/${TEST_SPACE_ID}/datasource_entries/${entryId}?token=${TEST_TOKEN}`)
           .expect(200);
 
         expect(res.body).toHaveProperty('datasource_entry');

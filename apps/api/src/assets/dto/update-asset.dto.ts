@@ -45,6 +45,7 @@ const SignUploadSchema = z.object({
   filename: z.string().min(1),
   size: z.number().int().positive(),
   content_type: z.string().optional(),
+  asset_folder_id: z.number().int().nullable().optional(),
 });
 
 export class SignUploadDto extends createZodDto(SignUploadSchema) {}
@@ -52,7 +53,7 @@ export class SignUploadDto extends createZodDto(SignUploadSchema) {}
 // ─── Bulk operations ─────────────────────────────────────────────────────────
 
 const BulkUpdateSchema = z.object({
-  asset_folder_id: z.number().int(),
+  asset_folder_id: z.number().int().nullable(),
   ids: z.array(z.number().int()),
 });
 

@@ -11,27 +11,19 @@ import { CreateGroupModal } from '@/components/block-library/create-group-modal'
 import { CreateBlockModal } from '@/components/block-library/create-block-modal';
 import { BlockList, type Block } from '@/components/block-library/block-list';
 import { EditBlockModal } from '@/components/block-library/edit-block-modal';
-import { TagsView, type ComponentInternalTag } from '@/components/block-library/tags-view';
+import { TagsView } from '@/components/block-library/tags-view';
 import type { SortOption } from '@/components/ui/search-filter-bar';
 import { SelectDropdown } from '@/components/ui/select-dropdown';
 import { RenameModal } from '@/components/ui/rename-modal';
 import { BulkActionBar } from '@/components/ui/bulk-action-bar';
 import { SplitPageLayout } from '@/components/ui/split-page-layout';
-import { useApi } from '@/lib/swr';
+import { MoveGroupModal } from './move-group-modal';
+import { useBlockLibraryCrud } from './use-block-library-crud';
 
 const SORT_OPTIONS: SortOption[] = [
   { value: 'name', label: 'Name (A–Z)' },
   { value: 'updated_at', label: 'Updated (newest)' },
 ];
-
-interface ComponentsResponse {
-  components: Block[];
-  component_groups: ComponentGroup[];
-}
-
-interface TagsResponse {
-  internal_tags: ComponentInternalTag[];
-}
 
 export default function BlockLibraryPage({ params }: { params: Promise<{ spaceId: string }> }) {
   const { spaceId } = use(params);
@@ -63,28 +55,27 @@ export default function BlockLibraryPage({ params }: { params: Promise<{ spaceId
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [deleteBlocksOpen, setDeleteBlocksOpen] = useState(false);
   const [moveGroupOpen, setMoveGroupOpen] = useState(false);
-  const [moveTargetUuid, setMoveTargetUuid] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
 
-  // ─── Data fetching ─────────────────────────────────────────────────────────
+  // ─── Data + CRUD from hook ─────────────────────────────────────────────────
   const {
-    data: componentsData,
     isLoading,
-    mutate: mutateComponents,
-  } = useApi<ComponentsResponse>(`/api/admin/spaces/${spaceId}/components`);
-
-  const allBlocks = componentsData?.components ?? [];
-  const groups = componentsData?.component_groups ?? [];
-
-  const {
-    data: tagsData,
-    isLoading: tagsLoading,
-    mutate: mutateTags,
-  } = useApi<TagsResponse>(
-    isTagsView ? `/api/admin/spaces/${spaceId}/internal_tags?by_object_type=component` : null,
-  );
-
-  const tags = tagsData?.internal_tags ?? [];
+    mutateComponents,
+    tagsLoading,
+    allBlocks,
+    groups,
+    tags,
+    handleCreateBlock: crudCreateBlock,
+    handleCreateGroup: crudCreateGroup,
+    handleRenameGroup: crudRenameGroup,
+    handleDeleteGroup: crudDeleteGroup,
+    handleDuplicate: crudDuplicate,
+    handleMoveToGroup: crudMoveToGroup,
+    handleDeleteBlocks: crudDeleteBlocks,
+    handleCreateTag,
+    handleRenameTag,
+    handleDeleteTag,
+  } = useBlockLibraryCrud(spaceId, { isTagsView });
 
   // ─── Client-side counts (derived from allBlocks) ───────────────────────────
   const counts = useMemo(() => {
@@ -131,7 +122,7 @@ export default function BlockLibraryPage({ params }: { params: Promise<{ spaceId
     return filtered.slice(start, start + perPage);
   }, [filtered, page, perPage]);
 
-  // ─── Block CRUD ────────────────────────────────────────────────────────────
+  // ─── Handlers with UI side effects ─────────────────────────────────────────
 
   async function handleCreateBlock(data: {
     name: string;
@@ -140,96 +131,44 @@ export default function BlockLibraryPage({ params }: { params: Promise<{ spaceId
     is_root: boolean;
     component_group_uuid: string | null;
   }) {
-    const res = await fetch(`/api/admin/spaces/${spaceId}/components`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.message ?? 'Failed to create block');
-    }
+    await crudCreateBlock(data);
     setCreateBlockOpen(false);
-    await mutateComponents();
   }
 
-  // ─── Group CRUD ────────────────────────────────────────────────────────────
-
   async function handleCreateGroup(name: string) {
-    const res = await fetch(`/api/admin/spaces/${spaceId}/component-groups`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name }),
-    });
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.message ?? 'Failed to create group');
-    }
+    await crudCreateGroup(name);
     setCreateGroupOpen(false);
-    await mutateComponents();
   }
 
   async function handleRenameGroup(newName: string) {
     if (!renameGroup) return;
-    const res = await fetch(`/api/admin/spaces/${spaceId}/component-groups/${renameGroup.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newName }),
-    });
-    if (res.ok) {
-      setRenameGroup(null);
-      await mutateComponents();
-    }
+    await crudRenameGroup(renameGroup.id, newName);
+    setRenameGroup(null);
   }
 
   async function handleDeleteGroup() {
     if (!deleteGroupTarget) return;
-    const res = await fetch(
-      `/api/admin/spaces/${spaceId}/component-groups/${deleteGroupTarget.id}`,
-      {
-        method: 'DELETE',
-      },
-    );
-    if (res.ok) {
-      if (selectedGroupUuid === deleteGroupTarget.uuid) setSelectedGroupUuid(null);
-      setDeleteGroupTarget(null);
-      await mutateComponents();
-    }
+    await crudDeleteGroup(deleteGroupTarget.id);
+    if (selectedGroupUuid === deleteGroupTarget.uuid) setSelectedGroupUuid(null);
+    setDeleteGroupTarget(null);
   }
-
-  // ─── Bulk actions ──────────────────────────────────────────────────────────
 
   async function handleDuplicate() {
     setActionLoading(true);
     try {
-      await Promise.all(
-        [...selectedIds].map((id) =>
-          fetch(`/api/admin/spaces/${spaceId}/components/${id}/duplicate`, { method: 'POST' }),
-        ),
-      );
+      await crudDuplicate(selectedIds);
       setSelectedIds(new Set());
-      await mutateComponents();
     } finally {
       setActionLoading(false);
     }
   }
 
-  async function handleMove() {
-    if (moveTargetUuid === undefined) return;
+  async function handleMoveToGroup(targetUuid: string | null) {
     setActionLoading(true);
     try {
-      await Promise.all(
-        [...selectedIds].map((id) =>
-          fetch(`/api/admin/spaces/${spaceId}/components/${id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ component_group_uuid: moveTargetUuid }),
-          }),
-        ),
-      );
+      await crudMoveToGroup(selectedIds, targetUuid);
       setSelectedIds(new Set());
       setMoveGroupOpen(false);
-      await mutateComponents();
     } finally {
       setActionLoading(false);
     }
@@ -238,47 +177,12 @@ export default function BlockLibraryPage({ params }: { params: Promise<{ spaceId
   async function handleDeleteBlocks() {
     setActionLoading(true);
     try {
-      await Promise.all(
-        [...selectedIds].map((id) =>
-          fetch(`/api/admin/spaces/${spaceId}/components/${id}`, { method: 'DELETE' }),
-        ),
-      );
+      await crudDeleteBlocks(selectedIds);
       setSelectedIds(new Set());
       setDeleteBlocksOpen(false);
-      await mutateComponents();
     } finally {
       setActionLoading(false);
     }
-  }
-
-  // ─── Tag CRUD ──────────────────────────────────────────────────────────────
-
-  async function handleCreateTag(name: string) {
-    const res = await fetch(`/api/admin/spaces/${spaceId}/internal_tags`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, object_type: 'component' }),
-    });
-    if (!res.ok) throw new Error('Failed to create tag');
-    await mutateTags();
-  }
-
-  async function handleRenameTag(tag: ComponentInternalTag, newName: string) {
-    const res = await fetch(`/api/admin/spaces/${spaceId}/internal_tags/${tag.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newName }),
-    });
-    if (!res.ok) throw new Error('Failed to rename tag');
-    await mutateTags();
-  }
-
-  async function handleDeleteTag(tag: ComponentInternalTag) {
-    const res = await fetch(`/api/admin/spaces/${spaceId}/internal_tags/${tag.id}`, {
-      method: 'DELETE',
-    });
-    if (!res.ok) throw new Error('Failed to delete tag');
-    await mutateTags();
   }
 
   return (
@@ -289,6 +193,7 @@ export default function BlockLibraryPage({ params }: { params: Promise<{ spaceId
         {!isTagsView && (
           <div className="flex items-center gap-2">
             <button
+              type="button"
               onClick={() => setCreateGroupOpen(true)}
               className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
             >
@@ -296,6 +201,7 @@ export default function BlockLibraryPage({ params }: { params: Promise<{ spaceId
               Create Group
             </button>
             <button
+              type="button"
               onClick={() => setCreateBlockOpen(true)}
               className="flex items-center gap-1.5 px-3 py-2 text-sm bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
             >
@@ -416,10 +322,7 @@ export default function BlockLibraryPage({ params }: { params: Promise<{ spaceId
           {
             label: 'Move',
             icon: <Move className="w-4 h-4" />,
-            onClick: () => {
-              setMoveTargetUuid(null);
-              setMoveGroupOpen(true);
-            },
+            onClick: () => setMoveGroupOpen(true),
             disabled: actionLoading,
           },
           {
@@ -502,58 +405,14 @@ export default function BlockLibraryPage({ params }: { params: Promise<{ spaceId
       />
 
       {/* Move to group modal */}
-      {moveGroupOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setMoveGroupOpen(false)} />
-          <div className="relative bg-white dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-sm mx-4 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
-              Move {selectedIds.size} block{selectedIds.size === 1 ? '' : 's'} to group
-            </h2>
-
-            <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-y-auto max-h-64 mb-4">
-              <button
-                onClick={() => setMoveTargetUuid(null)}
-                className={`w-full text-left px-3 py-2.5 text-sm transition-colors ${
-                  moveTargetUuid === null
-                    ? 'bg-gray-100 dark:bg-gray-800 text-teal-600 dark:text-teal-400 font-medium'
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
-                }`}
-              >
-                No group
-              </button>
-              {groups.map((g) => (
-                <button
-                  key={g.id}
-                  onClick={() => setMoveTargetUuid(g.uuid)}
-                  className={`w-full text-left px-3 py-2.5 text-sm transition-colors ${
-                    moveTargetUuid === g.uuid
-                      ? 'bg-gray-100 dark:bg-gray-800 text-teal-600 dark:text-teal-400 font-medium'
-                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
-                  }`}
-                >
-                  {g.name}
-                </button>
-              ))}
-            </div>
-
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setMoveGroupOpen(false)}
-                className="px-4 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleMove}
-                disabled={actionLoading}
-                className="px-4 py-2 text-sm bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50"
-              >
-                {actionLoading ? 'Moving...' : 'Move'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <MoveGroupModal
+        open={moveGroupOpen}
+        groups={groups}
+        selectedCount={selectedIds.size}
+        onMove={handleMoveToGroup}
+        onCancel={() => setMoveGroupOpen(false)}
+        loading={actionLoading}
+      />
     </div>
   );
 }

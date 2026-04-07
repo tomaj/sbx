@@ -26,11 +26,43 @@ interface AssetPickerModalProps {
   mode: 'single' | 'multi';
   onSelect: (assets: Asset[]) => void;
   onClose: () => void;
+  /** Restrict shown assets to these categories: 'images' | 'videos' | 'audios' | 'texts' */
+  filetypes?: string[];
+  /** Preselect this folder when the modal opens */
+  initialFolderId?: number | null;
 }
 
-export function AssetPickerModal({ spaceId, mode, onSelect, onClose }: AssetPickerModalProps) {
+function matchesFiletypes(asset: Asset, filetypes?: string[]): boolean {
+  if (!filetypes || filetypes.length === 0) return true;
+  const ct = asset.content_type ?? '';
+  return filetypes.some((ft) => {
+    switch (ft) {
+      case 'images':
+        return ct.startsWith('image/');
+      case 'videos':
+        return ct.startsWith('video/');
+      case 'audios':
+        return ct.startsWith('audio/');
+      case 'texts':
+        return ct.startsWith('text/') || ct === 'application/pdf';
+      default:
+        return true;
+    }
+  });
+}
+
+export function AssetPickerModal({
+  spaceId,
+  mode,
+  onSelect,
+  onClose,
+  filetypes,
+  initialFolderId,
+}: AssetPickerModalProps) {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [selectedFolder, setSelectedFolder] = useState<number | null | undefined>(undefined);
+  const [selectedFolder, setSelectedFolder] = useState<number | null | undefined>(
+    initialFolderId !== undefined ? initialFolderId : undefined,
+  );
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState('created_at_desc');
   const [page, setPage] = useState(1);
@@ -62,7 +94,10 @@ export function AssetPickerModal({ spaceId, mode, onSelect, onClose }: AssetPick
   const { data: assetsData, isLoading } = useApi<{ assets: Asset[]; total: number }>(
     `/api/admin/spaces/${spaceId}/assets?${assetsQs}`,
   );
-  const assets = assetsData?.assets ?? [];
+  const rawAssets = assetsData?.assets ?? [];
+  const assets = filetypes?.length
+    ? rawAssets.filter((a) => matchesFiletypes(a, filetypes))
+    : rawAssets;
   const total = assetsData?.total ?? 0;
 
   function toggleAsset(asset: Asset) {

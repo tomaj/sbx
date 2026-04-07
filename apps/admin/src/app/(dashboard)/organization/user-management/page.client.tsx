@@ -1,22 +1,23 @@
 'use client';
 
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { usePerPage } from '@/hooks/use-per-page';
-import { MoreHorizontal, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { Tabs } from '@/components/ui/tabs';
 import { SearchBar } from '@/components/ui/search-bar';
 import { DataTable, type Column, type SortState } from '@/components/ui/data-table';
 import { CrudSidebarForm } from '@/components/ui/crud-sidebar-form';
 import { UserAvatar } from '@/components/ui/user-avatar';
-import { SkeletonAvatar, SkeletonText } from '@/components/ui/skeleton';
-import { cn } from '@/lib/utils';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { useCrudSidebar } from '@/hooks/use-crud-sidebar';
 import { PageLayout } from '@/components/ui/page-layout';
+import { FormField, FormRootError, inputCls } from '@/components/ui/form-field';
 import { useApi } from '@/lib/swr';
-import type { User, UserSpace } from '@sbx/types';
+import { getUserColumns } from './user-columns';
+import type { User } from '@sbx/types';
 
 const createUserSchema = z.object({
   email: z.string().email('Valid email is required'),
@@ -42,114 +43,6 @@ const FILTER_MAP: Record<string, string> = {
   disabled: 'disabled',
 };
 
-// ---- Spaces tooltip ----
-
-function SpacesTooltip({ spaces }: { spaces: UserSpace[] }) {
-  const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState({ top: 0, left: 0 });
-  const btnRef = useRef<HTMLButtonElement>(null);
-
-  function handleMouseEnter() {
-    if (!btnRef.current) return;
-    const rect = btnRef.current.getBoundingClientRect();
-    setPos({ top: rect.bottom + 4, left: rect.left });
-    setOpen(true);
-  }
-
-  if (spaces.length === 0) return <span className="text-sm text-gray-400">—</span>;
-
-  return (
-    <>
-      <button
-        ref={btnRef}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={() => setOpen(false)}
-        className="text-sm text-teal-600 dark:text-teal-400 hover:underline whitespace-nowrap"
-      >
-        Active in {spaces.length} {spaces.length === 1 ? 'space' : 'spaces'}
-      </button>
-      {open && (
-        <div
-          style={{ top: pos.top, left: pos.left }}
-          className="fixed z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg min-w-[240px] py-2"
-          onMouseEnter={() => setOpen(true)}
-          onMouseLeave={() => setOpen(false)}
-        >
-          {spaces.map((s) => (
-            <div key={s.id} className="px-4 py-2.5">
-              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{s.name}</p>
-              <p className="text-xs text-gray-400 mt-0.5">
-                #{s.id} · {s.role}
-              </p>
-            </div>
-          ))}
-        </div>
-      )}
-    </>
-  );
-}
-
-// ---- Row menu ----
-
-function RowMenu({
-  onEdit,
-  onDisable,
-  disabled,
-}: {
-  onEdit: () => void;
-  onDisable: () => void;
-  disabled: boolean;
-}) {
-  const [open, setOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    function onClickOutside(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', onClickOutside);
-    return () => document.removeEventListener('mousedown', onClickOutside);
-  }, [open]);
-
-  return (
-    <div ref={menuRef} className="relative">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="p-1 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-      >
-        <MoreHorizontal className="size-4" />
-      </button>
-      {open && (
-        <div className="absolute right-0 top-full mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 min-w-[150px]">
-          <button
-            onClick={() => {
-              onEdit();
-              setOpen(false);
-            }}
-            className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-          >
-            Edit
-          </button>
-          <button
-            onClick={() => {
-              onDisable();
-              setOpen(false);
-            }}
-            className="w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-          >
-            {disabled ? 'Enable' : 'Disable'}
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ---- Main page ----
-
 export default function UserManagementPage() {
   const [activeTab, setActiveTab] = useState('org');
   const [search, setSearch] = useState('');
@@ -157,6 +50,7 @@ export default function UserManagementPage() {
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = usePerPage('perPage:users', 10);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const {
     open: sidebarOpen,
@@ -273,6 +167,14 @@ export default function UserManagementPage() {
     }
   }
 
+  async function handleDeleteSelected() {
+    await Promise.all(
+      selectedIds.map((id) => fetch(`/api/admin/users/${id}`, { method: 'DELETE' })),
+    );
+    setSelectedIds([]);
+    mutate();
+  }
+
   const tabs = useMemo(
     () => [
       { id: 'org', label: 'Organization users', count: counts.org },
@@ -282,80 +184,7 @@ export default function UserManagementPage() {
     [counts],
   );
 
-  const columns: Column<User>[] = [
-    {
-      key: 'name',
-      label: 'Name',
-      sortable: true,
-      skeletonRender: () => (
-        <div className="flex items-center gap-3">
-          <SkeletonAvatar />
-          <div className="space-y-1.5">
-            <SkeletonText className="w-28 h-3.5" />
-            <SkeletonText className="w-40 h-3" />
-          </div>
-        </div>
-      ),
-      render: (u) => (
-        <div className="flex items-center gap-3">
-          <UserAvatar name={u.name || `${u.firstname} ${u.lastname}`} src={u.avatar} size="md" />
-          <div>
-            <p className="font-medium text-gray-900 dark:text-gray-100">
-              {u.firstname} {u.lastname}
-            </p>
-            <p className="text-xs text-gray-400">{u.email}</p>
-          </div>
-        </div>
-      ),
-    },
-    {
-      key: 'role',
-      label: 'Role',
-      sortable: true,
-      width: '120px',
-      render: (u) =>
-        u.role === 'admin' ? (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300">
-            Admin
-          </span>
-        ) : (
-          <span className="text-sm text-gray-600 dark:text-gray-400">Member</span>
-        ),
-    },
-    {
-      key: 'spaces',
-      label: 'Spaces',
-      width: '180px',
-      render: (u) => <SpacesTooltip spaces={u.spaces} />,
-    },
-    {
-      key: 'status',
-      label: 'Status',
-      width: '100px',
-      render: (u) => (
-        <span
-          className={cn(
-            'text-sm',
-            !u.disabled ? 'text-gray-600 dark:text-gray-400' : 'text-gray-400',
-          )}
-        >
-          {u.disabled ? 'Disabled' : 'Active'}
-        </span>
-      ),
-    },
-    {
-      key: 'actions',
-      label: '',
-      width: '40px',
-      render: (u) => (
-        <RowMenu
-          onEdit={() => openEdit(u)}
-          onDisable={() => handleDisable(u)}
-          disabled={u.disabled}
-        />
-      ),
-    },
-  ];
+  const columns = getUserColumns({ openEdit, handleDisable });
 
   const isSubmitting = sidebarMode === 'create' ? isCreating : isSaving;
 
@@ -364,6 +193,7 @@ export default function UserManagementPage() {
       title="User management"
       action={
         <button
+          type="button"
           onClick={openCreate}
           className="flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium rounded-md transition-colors"
         >
@@ -408,6 +238,7 @@ export default function UserManagementPage() {
         selectionActions={
           <div className="flex items-center gap-2">
             <button
+              type="button"
               onClick={async () => {
                 await Promise.all(
                   selectedIds.map((id) =>
@@ -426,15 +257,8 @@ export default function UserManagementPage() {
               Disable selected
             </button>
             <button
-              onClick={async () => {
-                if (!confirm(`Delete ${selectedIds.length} user(s)? This cannot be undone.`))
-                  return;
-                await Promise.all(
-                  selectedIds.map((id) => fetch(`/api/admin/users/${id}`, { method: 'DELETE' })),
-                );
-                setSelectedIds([]);
-                mutate();
-              }}
+              type="button"
+              onClick={() => setConfirmDelete(true)}
               className="px-3 py-1.5 text-xs border border-red-300 rounded hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500 transition-colors"
             >
               Remove selected
@@ -452,6 +276,19 @@ export default function UserManagementPage() {
           },
           storageKey: 'perPage:users',
         }}
+      />
+
+      <ConfirmModal
+        open={confirmDelete}
+        title="Remove selected users"
+        message={`Remove ${selectedIds.length} user(s)? This cannot be undone.`}
+        confirmLabel="Remove"
+        dangerous
+        onConfirm={async () => {
+          setConfirmDelete(false);
+          await handleDeleteSelected();
+        }}
+        onCancel={() => setConfirmDelete(false)}
       />
 
       <CrudSidebarForm
@@ -490,54 +327,26 @@ export default function UserManagementPage() {
         )}
 
         {sidebarMode === 'create' ? (
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                Email <span className="text-red-500">*</span>
-              </label>
+          <div className="space-y-1">
+            <FormField label="Email" required error={createErrors.email?.message}>
               <input
                 type="email"
                 {...registerCreate('email')}
                 placeholder="user@telekom.sk"
-                className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-md text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className={inputCls}
               />
-              {createErrors.email && (
-                <p className="mt-1 text-xs text-red-500">{createErrors.email.message}</p>
-              )}
-            </div>
-            {createErrors.root && (
-              <p className="text-sm text-red-500 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-md">
-                {createErrors.root.message}
-              </p>
-            )}
+            </FormField>
+            <FormRootError message={createErrors.root?.message} />
           </div>
         ) : (
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                First name
-              </label>
-              <input
-                type="text"
-                {...registerEdit('firstname')}
-                className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-md text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                Last name
-              </label>
-              <input
-                type="text"
-                {...registerEdit('lastname')}
-                className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-md text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
-              />
-            </div>
-            {editErrors.root && (
-              <p className="text-sm text-red-500 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-md">
-                {editErrors.root.message}
-              </p>
-            )}
+          <div className="space-y-1">
+            <FormField label="First name">
+              <input type="text" {...registerEdit('firstname')} className={inputCls} />
+            </FormField>
+            <FormField label="Last name">
+              <input type="text" {...registerEdit('lastname')} className={inputCls} />
+            </FormField>
+            <FormRootError message={editErrors.root?.message} />
           </div>
         )}
       </CrudSidebarForm>

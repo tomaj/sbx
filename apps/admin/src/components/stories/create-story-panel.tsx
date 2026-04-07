@@ -6,6 +6,8 @@ import { RightSidebar } from '@/components/ui/right-sidebar';
 import { SelectDropdown } from '@/components/ui/select-dropdown';
 import { ContentTypeSelector } from '@/components/ui/content-type-selector';
 import { InfoTooltip } from '@/components/ui/info-tooltip';
+import { FormField } from '@/components/ui/form-field';
+import { StoryConfigSection } from '@/components/stories/story-config-section';
 import { useApi } from '@/lib/swr';
 
 type Component = {
@@ -29,67 +31,7 @@ function toSlug(name: string) {
     .replace(/^-|-$/g, '');
 }
 
-// ─── Shared form fields ───────────────────────────────────────────────────────
-
-function FormInput({
-  label,
-  required,
-  value,
-  onChange,
-  placeholder,
-  tooltip,
-}: {
-  label: string;
-  required?: boolean;
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-  tooltip?: string;
-}) {
-  return (
-    <div>
-      <label className="flex items-center gap-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-        {label}
-        {required && <span className="text-red-500">*</span>}
-        {tooltip && <InfoTooltip text={tooltip} />}
-      </label>
-      <input
-        type="text"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-      />
-    </div>
-  );
-}
-
-function FormTextarea({
-  label,
-  value,
-  onChange,
-  tooltip,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  tooltip?: string;
-}) {
-  return (
-    <div>
-      <label className="flex items-center gap-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-        {label}
-        {tooltip && <InfoTooltip text={tooltip} />}
-      </label>
-      <textarea
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        rows={3}
-        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent resize-none"
-      />
-    </div>
-  );
-}
+// ─── Shared helpers ──────────────────────────────────────────────────────────
 
 function PanelFooter({
   onCancel,
@@ -174,6 +116,13 @@ function useComponentOptions(open: boolean, spaceId: string) {
   return { options, loading: isLoading };
 }
 
+function useSpaceDefaultRoot(open: boolean, spaceId: string) {
+  const { data } = useApi<{ space: { default_root: string | null } }>(
+    open ? `/api/admin/spaces/${spaceId}/space` : null,
+  );
+  return data?.space?.default_root ?? null;
+}
+
 function useFolderOptions(open: boolean, spaceId: string) {
   const { data, isLoading } = useApi<{ stories: FolderStory[] }>(
     open ? `/api/admin/spaces/${spaceId}/stories?per_page=200` : null,
@@ -209,10 +158,19 @@ export function CreateStoryPanel({
   const [saving, setSaving] = useState(false);
   const { options: compOptions, loading: compLoading } = useComponentOptions(open, spaceId);
   const { folderOptions, loading: folderLoading } = useFolderOptions(open, spaceId);
+  const defaultRoot = useSpaceDefaultRoot(open, spaceId);
 
   useEffect(() => {
-    if (!open) setContentType('');
-  }, [open]);
+    if (!open) {
+      setContentType('');
+      return;
+    }
+    // Pre-select default_root if set and no type chosen yet
+    if (defaultRoot && !contentType) {
+      setContentType(defaultRoot);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, defaultRoot, contentType]);
 
   const canCreate = name.trim() && slug.trim() && contentType;
 
@@ -267,52 +225,34 @@ export function CreateStoryPanel({
         />
       }
     >
-      <div className="space-y-4">
+      <div>
         {error && (
-          <div className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg">
+          <div className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg mb-4">
             {error}
           </div>
         )}
 
-        <FormInput
-          label="Name"
-          required
-          value={name}
-          onChange={setName}
-          placeholder="e.g. Landing"
-        />
-        <FormInput label="Slug" value={slug} onChange={setSlug} />
-        <FormTextarea
-          label="Real Path"
-          value={path}
-          onChange={setPath}
-          tooltip="The real path is the location that the editor opens if the location differs from the slug defined."
+        <StoryConfigSection
+          name={name}
+          onNameChange={setName}
+          slug={slug}
+          onSlugChange={setSlug}
+          path={path}
+          onPathChange={setPath}
+          parentId={parentId}
+          onParentIdChange={setParentId}
+          folderOptions={folderOptions}
+          folderLoading={folderLoading}
         />
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-            Parent folder
-          </label>
-          <SelectDropdown
-            options={folderOptions}
-            value={parentId !== null ? String(parentId) : ''}
-            onChange={(v) => setParentId(v ? parseInt(v, 10) : null)}
-            placeholder="Root"
-            loading={folderLoading}
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-            Content type <span className="text-red-500">*</span>
-          </label>
+        <FormField label="Content type" required>
           <SelectDropdown
             options={compOptions}
             value={contentType || null}
             onChange={(v) => setContentType(v ?? '')}
             placeholder={compLoading ? 'Loading...' : 'Select content type'}
           />
-        </div>
+        </FormField>
       </div>
     </RightSidebar>
   );
@@ -409,46 +349,27 @@ export function CreateFolderPanel({
         />
       }
     >
-      <div className="space-y-4">
+      <div>
         {error && (
-          <div className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg">
+          <div className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg mb-4">
             {error}
           </div>
         )}
 
-        <FormInput
-          label="Name"
-          required
-          value={name}
-          onChange={setName}
-          placeholder="e.g. Landing"
-        />
-        <FormInput label="Slug" value={slug} onChange={setSlug} />
-        <FormTextarea
-          label="Real Path"
-          value={path}
-          onChange={setPath}
-          tooltip="The real path is the location that the editor opens if the location differs from the slug defined."
+        <StoryConfigSection
+          name={name}
+          onNameChange={setName}
+          slug={slug}
+          onSlugChange={setSlug}
+          path={path}
+          onPathChange={setPath}
+          parentId={parentId}
+          onParentIdChange={setParentId}
+          folderOptions={folderOptions}
+          folderLoading={folderLoading}
         />
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-            Parent folder
-          </label>
-          <SelectDropdown
-            options={folderOptions}
-            value={parentId !== null ? String(parentId) : ''}
-            onChange={(v) => setParentId(v ? parseInt(v, 10) : null)}
-            placeholder="Root"
-            loading={folderLoading}
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Content type <span className="text-red-500">*</span>
-          </label>
-
+        <FormField label="Content type" required>
           {/* Mode toggle */}
           <div className="flex items-center gap-4 mb-2">
             <label className="flex items-center gap-2 cursor-pointer">
@@ -494,10 +415,10 @@ export function CreateFolderPanel({
               placeholder={compLoading ? 'Loading...' : 'Select content types...'}
             />
           )}
-        </div>
+        </FormField>
 
-        <div>
-          <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+        <div className="mb-5">
+          <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">
             Folder content settings
           </p>
           <label className="flex items-center gap-2 cursor-pointer">

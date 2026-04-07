@@ -1,10 +1,10 @@
-import type { Metadata } from 'next'
-import { StoryblokProvider } from '@/components/StoryblokProvider'
-import './globals.css'
+import type { Metadata } from 'next';
+import { StoryblokProvider } from '@/components/StoryblokProvider';
+import './globals.css';
 
 export const metadata: Metadata = {
   title: 'SBX Demo',
-}
+};
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -13,5 +13,5 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <StoryblokProvider>{children}</StoryblokProvider>
       </body>
     </html>
-  )
+  );
 }

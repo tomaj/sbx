@@ -102,7 +102,9 @@ describe('Discussions MAPI (e2e)', () => {
     describe('GET /v1/spaces/:spaceId/discussions/:discussionId/comments', () => {
       it('returns list of comments', async () => {
         const res = await request(app.getHttpServer())
-          .get(`/v1/spaces/${TEST_SPACE_ID}/discussions/${discussionId}/comments?token=${TEST_TOKEN}`)
+          .get(
+            `/v1/spaces/${TEST_SPACE_ID}/discussions/${discussionId}/comments?token=${TEST_TOKEN}`,
+          )
           .expect(200);
 
         expect(res.body).toHaveProperty('comments');
@@ -113,7 +115,9 @@ describe('Discussions MAPI (e2e)', () => {
     describe('POST /v1/spaces/:spaceId/discussions/:discussionId/comments', () => {
       it('creates a comment', async () => {
         const res = await request(app.getHttpServer())
-          .post(`/v1/spaces/${TEST_SPACE_ID}/discussions/${discussionId}/comments?token=${TEST_TOKEN}`)
+          .post(
+            `/v1/spaces/${TEST_SPACE_ID}/discussions/${discussionId}/comments?token=${TEST_TOKEN}`,
+          )
           .send({
             comment: {
               message: 'Hello, world!',
@@ -136,7 +140,9 @@ describe('Discussions MAPI (e2e)', () => {
     describe('GET /v1/spaces/:spaceId/discussions/:discussionId/comments/:commentId', () => {
       it('returns a single comment by id', async () => {
         const res = await request(app.getHttpServer())
-          .get(`/v1/spaces/${TEST_SPACE_ID}/discussions/${discussionId}/comments/${commentId}?token=${TEST_TOKEN}`)
+          .get(
+            `/v1/spaces/${TEST_SPACE_ID}/discussions/${discussionId}/comments/${commentId}?token=${TEST_TOKEN}`,
+          )
           .expect(200);
 
         expect(res.body).toHaveProperty('comment');
@@ -146,7 +152,9 @@ describe('Discussions MAPI (e2e)', () => {
 
       it('returns 404 for non-existent comment', async () => {
         return request(app.getHttpServer())
-          .get(`/v1/spaces/${TEST_SPACE_ID}/discussions/${discussionId}/comments/999999999?token=${TEST_TOKEN}`)
+          .get(
+            `/v1/spaces/${TEST_SPACE_ID}/discussions/${discussionId}/comments/999999999?token=${TEST_TOKEN}`,
+          )
           .expect(404);
       });
     });
@@ -154,7 +162,9 @@ describe('Discussions MAPI (e2e)', () => {
     describe('PUT /v1/spaces/:spaceId/discussions/:discussionId/comments/:commentId', () => {
       it('updates a comment', async () => {
         const res = await request(app.getHttpServer())
-          .put(`/v1/spaces/${TEST_SPACE_ID}/discussions/${discussionId}/comments/${commentId}?token=${TEST_TOKEN}`)
+          .put(
+            `/v1/spaces/${TEST_SPACE_ID}/discussions/${discussionId}/comments/${commentId}?token=${TEST_TOKEN}`,
+          )
           .send({
             comment: {
               message: 'Updated message',
@@ -171,7 +181,9 @@ describe('Discussions MAPI (e2e)', () => {
     describe('DELETE /v1/spaces/:spaceId/discussions/:discussionId/comments/:commentId', () => {
       it('deletes a comment and returns 200 with empty object', async () => {
         const res = await request(app.getHttpServer())
-          .delete(`/v1/spaces/${TEST_SPACE_ID}/discussions/${discussionId}/comments/${commentId}?token=${TEST_TOKEN}`)
+          .delete(
+            `/v1/spaces/${TEST_SPACE_ID}/discussions/${discussionId}/comments/${commentId}?token=${TEST_TOKEN}`,
+          )
           .expect(200);
 
         expect(res.body).toEqual({});
@@ -179,7 +191,9 @@ describe('Discussions MAPI (e2e)', () => {
 
       it('returns 404 after deletion', async () => {
         return request(app.getHttpServer())
-          .get(`/v1/spaces/${TEST_SPACE_ID}/discussions/${discussionId}/comments/${commentId}?token=${TEST_TOKEN}`)
+          .get(
+            `/v1/spaces/${TEST_SPACE_ID}/discussions/${discussionId}/comments/${commentId}?token=${TEST_TOKEN}`,
+          )
           .expect(404);
       });
     });

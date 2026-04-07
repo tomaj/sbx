@@ -15,6 +15,13 @@
       "when": 1743800000000,
       "tag": "0001_remove_better_auth",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1743961200000,
+      "tag": "0002_add_maintenance_mode",
+      "breakpoints": true
     }
   ]
 }

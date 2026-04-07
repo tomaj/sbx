@@ -59,6 +59,7 @@ async function seedSpaces() {
     }));
     const encodeUrl = s.options?.encode_preview_urls ?? false;
     const mobileWidth = s.options?.mobile_size ?? 360;
+    const defaultRoot = s.default_root ?? null;
 
     await db
       .insert(spaces)
@@ -73,6 +74,7 @@ async function seedSpaces() {
         previewUrls,
         encodeUrl,
         mobileWidth,
+        defaultRoot,
       })
       .onConflictDoUpdate({
         target: spaces.id,
@@ -85,6 +87,7 @@ async function seedSpaces() {
           previewUrls,
           encodeUrl,
           mobileWidth,
+          defaultRoot,
         },
       });
 

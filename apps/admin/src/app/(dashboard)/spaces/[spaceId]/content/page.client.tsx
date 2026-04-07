@@ -5,26 +5,19 @@ import { usePerPage } from '@/hooks/use-per-page';
 import { useApi } from '@/lib/swr';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import {
-  Plus,
-  Settings,
-  Move,
-  Files,
-  Eye,
-  EyeOff,
-  Trash2,
-  SquarePen,
-  CalendarDays,
-} from 'lucide-react';
+import { Settings, Move, Files, Eye, EyeOff, Trash2, CalendarDays } from 'lucide-react';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { Pagination } from '@/components/ui/pagination';
 import { BulkActionBar } from '@/components/ui/bulk-action-bar';
 import { type ActiveFilter } from '@/components/ui/search-filter-bar';
 import { StoryList, type Story, type StoryUser } from '@/components/stories/story-list';
 import { CreateStoryPanel, CreateFolderPanel } from '@/components/stories/create-story-panel';
-import { ReleaseSwitcher, type Release } from '@/components/stories/release-switcher';
+import { ReleaseSwitcher, type Release } from '@/components/stories/releases';
 import { BranchSwitcher, type Branch } from '@/components/stories/branch-switcher';
 import { StoryFiltersBar, type BreadcrumbEntry } from '@/components/stories/story-filters-bar';
+import { CreateNewMenu } from './create-new-menu';
+import { useContentActions } from './use-content-actions';
+import { MaintenanceBanner } from './maintenance-banner';
 
 function parseSortOption(sort: string): { field: string; dir: string } {
   const last = sort.lastIndexOf('_');
@@ -60,6 +53,20 @@ export default function ContentPage({ params }: { params: Promise<{ spaceId: str
 
   const { data: meData } = useApi<{ user: { id: number } }>('/api/admin/user/me');
   const currentUserId = meData?.user?.id ?? null;
+
+  const { data: spaceData, mutate: mutateSpace } = useApi<{ space: { maintenance?: boolean } }>(
+    `/api/admin/spaces/${spaceId}/space`,
+  );
+  const maintenanceMode = spaceData?.space?.maintenance ?? false;
+
+  async function disableMaintenance() {
+    await fetch(`/api/admin/spaces/${spaceId}/space`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ maintenance: false }),
+    });
+    await mutateSpace();
+  }
 
   // ─── Branches (pipeline switcher) ─────────────────────────────────────────
   const [activeBranch, setActiveBranch] = useState<Branch | null>(null);
@@ -127,8 +134,8 @@ export default function ContentPage({ params }: { params: Promise<{ spaceId: str
     else p.delete('search');
     if (sort !== 'position_asc') p.set('sort', sort);
     else p.delete('sort');
-    Object.keys(KNOWN_FILTER_KEYS).forEach((key) => p.delete(key));
-    Object.entries(filtersToParams(activeFilters)).forEach(([k, v]) => p.set(k, v));
+    for (const key of Object.keys(KNOWN_FILTER_KEYS)) p.delete(key);
+    for (const [k, v] of Object.entries(filtersToParams(activeFilters))) p.set(k, v);
     router.replace(`?${p}`);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, sort, activeFilters, searchParams.toString, router.replace]);
@@ -140,10 +147,8 @@ export default function ContentPage({ params }: { params: Promise<{ spaceId: str
   // ─── Selection ────────────────────────────────────────────────────────────
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [actionLoading, setActionLoading] = useState(false);
 
   // ─── Create new ───────────────────────────────────────────────────────────
-  const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [createStoryOpen, setCreateStoryOpen] = useState(false);
   const [createFolderOpen, setCreateFolderOpen] = useState(false);
 
@@ -209,7 +214,7 @@ export default function ContentPage({ params }: { params: Promise<{ spaceId: str
   // Reset local stories when SWR data updates
   useEffect(() => {
     setLocalStories(null);
-  }, [storiesData]);
+  }, []);
 
   // ─── Navigation ──────────────────────────────────────────────────────────
   function navigateInto(story: Story) {
@@ -230,78 +235,26 @@ export default function ContentPage({ params }: { params: Promise<{ spaceId: str
     router.push(`?${p}`);
   }
 
-  // ─── Bulk actions (stubs) ─────────────────────────────────────────────────
-  async function handlePublish() {
-    setActionLoading(true);
-    try {
-      await Promise.all(
-        [...selectedIds].map((id) =>
-          fetch(`/api/admin/spaces/${spaceId}/stories/${id}/publish`, { method: 'POST' }),
-        ),
-      );
-      setSelectedIds(new Set());
-      await mutateStories();
-    } finally {
-      setActionLoading(false);
-    }
-  }
-
-  async function handleUnpublish() {
-    setActionLoading(true);
-    try {
-      await Promise.all(
-        [...selectedIds].map((id) =>
-          fetch(`/api/admin/spaces/${spaceId}/stories/${id}/unpublish`, { method: 'POST' }),
-        ),
-      );
-      setSelectedIds(new Set());
-      await mutateStories();
-    } finally {
-      setActionLoading(false);
-    }
-  }
-
-  async function handleDelete() {
-    setActionLoading(true);
-    try {
-      await Promise.all(
-        [...selectedIds].map((id) =>
-          fetch(`/api/admin/spaces/${spaceId}/stories/${id}`, { method: 'DELETE' }),
-        ),
-      );
-      setSelectedIds(new Set());
-      setDeleteOpen(false);
-      await mutateStories();
-    } finally {
-      setActionLoading(false);
-    }
-  }
-
-  async function handleToggleFavorite(storyId: number) {
-    if (currentUserId === null) return;
-    const story = displayStories.find((s) => s.id === storyId);
-    if (!story) return;
-    const currentIds = story.favourite_for_user_ids ?? [];
-    const isFav = currentIds.includes(currentUserId);
-    const newIds = isFav
-      ? currentIds.filter((id) => id !== currentUserId)
-      : [...currentIds, currentUserId];
-    // Optimistic update
-    setLocalStories(
-      displayStories.map((s) => (s.id === storyId ? { ...s, favourite_for_user_ids: newIds } : s)),
+  // ─── Bulk actions + favorite toggle ────────────────────────────────────────
+  const { handlePublish, handleUnpublish, handleDelete, handleToggleFavorite, actionLoading } =
+    useContentActions(
+      spaceId,
+      selectedIds,
+      currentUserId,
+      displayStories,
+      () => {
+        setSelectedIds(new Set());
+        mutateStories();
+      },
+      setLocalStories,
     );
-    const res = await fetch(`/api/admin/spaces/${spaceId}/stories/${storyId}/partial_update`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ story: { favourite_for_user_ids: newIds } }),
-    });
-    if (!res.ok) {
-      // Revert optimistic update
-      setLocalStories(null);
-    }
+
+  async function handleDeleteWithClose() {
+    await handleDelete();
+    setDeleteOpen(false);
   }
 
-  const hasSelection = selectedIds.size > 0;
+  const _hasSelection = selectedIds.size > 0;
   const singleSelected = selectedIds.size === 1;
 
   const spaceIdNum = parseInt(spaceId, 10);
@@ -309,6 +262,8 @@ export default function ContentPage({ params }: { params: Promise<{ spaceId: str
 
   return (
     <div className="flex flex-col h-full">
+      {/* Maintenance mode banner */}
+      {maintenanceMode && <MaintenanceBanner onDisable={disableMaintenance} />}
       {/* Header */}
       <div className="flex items-center justify-between px-8 pt-6 pb-4 border-b border-gray-200 dark:border-gray-700">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Content</h1>
@@ -320,60 +275,10 @@ export default function ContentPage({ params }: { params: Promise<{ spaceId: str
             <CalendarDays className="w-4 h-4" />
             Content Planner
           </Link>
-          <div className="relative">
-            <button
-              onClick={() => setCreateMenuOpen((v) => !v)}
-              className="flex items-center gap-1.5 px-4 py-2 text-sm bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              Create new
-            </button>
-            {createMenuOpen && (
-              <>
-                <div className="fixed inset-0 z-30" onClick={() => setCreateMenuOpen(false)} />
-                <div className="absolute right-0 top-full mt-1 z-40 w-64 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg overflow-hidden">
-                  <button
-                    onClick={() => {
-                      setCreateMenuOpen(false);
-                      setCreateStoryOpen(true);
-                    }}
-                    className="w-full text-left px-4 py-3.5 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors border-b border-gray-100 dark:border-gray-700"
-                  >
-                    <div className="flex items-start gap-3">
-                      <SquarePen className="w-5 h-5 text-gray-500 dark:text-gray-400 mt-0.5 shrink-0" />
-                      <div>
-                        <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                          Story
-                        </div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                          A &ldquo;Story&rdquo; is what we call the content entries you can create.
-                        </div>
-                      </div>
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setCreateMenuOpen(false);
-                      setCreateFolderOpen(true);
-                    }}
-                    className="w-full text-left px-4 py-3.5 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-                  >
-                    <div className="flex items-start gap-3">
-                      <Files className="w-5 h-5 text-gray-500 dark:text-gray-400 mt-0.5 shrink-0" />
-                      <div>
-                        <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                          Folder
-                        </div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                          Can be used to group your entries of specific content types.
-                        </div>
-                      </div>
-                    </div>
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
+          <CreateNewMenu
+            onCreateStory={() => setCreateStoryOpen(true)}
+            onCreateFolder={() => setCreateFolderOpen(true)}
+          />
         </div>
       </div>
 
@@ -478,7 +383,7 @@ export default function ContentPage({ params }: { params: Promise<{ spaceId: str
         message={`Are you sure you want to delete ${selectedIds.size} stor${selectedIds.size === 1 ? 'y' : 'ies'}? This action cannot be undone.`}
         confirmLabel="Delete"
         dangerous
-        onConfirm={handleDelete}
+        onConfirm={handleDeleteWithClose}
         onCancel={() => setDeleteOpen(false)}
       />
 

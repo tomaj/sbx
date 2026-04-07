@@ -43,6 +43,7 @@ export class SpacesController {
         asset_library_settings?: Record<string, unknown>;
         story_published_hook?: string | null;
         environments?: { name: string; location: string }[];
+        maintenance?: boolean;
       };
     },
   ) {
@@ -60,6 +61,7 @@ export class SpacesController {
         assetLibrarySettings: s.asset_library_settings,
         storyPublishedHook: s.story_published_hook,
         environments: s.environments,
+        maintenance: s.maintenance,
       }),
     );
   }

@@ -11,7 +11,10 @@ export const REQUEST_DELAY_MS = 350; // ~3 req/s, conservative
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // Simple HTTPS fetch returning parsed JSON + response headers
-export function apiFetch(url: string, token: string): Promise<{ data: any; headers: Record<string, string> }> {
+export function apiFetch(
+  url: string,
+  token: string,
+): Promise<{ data: any; headers: Record<string, string> }> {
   return new Promise((resolve, reject) => {
     const req = https.get(url, { headers: { Authorization: token } }, (res) => {
       let body = '';
@@ -41,7 +44,10 @@ export function ensureDir(dir: string) {
 /** Read all items from chunk files, sorted by chunk filename (oldest first). */
 export function readChunks(dir: string): any[] {
   if (!fs.existsSync(dir)) return [];
-  const files = fs.readdirSync(dir).filter((f) => f.startsWith('chunk_') && f.endsWith('.json')).sort();
+  const files = fs
+    .readdirSync(dir)
+    .filter((f) => f.startsWith('chunk_') && f.endsWith('.json'))
+    .sort();
   const items: any[] = [];
   for (const f of files) {
     const chunk = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf-8'));
@@ -51,14 +57,21 @@ export function readChunks(dir: string): any[] {
 }
 
 /** Write items into chunk files starting from chunkOffset (1-based). Fills CHUNK_SIZE per file. */
-export function writeChunks(dir: string, newItems: any[], startChunkNum: number, startOffset: number) {
+export function writeChunks(
+  dir: string,
+  newItems: any[],
+  startChunkNum: number,
+  startOffset: number,
+) {
   ensureDir(dir);
   let chunkNum = startChunkNum;
   let offset = startOffset; // how many items are already in the current last chunk
 
   for (let i = 0; i < newItems.length; ) {
     const chunkFile = path.join(dir, `chunk_${String(chunkNum).padStart(4, '0')}.json`);
-    const existing: any[] = fs.existsSync(chunkFile) ? JSON.parse(fs.readFileSync(chunkFile, 'utf-8')) : [];
+    const existing: any[] = fs.existsSync(chunkFile)
+      ? JSON.parse(fs.readFileSync(chunkFile, 'utf-8'))
+      : [];
     const room = CHUNK_SIZE - offset;
     const toAdd = newItems.slice(i, i + room);
     const updated = [...existing, ...toAdd];
@@ -77,7 +90,7 @@ export function writeChunks(dir: string, newItems: any[], startChunkNum: number,
 // ── State helpers ──────────────────────────────────────────────────────────────
 
 export interface ResourceState {
-  lastSyncAt: string;       // ISO timestamp of newest item we have
+  lastSyncAt: string; // ISO timestamp of newest item we have
   totalItems: number;
   chunkCount: number;
   lastChunkSize: number;

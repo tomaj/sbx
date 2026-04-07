@@ -18,12 +18,17 @@ export class WebhooksProcessor extends WorkerHost {
 
   async process(job: Job<WebhookDispatchJobData>): Promise<void> {
     const { webhookEndpointId, spaceId, endpoint, secret, action, payload } = job.data;
+    const maxAttempts = job.opts.attempts ?? 1;
+    const isFinalAttempt = job.attemptsMade + 1 >= maxAttempts;
 
-    this.logger.debug(`Dispatching webhook ${webhookEndpointId} action=${action}`);
+    this.logger.debug(
+      `Dispatching webhook ${webhookEndpointId} action=${action} attempt=${job.attemptsMade + 1}/${maxAttempts}`,
+    );
 
     let status = 'failed';
     let responseBody: string | null = null;
     let responseStatus: number | null = null;
+    let dispatchError: Error | null = null;
 
     try {
       const bodyStr = JSON.stringify(payload);
@@ -58,10 +63,13 @@ export class WebhooksProcessor extends WorkerHost {
       responseBody = await res.text().catch(() => null);
       status = res.ok ? 'success' : 'failed';
     } catch (err) {
-      this.logger.warn(`Webhook ${webhookEndpointId} failed: ${(err as Error).message}`);
-      // Re-throw so BullMQ retries with backoff
-      throw err;
-    } finally {
+      dispatchError = err as Error;
+      this.logger.warn(`Webhook ${webhookEndpointId} failed: ${dispatchError.message}`);
+    }
+
+    // Log to DB only on success or on the final failed attempt to avoid
+    // creating a separate webhook_log row for each intermediate retry.
+    if (status === 'success' || isFinalAttempt) {
       await this.db.insert(webhookLogs).values({
         webhookEndpointId,
         spaceId,
@@ -72,6 +80,10 @@ export class WebhooksProcessor extends WorkerHost {
         responseStatus,
         executedAt: new Date(),
       });
+    }
+
+    if (dispatchError) {
+      throw dispatchError;
     }
 
     if (status === 'failed') {

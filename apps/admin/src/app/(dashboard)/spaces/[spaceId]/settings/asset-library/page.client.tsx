@@ -19,17 +19,18 @@ interface DefaultMetadataFields {
   source: DefaultMetadataField;
 }
 
+// Storyblok-compatible custom metadata field schema
 interface CustomMetadataField {
-  name: string;
-  filetype: string;
+  key: string;
   required: boolean;
+  filetypes: string[]; // ['any'] | subset of ['images','videos','audios','texts']
+  translatable: boolean;
 }
 
 interface AssetLibrarySettings {
   defaultMetadataFields: DefaultMetadataFields;
   customMetadataFields: CustomMetadataField[];
   uploadLimitMb: number;
-  imageServicePathsToInvalidate: string;
 }
 
 const DEFAULT_SETTINGS: AssetLibrarySettings = {
@@ -41,15 +42,14 @@ const DEFAULT_SETTINGS: AssetLibrarySettings = {
   },
   customMetadataFields: [],
   uploadLimitMb: 5,
-  imageServicePathsToInvalidate: '',
 };
 
 const FILETYPE_OPTIONS = [
   { value: 'any', label: 'Any filetype' },
-  { value: 'image', label: 'Images' },
-  { value: 'video', label: 'Videos' },
-  { value: 'audio', label: 'Audio' },
-  { value: 'document', label: 'Documents' },
+  { value: 'images', label: 'Images' },
+  { value: 'videos', label: 'Videos' },
+  { value: 'audios', label: 'Audio' },
+  { value: 'texts', label: 'Documents / Text' },
 ];
 
 const DEFAULT_FIELD_LABELS: Record<keyof DefaultMetadataFields, string> = {
@@ -62,14 +62,17 @@ const DEFAULT_FIELD_LABELS: Record<keyof DefaultMetadataFields, string> = {
 export default function AssetLibraryPage({ params }: { params: Promise<{ spaceId: string }> }) {
   const { spaceId } = use(params);
 
-  const { data: spaceData } = useApi<any>(`/api/admin/spaces/${spaceId}/space`);
+  const { data: spaceData } = useApi<{ space: { asset_library_settings?: AssetLibrarySettings } }>(
+    `/api/admin/spaces/${spaceId}/space`,
+  );
 
   const [settings, setSettings] = useState<AssetLibrarySettings>(DEFAULT_SETTINGS);
   const [initialized, setInitialized] = useState(false);
   const [newCustomField, setNewCustomField] = useState<CustomMetadataField>({
-    name: '',
-    filetype: 'any',
+    key: '',
+    filetypes: ['any'],
     required: false,
+    translatable: false,
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -101,7 +104,6 @@ export default function AssetLibraryPage({ params }: { params: Promise<{ spaceId
         },
         customMetadataFields: s.customMetadataFields ?? [],
         uploadLimitMb: s.uploadLimitMb ?? 5,
-        imageServicePathsToInvalidate: s.imageServicePathsToInvalidate ?? '',
       });
       setInitialized(true);
     }
@@ -129,8 +131,8 @@ export default function AssetLibraryPage({ params }: { params: Promise<{ spaceId
       setIsDirty(false);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to save');
     } finally {
       setSaving(false);
     }
@@ -151,15 +153,15 @@ export default function AssetLibraryPage({ params }: { params: Promise<{ spaceId
   }
 
   function addCustomField() {
-    if (!newCustomField.name.trim()) return;
+    if (!newCustomField.key.trim()) return;
     updateSettings((s) => ({
       ...s,
       customMetadataFields: [
         ...s.customMetadataFields,
-        { ...newCustomField, name: newCustomField.name.trim() },
+        { ...newCustomField, key: newCustomField.key.trim() },
       ],
     }));
-    setNewCustomField({ name: '', filetype: 'any', required: false });
+    setNewCustomField({ key: '', filetypes: ['any'], required: false, translatable: false });
   }
 
   function removeCustomField(index: number) {
@@ -175,6 +177,7 @@ export default function AssetLibraryPage({ params }: { params: Promise<{ spaceId
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Asset Library</h1>
         <button
+          type="button"
           onClick={handleSave}
           disabled={saving}
           className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-teal-700 hover:bg-teal-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors"
@@ -254,15 +257,18 @@ export default function AssetLibraryPage({ params }: { params: Promise<{ spaceId
           <div className="mb-4 space-y-2">
             {settings.customMetadataFields.map((field, idx) => (
               <div
-                key={idx}
+                key={field.key}
                 className="flex items-center gap-2 p-3 border border-gray-200 dark:border-gray-700 rounded-lg"
               >
-                <span className="flex-1 text-sm text-gray-900 dark:text-gray-100 font-medium">
-                  {field.name}
+                <span className="flex-1 text-sm text-gray-900 dark:text-gray-100 font-medium font-mono">
+                  {field.key}
                 </span>
                 <span className="text-xs text-gray-500 dark:text-gray-400 px-2 py-1 bg-gray-100 dark:bg-gray-800 rounded">
-                  {FILETYPE_OPTIONS.find((o) => o.value === field.filetype)?.label ??
-                    field.filetype}
+                  {field.filetypes?.includes('any') || !field.filetypes?.length
+                    ? 'Any filetype'
+                    : field.filetypes
+                        .map((ft) => FILETYPE_OPTIONS.find((o) => o.value === ft)?.label ?? ft)
+                        .join(', ')}
                 </span>
                 {field.required && (
                   <span className="text-xs text-teal-700 dark:text-teal-400 px-2 py-1 bg-teal-50 dark:bg-teal-900/20 rounded">
@@ -270,6 +276,7 @@ export default function AssetLibraryPage({ params }: { params: Promise<{ spaceId
                   </span>
                 )}
                 <button
+                  type="button"
                   onClick={() => removeCustomField(idx)}
                   className="p-1.5 text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
                 >
@@ -284,15 +291,15 @@ export default function AssetLibraryPage({ params }: { params: Promise<{ spaceId
         <div className="flex items-center gap-2">
           <input
             type="text"
-            value={newCustomField.name}
-            onChange={(e) => setNewCustomField((f) => ({ ...f, name: e.target.value }))}
+            value={newCustomField.key}
+            onChange={(e) => setNewCustomField((f) => ({ ...f, key: e.target.value }))}
             onKeyDown={(e) => e.key === 'Enter' && addCustomField()}
-            placeholder="Name"
-            className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500"
+            placeholder="key_name"
+            className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 font-mono"
           />
           <select
-            value={newCustomField.filetype}
-            onChange={(e) => setNewCustomField((f) => ({ ...f, filetype: e.target.value }))}
+            value={newCustomField.filetypes[0] ?? 'any'}
+            onChange={(e) => setNewCustomField((f) => ({ ...f, filetypes: [e.target.value] }))}
             className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-teal-500 cursor-pointer"
           >
             {FILETYPE_OPTIONS.map((opt) => (
@@ -311,8 +318,9 @@ export default function AssetLibraryPage({ params }: { params: Promise<{ spaceId
             <span className="text-sm text-gray-700 dark:text-gray-300">Required</span>
           </label>
           <button
+            type="button"
             onClick={addCustomField}
-            disabled={!newCustomField.name.trim()}
+            disabled={!newCustomField.key.trim()}
             className="px-4 py-2 text-sm font-medium border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             Add
@@ -330,6 +338,7 @@ export default function AssetLibraryPage({ params }: { params: Promise<{ spaceId
         </p>
         <div className="flex items-center gap-0 w-40">
           <button
+            type="button"
             onClick={() =>
               updateSettings((s) => ({ ...s, uploadLimitMb: Math.max(1, s.uploadLimitMb - 1) }))
             }
@@ -349,6 +358,7 @@ export default function AssetLibraryPage({ params }: { params: Promise<{ spaceId
             className="flex-1 px-3 py-2 border-y border-gray-300 dark:border-gray-600 text-sm text-center text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-teal-500 w-16"
           />
           <button
+            type="button"
             onClick={() =>
               updateSettings((s) => ({ ...s, uploadLimitMb: Math.min(5000, s.uploadLimitMb + 1) }))
             }
@@ -358,30 +368,6 @@ export default function AssetLibraryPage({ params }: { params: Promise<{ spaceId
           </button>
         </div>
       </SettingsSection>
-
-      {/* Image service */}
-      <div className="pb-8">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1">
-          Image service
-        </h2>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
-          Resize images on the fly! With this image service, you can give your customers a
-          high-quality, compelling brand experience at a speed they would not expect, no matter what
-          device or platform they are using.
-        </p>
-        <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">
-          List of paths to invalidate
-        </p>
-        <textarea
-          value={settings.imageServicePathsToInvalidate}
-          onChange={(e) =>
-            updateSettings((s) => ({ ...s, imageServicePathsToInvalidate: e.target.value }))
-          }
-          placeholder={`/300x300/f/xxx.jpg\n/300x300/f/xxx.jpg\n...`}
-          rows={5}
-          className="w-full px-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 font-mono resize-y"
-        />
-      </div>
 
       <UnsavedChangesModal
         open={showUnsavedModal}

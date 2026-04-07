@@ -58,9 +58,7 @@ describe('Approvals MAPI (e2e)', () => {
 
   describe('GET /v1/spaces/:spaceId/approvals', () => {
     it('returns 401 without token', async () => {
-      return request(app.getHttpServer())
-        .get(`/v1/spaces/${TEST_SPACE_ID}/approvals`)
-        .expect(401);
+      return request(app.getHttpServer()).get(`/v1/spaces/${TEST_SPACE_ID}/approvals`).expect(401);
     });
 
     it('returns list of approvals', async () => {

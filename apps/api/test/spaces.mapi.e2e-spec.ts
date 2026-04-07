@@ -57,9 +57,7 @@ describe('Spaces MAPI (e2e)', () => {
 
   describe('GET /v1/spaces', () => {
     it('returns 401 without token', () => {
-      return request(app.getHttpServer())
-        .get('/v1/spaces')
-        .expect(401);
+      return request(app.getHttpServer()).get('/v1/spaces').expect(401);
     });
 
     it('returns list of spaces', async () => {

@@ -27,6 +27,7 @@
     "@nestjs/platform-express": "catalog:",
     "@nestjs/throttler": "catalog:",
     "helmet": "catalog:",
+    "ioredis": "catalog:",
     "nestjs-pino": "catalog:",
     "pino-http": "catalog:",
     "reflect-metadata": "catalog:",

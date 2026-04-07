@@ -11,8 +11,16 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import {
-  apiFetch, sleep, chunkDir, ensureDir, readChunks, writeChunks,
-  readState, writeState, MAPI_BASE, REQUEST_DELAY_MS, CHUNK_SIZE, GOLDEN,
+  apiFetch,
+  sleep,
+  chunkDir,
+  ensureDir,
+  readState,
+  writeState,
+  MAPI_BASE,
+  REQUEST_DELAY_MS,
+  CHUNK_SIZE,
+  GOLDEN,
 } from '../utils';
 
 const PER_PAGE = 100;
@@ -23,7 +31,8 @@ const STORIES_RESOURCE = 'stories';
 function readGoldenStories(spaceId: number): any[] {
   const dir = path.join(GOLDEN, String(spaceId), STORIES_RESOURCE);
   if (!fs.existsSync(dir)) return [];
-  const files = fs.readdirSync(dir)
+  const files = fs
+    .readdirSync(dir)
     .filter((f) => f.startsWith('chunk_') && f.endsWith('.json'))
     .sort();
   const items: any[] = [];
@@ -52,7 +61,11 @@ async function fetchStoryVersions(spaceId: number, storyId: number, token: strin
   return versions;
 }
 
-export async function syncStoryVersions(spaceId: number, token: string, full = false): Promise<void> {
+export async function syncStoryVersions(
+  spaceId: number,
+  token: string,
+  full = false,
+): Promise<void> {
   const state = readState(spaceId);
   const prevState = state[RESOURCE] as any;
   const dir = chunkDir(spaceId, RESOURCE);
@@ -89,13 +102,14 @@ export async function syncStoryVersions(spaceId: number, token: string, full = f
   ensureDir(dir);
   // Clear old chunks upfront for full sync
   if (lastSyncAt === null) {
-    fs.readdirSync(dir).filter((f) => f.startsWith('chunk_')).forEach((f) =>
-      fs.unlinkSync(path.join(dir, f)));
+    fs.readdirSync(dir)
+      .filter((f) => f.startsWith('chunk_'))
+      .forEach((f) => fs.unlinkSync(path.join(dir, f)));
   }
 
   // Write incrementally: accumulate a buffer, flush every FLUSH_EVERY versions
   const FLUSH_EVERY = 500;
-  let buffer: any[] = [];
+  const buffer: any[] = [];
   let chunkIndex = 1;
   let totalVersions = 0;
   let lastChunkSize = 0;
@@ -130,7 +144,9 @@ export async function syncStoryVersions(spaceId: number, token: string, full = f
 
     fetched++;
     if (fetched % 20 === 0) {
-      process.stdout.write(`\r    story_versions: fetched ${fetched}/${storiesToFetch.length} (${totalVersions} versions)...`);
+      process.stdout.write(
+        `\r    story_versions: fetched ${fetched}/${storiesToFetch.length} (${totalVersions} versions)...`,
+      );
     }
     await sleep(REQUEST_DELAY_MS);
   }
@@ -146,5 +162,7 @@ export async function syncStoryVersions(spaceId: number, token: string, full = f
     lastChunkSize,
   };
   writeState(spaceId, state);
-  console.log(`    story_versions: ${totalVersions} versions across ${storiesToFetch.length} stories, chunks: ${finalChunkCount}`);
+  console.log(
+    `    story_versions: ${totalVersions} versions across ${storiesToFetch.length} stories, chunks: ${finalChunkCount}`,
+  );
 }

@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import { Search, Plus, Code2 } from 'lucide-react';
 import { PageLayout } from '@/components/ui/page-layout';
 import { SkeletonText } from '@/components/ui/skeleton';
+import { FormRootError } from '@/components/ui/form-field';
 import { useApi } from '@/lib/swr';
 import type { FieldType } from '@sbx/types';
 
@@ -21,11 +22,9 @@ export default function OrgFieldTypesPage() {
   const [search, setSearch] = useState('');
   const [creating, setCreating] = useState(false);
 
-  const {
-    data,
-    isLoading: loading,
-    mutate,
-  } = useApi<{ field_types: FieldType[] }>('/api/admin/field-types');
+  const { data, isLoading: loading } = useApi<{ field_types: FieldType[] }>(
+    '/api/admin/field-types',
+  );
   const fieldTypes = data?.field_types ?? [];
 
   const filtered = useMemo(() => {
@@ -104,7 +103,7 @@ export default function OrgFieldTypesPage() {
             </button>
           </form>
           {errors.name && <p className="text-xs text-red-500 mt-2">{errors.name.message}</p>}
-          {errors.root && <p className="text-xs text-red-500 mt-2">{errors.root.message}</p>}
+          <FormRootError message={errors.root?.message} />
         </div>
       )}
 
@@ -123,9 +122,9 @@ export default function OrgFieldTypesPage() {
       {/* List */}
       {loading ? (
         <div className="space-y-px border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-          {Array.from({ length: 5 }).map((_, i) => (
+          {['sk1', 'sk2', 'sk3', 'sk4', 'sk5'].map((k) => (
             <div
-              key={i}
+              key={k}
               className="flex items-center justify-between px-4 py-4 bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-800 last:border-0"
             >
               <div>

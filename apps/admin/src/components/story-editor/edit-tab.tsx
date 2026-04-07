@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { parseSchema } from '@/components/block-library/edit-block-modal/types';
 import { FieldRenderer } from './field-renderer';
+import { evaluateFieldConditions } from './field-conditions';
 import type { ComponentMeta, ComponentGroup } from './types';
 
 interface Props {
@@ -81,7 +82,9 @@ export function EditTab({
   const visibleTabs = tabs.filter((t) => fields.some((f) => f.tabKey === t.key));
 
   const currentTab = visibleTabs[activeTab] ?? visibleTabs[0];
-  const tabFields = fields.filter((f) => f.tabKey === currentTab?.key);
+  const tabFields = fields
+    .filter((f) => f.tabKey === currentTab?.key)
+    .filter((f) => evaluateFieldConditions((f.def as any).conditions, content));
 
   return (
     <div className="flex flex-col h-full">

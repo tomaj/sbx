@@ -155,6 +155,7 @@ export default function ContentPlannerClient({ params }: { params: Promise<{ spa
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
         <button
+          type="button"
           onClick={() => router.push(`/spaces/${spaceId}/content`)}
           className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
         >
@@ -162,6 +163,7 @@ export default function ContentPlannerClient({ params }: { params: Promise<{ spa
           Back to Content
         </button>
         <button
+          type="button"
           onClick={handleCreateRelease}
           className="flex items-center gap-1.5 px-4 py-2 text-sm bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
         >
@@ -179,6 +181,7 @@ export default function ContentPlannerClient({ params }: { params: Promise<{ spa
             {/* Month nav */}
             <div className="flex items-center justify-between mb-3">
               <button
+                type="button"
                 onClick={prevMonth}
                 className="p-1 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 rounded transition-colors"
               >
@@ -188,6 +191,7 @@ export default function ContentPlannerClient({ params }: { params: Promise<{ spa
                 {MONTHS[calMonth]} {calYear}
               </span>
               <button
+                type="button"
                 onClick={nextMonth}
                 className="p-1 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 rounded transition-colors"
               >
@@ -208,6 +212,7 @@ export default function ContentPlannerClient({ params }: { params: Promise<{ spa
             <div className="grid grid-cols-7">
               {/* Leading empty cells */}
               {Array.from({ length: firstDayOfMonth }).map((_, i) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: positional list
                 <div key={`empty-${i}`} />
               ))}
               {Array.from({ length: daysInMonth }).map((_, i) => {
@@ -218,6 +223,7 @@ export default function ContentPlannerClient({ params }: { params: Promise<{ spa
                 const hasRelease = scheduledDays.has(`${calYear}-${calMonth}-${day}`);
                 return (
                   <button
+                    type="button"
                     key={day}
                     onClick={() => handleDayClick(day)}
                     className={`relative flex flex-col items-center justify-center w-7 h-7 mx-auto rounded-full text-[11px] transition-colors ${
@@ -239,6 +245,7 @@ export default function ContentPlannerClient({ params }: { params: Promise<{ spa
 
             {/* Today link */}
             <button
+              type="button"
               onClick={goToday}
               className="mt-2 text-xs text-gray-400 hover:text-teal-600 dark:hover:text-teal-400 transition-colors"
             >
@@ -253,6 +260,7 @@ export default function ContentPlannerClient({ params }: { params: Promise<{ spa
             </p>
             <div className="flex flex-col gap-1">
               <button
+                type="button"
                 onClick={() => {
                   setFilterType('scheduled');
                   setSelectedDay(null);
@@ -271,6 +279,7 @@ export default function ContentPlannerClient({ params }: { params: Promise<{ spa
                 </span>
               </button>
               <button
+                type="button"
                 onClick={() => {
                   setFilterType('unscheduled');
                   setSelectedDay(null);
@@ -310,6 +319,7 @@ export default function ContentPlannerClient({ params }: { params: Promise<{ spa
           {loading ? (
             <div className="flex flex-col gap-2">
               {Array.from({ length: 6 }).map((_, i) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: positional list
                 <SkeletonBlock key={i} className="h-14 w-full rounded-lg" />
               ))}
             </div>
@@ -327,12 +337,14 @@ export default function ContentPlannerClient({ params }: { params: Promise<{ spa
             <div className="flex flex-col divide-y divide-gray-100 dark:divide-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
               {filteredReleases.map((release) => (
                 <button
+                  type="button"
                   key={release.id}
                   onClick={() => openRelease(release)}
                   className="flex items-center justify-between px-5 py-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors text-left"
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="w-7 h-7 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center shrink-0">
+                      {/* biome-ignore lint/a11y/noSvgWithoutTitle: decorative icon */}
                       <svg
                         className="w-4 h-4 text-gray-500 dark:text-gray-400"
                         viewBox="0 0 24 24"

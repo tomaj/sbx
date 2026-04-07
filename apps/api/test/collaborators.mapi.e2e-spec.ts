@@ -78,9 +78,7 @@ describe('Collaborators MAPI (e2e)', () => {
 
   afterAll(async () => {
     // Cleanup: remove space members first, then users, then space
-    await db
-      .delete(schema.spaceMembers)
-      .where(eq(schema.spaceMembers.spaceId, TEST_SPACE_ID));
+    await db.delete(schema.spaceMembers).where(eq(schema.spaceMembers.spaceId, TEST_SPACE_ID));
     if (testUserId) {
       await db.delete(schema.users).where(eq(schema.users.id, testUserId));
     }

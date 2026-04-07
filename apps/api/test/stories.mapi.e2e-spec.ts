@@ -5,7 +5,7 @@ import { AppModule } from '../src/app.module';
 import { DB } from '../src/db/db.module';
 import type { DbType } from '../src/db/db.module';
 import { spaces, apiTokens, stories } from '../src/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 
 const TEST_SPACE_ID = 999001;
 const TEST_TOKEN = 'test-stories-mapi-token';
@@ -59,9 +59,7 @@ describe('Stories MAPI (e2e)', () => {
 
   describe('GET /v1/spaces/:spaceId/stories', () => {
     it('returns 401 without token', async () => {
-      return request(app.getHttpServer())
-        .get(`/v1/spaces/${TEST_SPACE_ID}/stories`)
-        .expect(401);
+      return request(app.getHttpServer()).get(`/v1/spaces/${TEST_SPACE_ID}/stories`).expect(401);
     });
 
     it('returns list of stories', async () => {

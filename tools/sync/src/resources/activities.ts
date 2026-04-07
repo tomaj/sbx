@@ -3,7 +3,16 @@
  * Strategy: fetch pages from newest until we hit an item we already have,
  * then append only the new items to chunk files.
  */
-import { apiFetch, sleep, chunkDir, readChunks, writeChunks, readState, writeState, MAPI_BASE, REQUEST_DELAY_MS } from '../utils';
+import {
+  apiFetch,
+  sleep,
+  chunkDir,
+  writeChunks,
+  readState,
+  writeState,
+  MAPI_BASE,
+  REQUEST_DELAY_MS,
+} from '../utils';
 
 const PER_PAGE = 1000;
 const RESOURCE = 'activities';
@@ -25,7 +34,7 @@ export async function syncActivities(spaceId: number, token: string, full = fals
   while (!done) {
     const url = `${MAPI_BASE}/v1/spaces/${spaceId}/activities?per_page=${PER_PAGE}&page=${page}`;
     const { data, headers } = await apiFetch(url, token);
-    totalOnServer = parseInt(headers['total'] ?? '0', 10);
+    totalOnServer = parseInt(headers.total ?? '0', 10);
     const batch: any[] = data.activities ?? [];
 
     if (batch.length === 0) break;
@@ -61,7 +70,12 @@ export async function syncActivities(spaceId: number, token: string, full = fals
   const startChunkNum = prevState?.chunkCount ?? 1;
   const startOffset = prevState?.lastChunkSize ?? 0;
 
-  const { chunkNum, lastChunkSize } = writeChunks(dir, newItems, startChunkNum, startOffset === 1000 ? 1000 : startOffset);
+  const { chunkNum, lastChunkSize } = writeChunks(
+    dir,
+    newItems,
+    startChunkNum,
+    startOffset === 1000 ? 1000 : startOffset,
+  );
 
   const totalItems = (prevState?.totalItems ?? 0) + newItems.length;
   const newestItem = newItems[newItems.length - 1]; // after reverse, last = newest
@@ -74,5 +88,7 @@ export async function syncActivities(spaceId: number, token: string, full = fals
   };
   writeState(spaceId, state);
 
-  console.log(`    activities: +${newItems.length} new → total ${totalItems} (server: ${totalOnServer}), chunks: ${chunkNum}`);
+  console.log(
+    `    activities: +${newItems.length} new → total ${totalItems} (server: ${totalOnServer}), chunks: ${chunkNum}`,
+  );
 }

@@ -7,6 +7,7 @@ import { CrudSidebarForm } from '@/components/ui/crud-sidebar-form';
 import { CopyButton } from '@/components/ui/copy-button';
 import { useApi } from '@/lib/swr';
 import { useDelete } from '@/hooks/use-delete';
+import { FormField, inputCls } from '@/components/ui/form-field';
 import type { PersonalAccessToken } from '@sbx/types';
 import { formatDateTime as formatDate, formatDate as formatDateOnly } from '@/lib/date';
 
@@ -120,12 +121,14 @@ export default function TokensPage() {
             </div>
             <div className="flex items-center gap-2 shrink-0 ml-4">
               <button
+                type="button"
                 onClick={() => openEdit(token)}
                 className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 transition-colors"
               >
                 <Pencil className="size-4" />
               </button>
               <button
+                type="button"
                 onClick={() => tokenDelete.confirm(token)}
                 className="text-gray-400 hover:text-red-500 p-1 transition-colors"
               >
@@ -138,6 +141,7 @@ export default function TokensPage() {
 
       {!showForm && !newToken && (
         <button
+          type="button"
           onClick={() => setShowForm(true)}
           className="mt-4 px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-md text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
         >
@@ -151,23 +155,17 @@ export default function TokensPage() {
             Provide a expiration date to your new token
           </h3>
 
-          <div>
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-1.5">
-              Name
-            </label>
+          <FormField label="Name">
             <input
               type="text"
               placeholder="Enter your token name"
               value={tokenName}
               onChange={(e) => setTokenName(e.target.value)}
-              className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
+              className={inputCls}
             />
-          </div>
+          </FormField>
 
-          <div>
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-1.5">
-              Expiration
-            </label>
+          <FormField label="Expiration">
             <div className="flex items-center gap-4">
               <SelectDropdown
                 value={String(expiryDays)}
@@ -179,7 +177,7 @@ export default function TokensPage() {
                 <span className="text-sm text-gray-400">The token will expire on {expiryDate}</span>
               )}
             </div>
-          </div>
+          </FormField>
 
           <div className="flex items-start gap-2 text-sm text-gray-500">
             <TriangleAlert className="size-4 shrink-0 mt-0.5" />
@@ -187,6 +185,7 @@ export default function TokensPage() {
           </div>
 
           <button
+            type="button"
             onClick={handleGenerate}
             disabled={generating || !tokenName.trim()}
             className="px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-60"
@@ -196,6 +195,7 @@ export default function TokensPage() {
 
           <div>
             <button
+              type="button"
               onClick={() => setShowForm(false)}
               className="px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
             >
@@ -216,6 +216,7 @@ export default function TokensPage() {
           </div>
           <p className="text-xs text-gray-400">Save this token now — it will not be shown again.</p>
           <button
+            type="button"
             onClick={() => {
               setNewToken(null);
               setShowForm(false);
@@ -238,10 +239,7 @@ export default function TokensPage() {
         onSubmit={handleSaveEdit}
         noForm
       >
-        <div>
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-1.5">
-            Name
-          </label>
+        <FormField label="Name">
           <input
             type="text"
             value={editName}
@@ -249,9 +247,9 @@ export default function TokensPage() {
               setEditName(e.target.value);
               setEditIsDirty(true);
             }}
-            className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
+            className={inputCls}
           />
-        </div>
+        </FormField>
       </CrudSidebarForm>
     </div>
   );

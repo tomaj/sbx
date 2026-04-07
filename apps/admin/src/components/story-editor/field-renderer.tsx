@@ -12,26 +12,23 @@ import { BooleanField } from './fields/boolean-field';
 import { DatetimeField } from './fields/datetime-field';
 import { OptionField } from './fields/option-field';
 import { OptionsField } from './fields/options-field';
-import { LinkField } from './fields/link-field';
+import { LinkField } from './fields/link';
 import { AssetField, MultiassetField } from './fields/asset-field';
 import { SectionField } from './fields/section-field';
 import { TableField } from './fields/table-field';
 import { BloksField } from './fields/bloks-field';
 import { CustomPluginField } from './fields/custom-plugin-field';
 
-const RichtextField = dynamic(
-  () => import('./fields/richtext-field').then((mod) => mod.RichtextField),
-  {
-    loading: () => (
-      <div>
-        <div className="h-4 w-24 animate-pulse bg-muted rounded mb-1" />
-        <div className="h-10 animate-pulse bg-muted rounded mb-1" />
-        <div className="h-32 animate-pulse bg-muted rounded" />
-      </div>
-    ),
-    ssr: false,
-  },
-);
+const RichtextField = dynamic(() => import('./fields/richtext').then((mod) => mod.RichtextField), {
+  loading: () => (
+    <div>
+      <div className="h-4 w-24 animate-pulse bg-muted rounded mb-1" />
+      <div className="h-10 animate-pulse bg-muted rounded mb-1" />
+      <div className="h-32 animate-pulse bg-muted rounded" />
+    </div>
+  ),
+  ssr: false,
+});
 
 interface Props {
   fieldKey: string;

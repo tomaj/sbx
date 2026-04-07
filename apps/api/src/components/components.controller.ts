@@ -11,6 +11,7 @@ import {
   Put,
   Query,
   Req,
+  UseGuards,
 } from '@nestjs/common';
 import { Auth } from '../auth/auth.decorator';
 import { ComponentsService } from './components.service';
@@ -21,9 +22,11 @@ import { CreateComponentGroupDto } from './dto/create-component-group.dto';
 import { UpdateComponentGroupDto } from './dto/update-component-group.dto';
 import { QueryParserUtil } from '../shared/query-parser.util';
 import { ResultGuard } from '../shared/result-guard.util';
+import { MaintenanceModeGuard } from '../shared/maintenance-mode.guard';
 
 @Controller('v1/spaces/:spaceId')
 @Auth('session-or-token')
+@UseGuards(MaintenanceModeGuard)
 export class ComponentsController {
   constructor(
     private readonly componentsService: ComponentsService,

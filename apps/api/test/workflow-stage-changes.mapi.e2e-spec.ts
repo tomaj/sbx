@@ -110,7 +110,9 @@ describe('WorkflowStageChanges MAPI (e2e)', () => {
 
     it('returns changes filtered by story id', async () => {
       const res = await request(app.getHttpServer())
-        .get(`/v1/spaces/${TEST_SPACE_ID}/workflow_stage_changes?token=${TEST_TOKEN}&with_story=${storyId}`)
+        .get(
+          `/v1/spaces/${TEST_SPACE_ID}/workflow_stage_changes?token=${TEST_TOKEN}&with_story=${storyId}`,
+        )
         .expect(200);
 
       expect(res.body).toHaveProperty('workflow_stage_changes');

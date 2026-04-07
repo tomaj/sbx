@@ -5,7 +5,18 @@
  */
 import * as fs from 'fs';
 import * as path from 'path';
-import { apiFetch, sleep, chunkDir, ensureDir, readChunks, writeChunks, readState, writeState, MAPI_BASE, REQUEST_DELAY_MS, CHUNK_SIZE } from '../utils';
+import {
+  apiFetch,
+  sleep,
+  chunkDir,
+  ensureDir,
+  readChunks,
+  writeChunks,
+  readState,
+  writeState,
+  MAPI_BASE,
+  REQUEST_DELAY_MS,
+} from '../utils';
 
 const PER_PAGE = 100;
 const RESOURCE = 'stories';
@@ -27,7 +38,7 @@ export async function syncStories(spaceId: number, token: string, full = false):
   while (!done) {
     const url = `${MAPI_BASE}/v1/spaces/${spaceId}/stories?per_page=${PER_PAGE}&page=${page}&sort_by=updated_at:desc&with_content=1`;
     const { data, headers } = await apiFetch(url, token);
-    totalOnServer = parseInt(headers['total'] ?? '0', 10);
+    totalOnServer = parseInt(headers.total ?? '0', 10);
     const batch: any[] = data.stories ?? [];
 
     if (batch.length === 0) break;
@@ -61,7 +72,9 @@ export async function syncStories(spaceId: number, token: string, full = false):
     ensureDir(dir);
     // Clear existing chunks
     if (fs.existsSync(dir)) {
-      fs.readdirSync(dir).filter(f => f.startsWith('chunk_')).forEach(f => fs.unlinkSync(path.join(dir, f)));
+      fs.readdirSync(dir)
+        .filter((f) => f.startsWith('chunk_'))
+        .forEach((f) => fs.unlinkSync(path.join(dir, f)));
     }
     const { chunkNum, lastChunkSize } = writeChunks(dir, updatedItems, 1, 0);
     const newestStory = updatedItems[updatedItems.length - 1];
@@ -86,7 +99,9 @@ export async function syncStories(spaceId: number, token: string, full = false):
     // Re-sort by id ascending (stable order) and rewrite chunks
     const all = Array.from(byId.values()).sort((a, b) => (a.id > b.id ? 1 : -1));
     ensureDir(dir);
-    fs.readdirSync(dir).filter(f => f.startsWith('chunk_')).forEach(f => fs.unlinkSync(path.join(dir, f)));
+    fs.readdirSync(dir)
+      .filter((f) => f.startsWith('chunk_'))
+      .forEach((f) => fs.unlinkSync(path.join(dir, f)));
     const { chunkNum, lastChunkSize } = writeChunks(dir, all, 1, 0);
     const newestStory = updatedItems[0]; // still newest-first order
 
@@ -97,12 +112,16 @@ export async function syncStories(spaceId: number, token: string, full = false):
       lastChunkSize,
     };
 
-    console.log(`    stories: ${updatedItems.length} updated (${newCount} new), total ${all.length}`);
+    console.log(
+      `    stories: ${updatedItems.length} updated (${newCount} new), total ${all.length}`,
+    );
   }
 
   writeState(spaceId, state);
 
   if (knownNewestAt === null) {
-    console.log(`    stories: full sync ${updatedItems.length} (server: ${totalOnServer}), chunks: ${state[RESOURCE].chunkCount}`);
+    console.log(
+      `    stories: full sync ${updatedItems.length} (server: ${totalOnServer}), chunks: ${state[RESOURCE].chunkCount}`,
+    );
   }
 }

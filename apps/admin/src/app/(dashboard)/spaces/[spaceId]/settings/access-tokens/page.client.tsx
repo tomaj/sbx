@@ -3,19 +3,20 @@
 import { use } from 'react';
 import { Controller } from 'react-hook-form';
 import { z } from 'zod';
-import { Plus, Settings, Trash2 } from 'lucide-react';
 import { CrudSidebarForm } from '@/components/ui/crud-sidebar-form';
+import { CrudSettingsPage } from '@/components/ui/crud-settings-page';
 import { SelectDropdown } from '@/components/ui/select-dropdown';
-import { EmptyState } from '@/components/ui/empty-state';
 import { CopyButton } from '@/components/ui/copy-button';
 import { AccessBadge } from '@/components/ui/badge';
+import { DataTable, type Column } from '@/components/ui/data-table';
 import { useApi } from '@/lib/swr';
 import { useDelete } from '@/hooks/use-delete';
 import { useCrudForm } from '@/hooks/use-crud-form';
 import { useCrudSidebar } from '@/hooks/use-crud-sidebar';
 import type { ApiToken, Branch } from '@sbx/types';
-import { SkeletonText, SkeletonBlock, SkeletonBadge } from '@/components/ui/skeleton';
-import { FormField, inputCls } from '@/components/ui/form-field';
+import { SkeletonText, SkeletonBadge } from '@/components/ui/skeleton';
+import { FormField, FormRootError, inputCls } from '@/components/ui/form-field';
+import { RowActions, RowActionsSkeleton } from '@/components/ui/row-actions';
 
 // ─── Zod schema ───────────────────────────────────────────────────────────────
 
@@ -99,9 +100,7 @@ function TokenForm({ spaceId, token, branches, open, onClose, onSaved }: TokenFo
       width="w-[480px]"
       noForm
     >
-      {errors.root?.message && (
-        <p className="text-sm text-red-600 dark:text-red-400">{errors.root.message}</p>
-      )}
+      <FormRootError message={errors.root?.message} />
 
       {token && (
         <FormField label="Key">
@@ -213,145 +212,81 @@ export default function AccessTokensPage({ params }: { params: Promise<{ spaceId
     return branches.find((b) => b.id === branchId)?.name ?? null;
   }
 
-  return (
-    <div className="max-w-4xl px-10 py-8">
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Access Tokens</h1>
-        <button
-          onClick={openCreate}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-teal-700 hover:bg-teal-800 rounded-lg transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          New Access Token
-        </button>
-      </div>
-      <p className="text-sm text-gray-500 dark:text-gray-400 mb-8">
-        Public access tokens are only for accessing the published version while preview tokens are
-        for accessing the draft version. Both are read-only tokens.
-      </p>
-
-      {tokensLoading ? (
-        <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-200 dark:border-gray-700">
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-                  Token
-                </th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-                  Access level
-                </th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-                  Pipeline
-                </th>
-                <th className="w-32" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <tr key={i}>
-                  <td className="px-4 py-3 space-y-1.5">
-                    <SkeletonText width="w-32" />
-                    <SkeletonText width="w-48" height="h-3" />
-                  </td>
-                  <td className="px-4 py-3">
-                    <SkeletonBadge width="w-16" />
-                  </td>
-                  <td className="px-4 py-3">
-                    <SkeletonText width="w-20" />
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center justify-end gap-1">
-                      <SkeletonBlock height="h-8" width="w-8" />
-                      <SkeletonBlock height="h-8" width="w-8" />
-                      <SkeletonBlock height="h-8" width="w-8" />
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+  const columns: Column<ApiToken>[] = [
+    {
+      key: 'token',
+      label: 'Token',
+      render: (t) => (
+        <div>
+          <p className="font-semibold text-gray-900 dark:text-gray-100">{t.name || '—'}</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 font-mono mt-0.5">{t.token}</p>
         </div>
-      ) : tokens.length === 0 ? (
-        <EmptyState
-          message="No access tokens yet."
-          action={
-            <button
-              onClick={openCreate}
-              className="text-sm text-teal-600 dark:text-teal-400 hover:underline"
-            >
-              Create your first token
-            </button>
-          }
+      ),
+      skeletonRender: () => (
+        <div className="space-y-1.5">
+          <SkeletonText width="w-32" />
+          <SkeletonText width="w-48" height="h-3" />
+        </div>
+      ),
+    },
+    {
+      key: 'access',
+      label: 'Access level',
+      render: (t) => <AccessBadge access={t.access} />,
+      skeletonRender: () => <SkeletonBadge width="w-16" />,
+    },
+    {
+      key: 'branch',
+      label: 'Pipeline',
+      render: (t) => (
+        <span className="text-gray-500 dark:text-gray-400">
+          {getBranchName(t.branch_id) ?? '——'}
+        </span>
+      ),
+      skeletonRender: () => <SkeletonText width="w-20" />,
+    },
+    {
+      key: 'actions',
+      label: '',
+      width: '120px',
+      render: (t) => (
+        <RowActions
+          before={<CopyButton text={t.token} />}
+          onEdit={() => openEdit(t)}
+          onDelete={() => tokenDelete.confirm(t)}
         />
-      ) : (
-        <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-200 dark:border-gray-700">
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-                  Token
-                </th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-                  Access level
-                </th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-                  Pipeline
-                </th>
-                <th className="w-32" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-              {tokens.map((t) => (
-                <tr key={t.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/40">
-                  <td className="px-4 py-3">
-                    <p className="font-semibold text-gray-900 dark:text-gray-100">
-                      {t.name || '—'}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 font-mono mt-0.5">
-                      {t.token}
-                    </p>
-                  </td>
-                  <td className="px-4 py-3">
-                    <AccessBadge access={t.access} />
-                  </td>
-                  <td className="px-4 py-3 text-gray-500 dark:text-gray-400">
-                    {getBranchName(t.branch_id) ?? '——'}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center justify-end gap-1">
-                      <CopyButton text={t.token} />
-                      <button
-                        onClick={() => openEdit(t)}
-                        className="flex items-center justify-center w-8 h-8 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                      >
-                        <Settings className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => tokenDelete.confirm(t)}
-                        className="flex items-center justify-center w-8 h-8 rounded-lg text-gray-400 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      ),
+      skeletonRender: () => <RowActionsSkeleton count={3} />,
+    },
+  ];
 
-      <TokenForm
-        spaceId={spaceId}
-        token={selectedToken}
-        branches={branches}
-        open={panelOpen}
-        onClose={close}
-        onSaved={handleSaved}
-      />
-
-      {tokenDelete.modal}
-    </div>
+  return (
+    <CrudSettingsPage
+      title="Access Tokens"
+      description="Public access tokens are only for accessing the published version while preview tokens are for accessing the draft version. Both are read-only tokens."
+      addLabel="New Access Token"
+      onAdd={openCreate}
+      sidebar={
+        <TokenForm
+          spaceId={spaceId}
+          token={selectedToken}
+          branches={branches}
+          open={panelOpen}
+          onClose={close}
+          onSaved={handleSaved}
+        />
+      }
+      extras={tokenDelete.modal}
+    >
+      <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+        <DataTable
+          columns={columns as unknown as Column<Record<string, unknown>>[]}
+          data={tokens as unknown as Record<string, unknown>[]}
+          keyField="id"
+          isLoading={tokensLoading}
+          emptyMessage="No access tokens yet."
+        />
+      </div>
+    </CrudSettingsPage>
   );
 }

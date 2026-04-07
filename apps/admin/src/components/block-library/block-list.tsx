@@ -22,6 +22,7 @@ export interface Block {
   schema: Record<string, any>;
   preview_field: string | null;
   preview_tmpl: string | null;
+  content_type_asset_preview: string | null;
   internal_tags_list: { id: string | number; name: string }[];
 }
 

@@ -1,16 +1,16 @@
-'use client'
+'use client';
 
-import { storyblokEditable } from '@storyblok/react'
+import { storyblokEditable } from '@storyblok/react';
 
 interface BlockProps {
-  blok: Record<string, any>
-  depth?: number
+  blok: Record<string, any>;
+  depth?: number;
 }
 
 // Renders rich text content (simplified)
 function RichTextContent({ content }: { content: any }) {
-  if (!content) return null
-  if (typeof content === 'string') return <span>{content}</span>
+  if (!content) return null;
+  if (typeof content === 'string') return <span>{content}</span>;
   if (content.type === 'doc' && content.content) {
     return (
       <div className="richtext">
@@ -18,13 +18,13 @@ function RichTextContent({ content }: { content: any }) {
           <RichTextNode key={i} node={node} />
         ))}
       </div>
-    )
+    );
   }
-  return null
+  return null;
 }
 
 function RichTextNode({ node }: { node: any }) {
-  if (!node) return null
+  if (!node) return null;
   if (node.type === 'paragraph') {
     return (
       <p style={{ marginBottom: '0.75rem' }}>
@@ -32,28 +32,28 @@ function RichTextNode({ node }: { node: any }) {
           <RichTextNode key={i} node={child} />
         ))}
       </p>
-    )
+    );
   }
   if (node.type === 'heading') {
-    const Tag = `h${node.attrs?.level ?? 2}` as unknown as React.ElementType
+    const Tag = `h${node.attrs?.level ?? 2}` as unknown as React.ElementType;
     return (
       <Tag style={{ marginBottom: '0.5rem', marginTop: '1rem' }}>
         {node.content?.map((child: any, i: number) => (
           <RichTextNode key={i} node={child} />
         ))}
       </Tag>
-    )
+    );
   }
   if (node.type === 'text') {
-    let text: React.ReactNode = node.text
+    let text: React.ReactNode = node.text;
     if (node.marks) {
       for (const mark of node.marks) {
-        if (mark.type === 'bold') text = <strong>{text}</strong>
-        if (mark.type === 'italic') text = <em>{text}</em>
-        if (mark.type === 'link') text = <a href={mark.attrs?.href}>{text}</a>
+        if (mark.type === 'bold') text = <strong>{text}</strong>;
+        if (mark.type === 'italic') text = <em>{text}</em>;
+        if (mark.type === 'link') text = <a href={mark.attrs?.href}>{text}</a>;
       }
     }
-    return <>{text}</>
+    return <>{text}</>;
   }
   if (node.type === 'bullet_list') {
     return (
@@ -62,7 +62,7 @@ function RichTextNode({ node }: { node: any }) {
           <RichTextNode key={i} node={child} />
         ))}
       </ul>
-    )
+    );
   }
   if (node.type === 'list_item') {
     return (
@@ -71,16 +71,16 @@ function RichTextNode({ node }: { node: any }) {
           <RichTextNode key={i} node={child} />
         ))}
       </li>
-    )
+    );
   }
-  return null
+  return null;
 }
 
 // Generic block renderer — handles any block type
 function Block({ blok, depth = 0 }: BlockProps) {
-  if (!blok || !blok.component) return null
+  if (!blok?.component) return null;
 
-  const editableAttrs = storyblokEditable(blok)
+  const editableAttrs = storyblokEditable(blok);
 
   // Specific renderers for common block types
   switch (blok.component) {
@@ -91,10 +91,10 @@ function Block({ blok, depth = 0 }: BlockProps) {
             <Block key={child._uid} blok={child} depth={depth + 1} />
           ))}
         </div>
-      )
+      );
 
     default:
-      return <GenericBlock blok={blok} depth={depth} editableAttrs={editableAttrs} />
+      return <GenericBlock blok={blok} depth={depth} editableAttrs={editableAttrs} />;
   }
 }
 
@@ -104,11 +104,11 @@ function GenericBlock({
   depth,
   editableAttrs,
 }: {
-  blok: Record<string, any>
-  depth: number
-  editableAttrs: Record<string, any>
+  blok: Record<string, any>;
+  depth: number;
+  editableAttrs: Record<string, any>;
 }) {
-  const bgColor = depth % 2 === 0 ? '#f9fafb' : '#fff'
+  const bgColor = depth % 2 === 0 ? '#f9fafb' : '#fff';
 
   return (
     <div
@@ -153,51 +153,74 @@ function GenericBlock({
 
       {/* Render fields */}
       {Object.entries(blok).map(([key, val]) => {
-        if (key.startsWith('_') || key === 'component') return null
+        if (key.startsWith('_') || key === 'component') return null;
 
         // Nested blocks array
         if (Array.isArray(val) && val.length > 0 && val[0]?._uid) {
           return (
             <div key={key} style={{ marginTop: '0.5rem' }}>
-              <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 600, marginBottom: '0.25rem' }}>
+              <div
+                style={{
+                  fontSize: '0.75rem',
+                  color: '#6b7280',
+                  fontWeight: 600,
+                  marginBottom: '0.25rem',
+                }}
+              >
                 {key}
               </div>
               {val.map((child: any) => (
                 <Block key={child._uid} blok={child} depth={depth + 1} />
               ))}
             </div>
-          )
+          );
         }
 
         // Rich text
         if (val && typeof val === 'object' && val.type === 'doc') {
           return (
             <div key={key} style={{ marginTop: '0.5rem' }}>
-              <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 600, marginBottom: '0.25rem' }}>
+              <div
+                style={{
+                  fontSize: '0.75rem',
+                  color: '#6b7280',
+                  fontWeight: 600,
+                  marginBottom: '0.25rem',
+                }}
+              >
                 {key}
               </div>
               <div style={{ fontSize: '0.9rem' }}>
                 <RichTextContent content={val} />
               </div>
             </div>
-          )
+          );
         }
 
         // Asset
         if (val && typeof val === 'object' && val.filename) {
           return (
             <div key={key} style={{ marginTop: '0.5rem' }}>
-              <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 600, marginBottom: '0.25rem' }}>
+              <div
+                style={{
+                  fontSize: '0.75rem',
+                  color: '#6b7280',
+                  fontWeight: 600,
+                  marginBottom: '0.25rem',
+                }}
+              >
                 {key}
               </div>
               <img
                 src={val.filename}
                 alt={val.alt ?? key}
                 style={{ maxWidth: '100%', maxHeight: 200, borderRadius: 4, objectFit: 'cover' }}
-                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
               />
             </div>
-          )
+          );
         }
 
         // String/number primitives
@@ -210,35 +233,51 @@ function GenericBlock({
                   {String(val).slice(0, 200)}…
                 </div>
               </div>
-            )
+            );
           }
-          if (!String(val)) return null
+          if (!String(val)) return null;
           return (
-            <div key={key} style={{ marginTop: '0.25rem', display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
-              <span style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 600, flexShrink: 0, minWidth: '6rem' }}>
+            <div
+              key={key}
+              style={{
+                marginTop: '0.25rem',
+                display: 'flex',
+                gap: '0.5rem',
+                alignItems: 'flex-start',
+              }}
+            >
+              <span
+                style={{
+                  fontSize: '0.75rem',
+                  color: '#6b7280',
+                  fontWeight: 600,
+                  flexShrink: 0,
+                  minWidth: '6rem',
+                }}
+              >
                 {key}
               </span>
               <span style={{ fontSize: '0.85rem', color: '#111' }}>{String(val)}</span>
             </div>
-          )
+          );
         }
 
-        return null
+        return null;
       })}
     </div>
-  )
+  );
 }
 
 interface StoryRendererProps {
   story: {
-    content: Record<string, any>
-    name: string
-    full_slug: string
-  }
+    content: Record<string, any>;
+    name: string;
+    full_slug: string;
+  };
 }
 
 export function StoryRenderer({ story }: StoryRendererProps) {
-  const content = story.content
+  const content = story.content;
 
   return (
     <div style={{ minHeight: '100vh', paddingBottom: '4rem' }}>
@@ -264,5 +303,5 @@ export function StoryRenderer({ story }: StoryRendererProps) {
         <Block blok={content} />
       </div>
     </div>
-  )
+  );
 }

@@ -1,9 +1,10 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import type { Redis } from 'ioredis';
 import { ResultGuard } from '../shared/result-guard.util';
 import { and, asc, desc, count, eq, ilike, isNull, isNotNull, or, sql } from 'drizzle-orm';
 import { DB } from '../db/db.module';
 import { DbType } from '../db/db.module';
-import { assets, assetFolders, internalTags } from '../db/schema';
+import { assets, assetFolders, internalTags, spaces } from '../db/schema';
 import { AiService } from '../ai/ai.service';
 import { AiConfigurationsService } from '../ai-configurations/ai-configurations.service';
 import { escapeLike } from '../shared/query-parser.util';
@@ -11,11 +12,13 @@ import { inArray } from 'drizzle-orm';
 import { StorageService } from '../storage/storage.service';
 import { WebhooksService } from '../webhooks/webhooks.service';
 import { WEBHOOK_ACTIONS } from '../webhooks/webhook-actions';
+import { REDIS } from '../redis/redis.module';
 
 @Injectable()
 export class AssetsService {
   constructor(
     @Inject(DB) private db: DbType,
+    @Inject(REDIS) private readonly redis: Redis,
     private readonly storage: StorageService,
     private readonly webhooks: WebhooksService,
     private readonly ai: AiService,
@@ -364,6 +367,17 @@ export class AssetsService {
       .returning();
     ResultGuard.throwIfNotFound(row, 'Asset not found');
 
+    // Sync CDN private-access flag in Redis whenever locked status changes
+    if (data.locked !== undefined) {
+      const objectKey = row.filename.replace(/^\/f\//, '');
+      const redisKey = `cdn:asset:private:${objectKey}`;
+      if (row.locked) {
+        await this.redis.set(redisKey, '1');
+      } else {
+        await this.redis.del(redisKey);
+      }
+    }
+
     void this.webhooks.dispatch(spaceId, 'asset.updated', {
       action: 'asset_updated',
       space_id: spaceId,
@@ -375,7 +389,128 @@ export class AssetsService {
     return this.formatAsset(row);
   }
 
+  // ─── MAPI upload flow (sign → upload → finish_upload) ───────────────────────
+
+  async signUpload(
+    spaceId: number,
+    body: {
+      filename: string;
+      size: number;
+      content_type?: string;
+      asset_folder_id?: number | null;
+    },
+  ) {
+    const id = Date.now() * 1000 + Math.floor(Math.random() * 1000);
+    const safeName = (body.filename ?? 'upload').replace(/[^a-zA-Z0-9._-]/g, '_');
+    const filename = `/f/${spaceId}/${id}-${safeName}`;
+
+    await this.redis.set(
+      `asset:upload:pending:${id}`,
+      JSON.stringify({
+        spaceId,
+        safeName,
+        filename,
+        contentType: body.content_type ?? null,
+        size: body.size,
+        folderId: body.asset_folder_id ?? null,
+      }),
+      'EX',
+      3600,
+    );
+
+    return {
+      id,
+      fields: {},
+      post_url: `/v1/spaces/${spaceId}/assets/${id}/upload`,
+      pretty_url: filename,
+      public_url: filename,
+      signed_request: '',
+    };
+  }
+
+  async uploadSignedFile(spaceId: number, id: number, file: Express.Multer.File) {
+    const pendingRaw = await this.redis.get(`asset:upload:pending:${id}`);
+    if (!pendingRaw) throw new BadRequestException('No pending upload found for this asset ID');
+
+    const pending = JSON.parse(pendingRaw);
+    if (pending.spaceId !== spaceId) throw new BadRequestException('Space mismatch');
+
+    // Enforce per-space upload size limit
+    const [space] = await this.db.select().from(spaces).where(eq(spaces.id, spaceId)).limit(1);
+    const uploadLimitMb = (space?.assetLibrarySettings as any)?.uploadLimitMb ?? 100;
+    if (file.size > uploadLimitMb * 1024 * 1024) {
+      throw new BadRequestException(`File exceeds the upload limit of ${uploadLimitMb} MB`);
+    }
+
+    const key = `${spaceId}/${id}-${pending.safeName}`;
+    await this.storage.putObject(key, file.buffer, file.mimetype);
+
+    // Mark as uploaded — keep rest of metadata for finish_upload
+    await this.redis.set(
+      `asset:upload:pending:${id}`,
+      JSON.stringify({
+        ...pending,
+        uploaded: true,
+        actualContentType: file.mimetype,
+        actualSize: file.size,
+      }),
+      'EX',
+      3600,
+    );
+
+    return {};
+  }
+
+  async finishUpload(spaceId: number, id: number) {
+    const pendingRaw = await this.redis.get(`asset:upload:pending:${id}`);
+    if (!pendingRaw) throw new BadRequestException('No pending upload found');
+
+    const pending = JSON.parse(pendingRaw);
+    if (pending.spaceId !== spaceId) throw new BadRequestException('Space mismatch');
+    if (!pending.uploaded) throw new BadRequestException('File has not been uploaded yet');
+
+    const [row] = await this.db
+      .insert(assets)
+      .values({
+        id,
+        spaceId,
+        filename: pending.filename,
+        shortFilename: pending.safeName,
+        contentType: pending.actualContentType ?? pending.contentType,
+        contentLength: pending.actualSize ?? pending.size,
+        folderId: pending.folderId ?? null,
+        metaData: {},
+      })
+      .returning();
+
+    await this.redis.del(`asset:upload:pending:${id}`);
+
+    void this.webhooks.dispatch(spaceId, WEBHOOK_ACTIONS.ASSET_CREATED, {
+      action: 'asset_created',
+      space_id: spaceId,
+      asset_id: row.id,
+      filename: row.filename,
+      text: `Asset "${row.shortFilename}" was uploaded.`,
+    });
+
+    return { asset: this.formatAsset(row) };
+  }
+
+  // ─── Legacy batch upload (admin endpoint) ────────────────────────────────────
+
   async uploadAssets(spaceId: number, files: Express.Multer.File[], folderId?: number | null) {
+    // Enforce per-space upload size limit from asset_library_settings
+    const [space] = await this.db.select().from(spaces).where(eq(spaces.id, spaceId)).limit(1);
+    const uploadLimitMb = (space?.assetLibrarySettings as any)?.uploadLimitMb ?? 100;
+    const uploadLimitBytes = uploadLimitMb * 1024 * 1024;
+    for (const file of files) {
+      if (file.size > uploadLimitBytes) {
+        throw new BadRequestException(
+          `File "${file.originalname}" exceeds the upload limit of ${uploadLimitMb} MB`,
+        );
+      }
+    }
+
     const results = await Promise.all(
       files.map(async (file) => {
         const id = Date.now() * 1000 + Math.floor(Math.random() * 1000);
@@ -483,7 +618,31 @@ export class AssetsService {
     };
   }
 
-  async bulkUpdate(spaceId: number, ids: number[], assetFolderId: number) {
+  async getAssetContent(
+    id: number,
+    spaceId: number,
+  ): Promise<{ buffer: Buffer; contentType: string; filename: string; locked: boolean }> {
+    const [asset] = await this.db
+      .select()
+      .from(assets)
+      .where(and(eq(assets.id, id), eq(assets.spaceId, spaceId), isNull(assets.deletedAt)))
+      .limit(1);
+    ResultGuard.throwIfNotFound(asset, 'Asset not found');
+
+    // Derive MinIO key from filename: /f/{spaceId}/key → {spaceId}/key
+    const key = asset.filename.replace(/^\/f\//, '');
+    const object = await this.storage.getObject(key);
+    if (!object) throw new NotFoundException('Asset file not found in storage');
+
+    return {
+      buffer: object.body,
+      contentType: asset.contentType ?? 'application/octet-stream',
+      filename: asset.shortFilename ?? asset.filename.split('/').pop() ?? 'download',
+      locked: asset.locked ?? false,
+    };
+  }
+
+  async bulkUpdate(spaceId: number, ids: number[], assetFolderId: number | null) {
     if (!ids.length) return;
     await this.db
       .update(assets)
