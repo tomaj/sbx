@@ -1,6 +1,6 @@
 #!/bin/bash
 # SBX Deploy Script
-# Usage: ./deploy/deploy.sh [--skip-golden]
+# Usage: ./deploy/deploy.sh [--skip-golden] [--skip-db]
 # Run from the root of the monorepo on your local machine
 
 set -e
@@ -8,9 +8,11 @@ set -e
 SERVER="root@46.224.90.233"
 APP_DIR="/opt/sbx"
 SKIP_GOLDEN=false
+SKIP_DB=false
 
 for arg in "$@"; do
   [[ "$arg" == "--skip-golden" ]] && SKIP_GOLDEN=true
+  [[ "$arg" == "--skip-db" ]] && SKIP_DB=true
 done
 
 echo "=== SBX Deploy ==="
@@ -31,11 +33,25 @@ rsync -az \
 echo ">>> Syncing deploy config..."
 rsync -az deploy/.env.prod "$SERVER:$APP_DIR/deploy/.env.prod"
 
-# 3. Build and restart on server
+# 3. Export and upload local DB if not skipped
+if [ "$SKIP_DB" = false ]; then
+  echo ">>> Exporting local database..."
+  pg_dump -U "${PGUSER:-$(whoami)}" -d sbx --clean --if-exists --no-owner --no-privileges -F custom -f /tmp/sbx-dump.pgcustom
+  echo ">>> Uploading database dump..."
+  scp /tmp/sbx-dump.pgcustom "$SERVER:/tmp/sbx-dump.pgcustom"
+fi
+
+# 4. Build and restart on server
 echo ">>> Building and restarting on server..."
 ssh "$SERVER" bash << 'REMOTE'
 set -e
 cd /opt/sbx
+
+# Export deploy env so docker compose can substitute ${VAR} in compose file
+set -a
+# shellcheck disable=SC1091
+source /opt/sbx/deploy/.env.prod
+set +a
 
 # Start/update infra
 echo "--- Starting infrastructure..."
@@ -44,10 +60,23 @@ docker compose -f deploy/docker-compose.infra.yml up -d
 # Wait for postgres to be ready
 echo "--- Waiting for PostgreSQL..."
 for i in $(seq 1 30); do
-  docker compose -f deploy/docker-compose.infra.yml exec -T postgres pg_isready -U sbx && break
+  docker compose -f deploy/docker-compose.infra.yml exec -T postgres pg_isready -U sbx < /dev/null && break
   echo "  waiting... ($i)"
   sleep 2
 done
+
+# Restore DB from dump if present
+if [ -f /tmp/sbx-dump.pgcustom ]; then
+  echo "--- Restoring database from dump..."
+  docker compose -f deploy/docker-compose.infra.yml exec -T postgres \
+    pg_restore -U sbx -d sbx --clean --if-exists --no-owner --no-privileges /tmp/sbx-dump.pgcustom < /dev/null || true
+  # pg_restore needs the file inside the container — use docker cp + exec instead
+  docker cp /tmp/sbx-dump.pgcustom deploy-postgres-1:/tmp/sbx-dump.pgcustom
+  docker compose -f deploy/docker-compose.infra.yml exec -T postgres \
+    pg_restore -U sbx -d sbx --clean --if-exists --no-owner --no-privileges /tmp/sbx-dump.pgcustom < /dev/null || true
+  echo "--- Database restored."
+  rm -f /tmp/sbx-dump.pgcustom
+fi
 
 # Ensure MinIO bucket exists
 echo "--- Ensuring MinIO bucket..."
@@ -59,28 +88,27 @@ docker run --rm --network host \
 echo "--- Installing dependencies..."
 pnpm install --frozen-lockfile
 
+# Build shared packages first
+echo "--- Building shared packages..."
+cd /opt/sbx
+pnpm --filter @sbx/db build 2>/dev/null || true
+pnpm --filter @sbx/jobs build 2>/dev/null || true
+pnpm --filter @sbx/types build 2>/dev/null || true
+
 # Build API
 echo "--- Building API..."
 cd /opt/sbx/apps/api
 pnpm build
 
-# Run DB migrations (via journal order)
-echo "--- Running DB migrations..."
-python3 -c "
-import json, subprocess, os, sys
-journal = json.load(open('/opt/sbx/apps/api/drizzle/meta/_journal.json'))
-for entry in journal['entries']:
-    sql_file = f\"/opt/sbx/apps/api/drizzle/{entry['tag']}.sql\"
-    if os.path.exists(sql_file):
-        with open(sql_file) as f:
-            sql = f.read()
-        result = subprocess.run(
-            ['docker', 'compose', '-f', '/opt/sbx/deploy/docker-compose.infra.yml',
-             'exec', '-T', 'postgres', 'psql', '-U', 'sbx', 'sbx'],
-            input=sql, capture_output=True, text=True
-        )
-        print(f'  {entry[\"tag\"]}: OK')
-"
+# Build CDN
+echo "--- Building CDN..."
+cd /opt/sbx/apps/cdn
+pnpm build
+
+# Build Workers
+echo "--- Building Workers..."
+cd /opt/sbx/apps/workers
+pnpm build
 
 # Build Admin
 echo "--- Building Admin..."
@@ -94,7 +122,7 @@ cd /opt/sbx/apps/demo-nextjs
 grep -v '^#' /opt/sbx/deploy/.env.prod | grep -v '^$' > .env.production.local
 pnpm build
 
-# Reload nginx (certbot manages /etc/nginx/sites-available/sbx, do not overwrite)
+# Reload nginx
 echo "--- Reloading nginx..."
 nginx -t && systemctl reload nginx
 
@@ -109,7 +137,7 @@ echo "=== Deploy complete! ==="
 pm2 list
 REMOTE
 
-# 4. Sync golden data (optional, can be slow ~10GB)
+# 5. Sync golden data (optional, can be slow ~10GB)
 if [ "$SKIP_GOLDEN" = false ] && [ -d "golden" ]; then
   echo ">>> Syncing golden data (this may take a while)..."
   rsync -az --info=progress2 golden/ "$SERVER:$APP_DIR/golden/"
@@ -118,5 +146,7 @@ fi
 
 echo ""
 echo "=== Done! ==="
-echo "Admin: http://46.224.90.233"
-echo "API:   http://46.224.90.233 (requests needing API subdomain)"
+echo "Admin: https://sb-x.online"
+echo "API:   https://api.sb-x.online"
+echo "CDN:   https://a.sb-x.online"
+echo "Demo:  https://demo.sb-x.online"

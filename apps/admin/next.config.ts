@@ -5,6 +5,13 @@ const cdnUrl = process.env.NEXT_PUBLIC_CDN_URL ?? 'http://localhost:3002';
 const apiUrl = process.env.API_URL ?? 'http://localhost:3000';
 const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3001';
 
+// Allowed origins for story preview iframes (configured per space in DB,
+// but frame-src must be declared statically here).
+const previewOrigins = (process.env.PREVIEW_ORIGINS ?? 'http://localhost:3003')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+
 // Content-Security-Policy header
 // 'unsafe-inline' for styles is required by shadcn/ui + Tailwind CSS
 // 'unsafe-eval' is restricted to dev only (Next.js HMR requires it)
@@ -12,12 +19,12 @@ const isDev = process.env.NODE_ENV !== 'production';
 
 const cspDirectives = [
   "default-src 'self'",
-  `script-src 'self'${isDev ? " 'unsafe-eval' 'unsafe-inline'" : ''}`,
+  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''}`,
   "style-src 'self' 'unsafe-inline'",
   `img-src 'self' data: blob: ${cdnUrl}`,
   `connect-src 'self' ${apiUrl} ${appUrl} ${cdnUrl}`,
   "font-src 'self'",
-  "frame-src 'self'",
+  `frame-src 'self'${previewOrigins.length ? ` ${previewOrigins.join(' ')}` : ''}`,
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
