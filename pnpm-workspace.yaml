@@ -45,7 +45,7 @@ catalog:
   "rxjs": "^7.8.1"
 
   # ── Runtime – Observability (OpenTelemetry) ───────────────────────────────
-  "@opentelemetry/auto-instrumentations-node": "^0.72.0"
+  "@opentelemetry/auto-instrumentations-node": "^0.75.0"
   "@opentelemetry/exporter-prometheus": "^0.214.0"
   "@opentelemetry/resources": "^2.6.1"
   "@opentelemetry/sdk-node": "^0.214.0"
